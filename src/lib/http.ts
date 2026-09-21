@@ -54,6 +54,19 @@ export async function fetchUtf(url: string, init?: RequestInit & { timeoutMs?: n
   return buf.toString("utf8");
 }
 
+export async function retryOk<T>(times: number, task: () => Promise<T>): Promise<T> {
+  let last: unknown;
+  const attempts = Math.max(1, times);
+  for (let i = 0; i < attempts; i += 1) {
+    try {
+      return await task();
+    } catch (error) {
+      last = error;
+    }
+  }
+  throw last instanceof Error ? last : new UpstreamError("全部重试失败");
+}
+
 export async function fetchJson<T>(url: string, init?: RequestInit & { timeoutMs?: number; referer?: string }): Promise<T> {
   const text = await fetchUtf(url, init);
   try {

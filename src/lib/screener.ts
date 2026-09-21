@@ -123,7 +123,14 @@ async function prefetchKlines(codes: string[], deadline: number, concurrency = 6
 }
 
 export async function screenBoards(): Promise<{ scanned: number; items: ScreenerHit[]; source: string }> {
-  const boards = await listIndustryBoards();
+  let boards: SectorItem[] = [];
+  try {
+    boards = await listIndustryBoards();
+  } catch (error) {
+    console.error("[screener] listIndustryBoards", error);
+    return { scanned: 0, items: [], source: "unknown" };
+  }
+  if (!boards.length) return { scanned: 0, items: [], source: "unknown" };
   const deadline = Date.now() + BOARD_DEADLINE_MS;
 
   const withMembers = await mapPool(boards, 5, async (board) => {

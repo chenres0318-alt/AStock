@@ -5,14 +5,17 @@ import type { BoardMember, SectorItem } from "./types";
 
 export async function listIndustryBoards(): Promise<SectorItem[]> {
   return cached("industry-boards", 10 * 60_000, async () => {
+    const sina = await fetchSinaIndustries().catch(() => [] as SectorItem[]);
+    if (sina.length >= 10) return sina;
     try {
       const em = await fetchIndustryBoards();
       const boards = em.filter((item) => item.code.startsWith("BK"));
       if (boards.length >= 10) return boards;
     } catch {
-      // East Money is optional; Sina CSRC industries are the fallback.
+      // East Money is optional
     }
-    return fetchSinaIndustries();
+    if (sina.length) return sina;
+    return [];
   });
 }
 

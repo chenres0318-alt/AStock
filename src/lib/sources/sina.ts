@@ -1,7 +1,7 @@
 import { cached } from "../cache";
 import { marketOf, toSinaCode, toTencentCode } from "../codes";
 import { toNumber } from "../format";
-import { fetchGbk, fetchUtf } from "../http";
+import { fetchGbk, fetchUtf, retryOk } from "../http";
 import type { BoardMember, KBar, RankItem, SearchItem, SectorItem } from "../types";
 
 type SinaRankRow = {
@@ -27,10 +27,12 @@ async function fetchSinaNodeRows(
   const url =
     `https://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeData` +
     `?page=1&num=${num}&sort=${sort}&asc=${asc}&node=${encodeURIComponent(node)}&_s_r_a=page`;
-  const text = await fetchUtf(url, {
-    referer: "https://vip.stock.finance.sina.com.cn/",
-    timeoutMs: 10000,
-  });
+  const text = await retryOk(2, () =>
+    fetchUtf(url, {
+      referer: "https://vip.stock.finance.sina.com.cn/",
+      timeoutMs: 12000,
+    }),
+  );
   const rows = JSON.parse(text) as SinaRankRow[];
   return Array.isArray(rows) ? rows : [];
 }
@@ -88,10 +90,12 @@ function parseSinaIndustryMap(text: string): Record<string, string> {
 
 export async function fetchSinaIndustries(): Promise<SectorItem[]> {
   return cached("sina-industries", 5 * 60_000, async () => {
-    const text = await fetchGbk("https://money.finance.sina.com.cn/q/view/newFLJK.php?param=industry", {
-      referer: "https://finance.sina.com.cn/",
-      timeoutMs: 10000,
-    });
+    const text = await retryOk(2, () =>
+      fetchGbk("https://money.finance.sina.com.cn/q/view/newFLJK.php?param=industry", {
+        referer: "https://finance.sina.com.cn/",
+        timeoutMs: 12000,
+      }),
+    );
     const obj = parseSinaIndustryMap(text);
     const items: SectorItem[] = [];
     for (const [key, raw] of Object.entries(obj)) {

@@ -150,6 +150,7 @@ export default function Screener() {
       setBoardHits(data.items);
       setSelected(new Set(data.items.map((item) => item.code)));
       setBoardMeta({ scanned: data.scanned, elapsedMs: data.elapsedMs, source: data.source });
+      if (data.error) setError(data.error);
     } catch (err) {
       setError(err instanceof Error ? err.message : "板块筛选失败");
     } finally {
