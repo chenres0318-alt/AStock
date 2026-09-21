@@ -3,7 +3,7 @@ import { DEFAULT_WATCHLIST, INDICES, SECTOR_ETFS, limitPercent, toTencentCode } 
 import { firstOk } from "./http";
 import { getMarketStatus } from "./market-status";
 import { fetchEastMoneySearch, fetchEastMoneySectors } from "./sources/eastmoney";
-import { fetchSinaRank, fetchSinaSuggest } from "./sources/sina";
+import { fetchSinaIndustries, fetchSinaRank, fetchSinaSuggest } from "./sources/sina";
 import { fetchTencentKline, fetchTencentQuotes, fetchTencentTrend } from "./sources/tencent";
 import type {
   KBar,
@@ -84,23 +84,31 @@ export async function getBoards(): Promise<{ limitUp: RankItem[]; limitDown: Ran
 
 export async function getSectors(): Promise<SectorItem[]> {
   return cached("sectors", 15_000, async () => {
-    try {
-      return await fetchEastMoneySectors(20);
-    } catch {
-      const quotes = await fetchTencentQuotes(SECTOR_ETFS.map((item) => item.code));
-      const names = new Map(SECTOR_ETFS.map((item) => [item.code, item.name]));
-      return quotes.map((quote) => ({
-        code: quote.code,
-        name: names.get(quote.code) || quote.name,
-        pct: quote.pct,
-        price: quote.price,
-        leader: quote.name,
-        leaderCode: quote.code,
-        upCount: null,
-        downCount: null,
-        source: "etf" as const,
-      }));
-    }
+    const sinaPromise = fetchSinaIndustries()
+      .then((rows) => rows.slice(0, 20))
+      .catch(() => [] as SectorItem[]);
+    const em = await Promise.race([
+      fetchEastMoneySectors(20).catch(() => [] as SectorItem[]),
+      new Promise<SectorItem[]>((resolve) => {
+        setTimeout(() => resolve([]), 2500);
+      }),
+    ]);
+    if (em.length) return em;
+    const sina = await sinaPromise;
+    if (sina.length) return sina;
+    const quotes = await fetchTencentQuotes(SECTOR_ETFS.map((item) => item.code));
+    const names = new Map(SECTOR_ETFS.map((item) => [item.code, item.name]));
+    return quotes.map((quote) => ({
+      code: quote.code,
+      name: names.get(quote.code) || quote.name,
+      pct: quote.pct,
+      price: quote.price,
+      leader: quote.name,
+      leaderCode: quote.code,
+      upCount: null,
+      downCount: null,
+      source: "etf" as const,
+    }));
   });
 }
 

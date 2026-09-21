@@ -130,6 +130,23 @@ export function limitPercent(code: string, name = ""): number {
   return 10;
 }
 
+export function isStName(name: string): boolean {
+  const upper = name.toUpperCase();
+  return upper.includes("ST") || name.includes("退");
+}
+
+export function isHsAShare(code: string, name = ""): boolean {
+  if (isStName(name)) return false;
+  const tx = toTencentCode(code);
+  if (marketOf(tx) === "BJ") return false;
+  const id = bareCode(tx);
+  return /^(60|68|00|30)\d{4}$/.test(id);
+}
+
+export function isListedStockCode(code: string): boolean {
+  return /^(sh|sz|bj)\d{6}$/i.test(code.trim());
+}
+
 export function isIndexCode(code: string): boolean {
   const tx = toTencentCode(code);
   if (INDEX_CODES.has(tx)) return true;

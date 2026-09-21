@@ -1,11 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { DEFAULT_WATCHLIST } from "@/lib/codes";
 import { formatClock } from "@/lib/format";
 import { pollInterval } from "@/lib/market-status";
 import { loadWatchlist, saveWatchlist } from "@/lib/storage";
 import type { KBar, MarketStatus, Quote, RankItem, SectorItem, TrendPoint, WatchItem } from "@/lib/types";
+import AppHeader from "./AppHeader";
 import ChartView, { type ChartMode } from "./ChartView";
 import IndexStrip from "./IndexStrip";
 import QuotePanel from "./QuotePanel";
@@ -28,6 +30,7 @@ async function readJson<T>(url: string): Promise<T> {
 }
 
 export default function Dashboard() {
+  const searchParams = useSearchParams();
   const [watchlist, setWatchlist] = useState<WatchItem[]>(DEFAULT_WATCHLIST);
   const [selected, setSelected] = useState("sh600519");
   const [indices, setIndices] = useState<Quote[]>([]);
@@ -56,10 +59,11 @@ export default function Dashboard() {
 
   useEffect(() => {
     const saved = loadWatchlist();
+    const fromQuery = searchParams.get("code");
     setWatchlist(saved.items);
-    setSelected(saved.selected);
+    setSelected(fromQuery || saved.selected);
     setReady(true);
-  }, []);
+  }, [searchParams]);
 
   useEffect(() => {
     if (!ready) return;
@@ -175,49 +179,38 @@ export default function Dashboard() {
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-[1600px] flex-col gap-3 p-3">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-end gap-0.5 rounded-lg bg-panel px-1.5 py-1 ring-1 ring-line">
-            <span className="h-5 w-1.5 rounded-sm bg-up" />
-            <span className="h-3 w-1.5 rounded-sm bg-gold" />
-            <span className="h-4 w-1.5 rounded-sm bg-down" />
-          </div>
-          <div>
-            <div className="text-lg font-medium leading-tight">
-              AStock <span className="text-gold">看盘</span>
-            </div>
-            <div className="text-[11px] text-mute">沪深京实时行情 · 红涨绿跌</div>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 text-sm">
-          <span
-            className={`rounded-full px-2.5 py-1 text-xs ${
-              status?.trading ? "bg-up/15 text-up" : "bg-panel text-mute"
-            }`}
-          >
-            {status?.label ?? "连接中"}
-          </span>
-          <span className="num text-xs text-mute">{clock}</span>
-          <button
-            type="button"
-            onClick={() => setAuto((value) => !value)}
-            className={`rounded-full px-2.5 py-1 text-xs ${auto ? "bg-gold text-bg" : "bg-panel text-mute"}`}
-          >
-            {auto ? "自动刷新" : "已暂停"}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              loadOverview().catch((err) => setError(err instanceof Error ? err.message : "刷新失败"));
-              loadChart().catch(() => undefined);
-              loadAux().catch(() => undefined);
-            }}
-            className="rounded-full bg-panel px-2.5 py-1 text-xs text-ink ring-1 ring-line"
-          >
-            立即刷新
-          </button>
-        </div>
-      </header>
+      <AppHeader
+        trailing={
+          <>
+            <span
+              className={`rounded-full px-2.5 py-1 text-xs ${
+                status?.trading ? "bg-up/15 text-up" : "bg-panel text-mute"
+              }`}
+            >
+              {status?.label ?? "连接中"}
+            </span>
+            <span className="num text-xs text-mute">{clock}</span>
+            <button
+              type="button"
+              onClick={() => setAuto((value) => !value)}
+              className={`rounded-full px-2.5 py-1 text-xs ${auto ? "bg-gold text-bg" : "bg-panel text-mute"}`}
+            >
+              {auto ? "自动刷新" : "已暂停"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                loadOverview().catch((err) => setError(err instanceof Error ? err.message : "刷新失败"));
+                loadChart().catch(() => undefined);
+                loadAux().catch(() => undefined);
+              }}
+              className="rounded-full bg-panel px-2.5 py-1 text-xs text-ink ring-1 ring-line"
+            >
+              立即刷新
+            </button>
+          </>
+        }
+      />
 
       {error ? (
         <div className="rounded-lg border border-up/40 bg-up/10 px-3 py-2 text-sm text-up">{error}</div>
