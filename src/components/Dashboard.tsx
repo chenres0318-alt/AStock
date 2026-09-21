@@ -33,7 +33,7 @@ export default function Dashboard() {
   const [indices, setIndices] = useState<Quote[]>([]);
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [status, setStatus] = useState<MarketStatus | null>(null);
-  const [clock, setClock] = useState(formatClock);
+  const [clock, setClock] = useState("");
   const [auto, setAuto] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<ChartMode>("trend");
@@ -67,7 +67,9 @@ export default function Dashboard() {
   }, [watchlist, selected, ready]);
 
   useEffect(() => {
-    const timer = setInterval(() => setClock(formatClock()), 1000);
+    const tick = () => setClock(formatClock());
+    tick();
+    const timer = setInterval(tick, 1000);
     return () => clearInterval(timer);
   }, []);
 
@@ -239,6 +241,7 @@ export default function Dashboard() {
           }}
         />
         <div className="flex min-h-0 flex-col gap-3">
+          <QuotePanel quote={current} />
           <ChartView
             mode={mode}
             onMode={setMode}
@@ -247,7 +250,6 @@ export default function Dashboard() {
             quote={current}
             loading={chartLoading}
           />
-          <QuotePanel quote={current} />
         </div>
         <div className="flex min-h-0 flex-col gap-3">
           <SectorList items={sectors} onPick={pickStock} />
