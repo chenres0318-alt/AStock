@@ -7,7 +7,8 @@
     "dev": "next dev --turbopack --hostname 0.0.0.0 --port 3000",
     "build": "next build",
     "start": "next start --hostname 0.0.0.0 --port 3000",
-    "lint": "eslint"
+    "lint": "eslint",
+    "check:indicators": "node --experimental-strip-types --no-warnings src/lib/indicators.check.ts"
   },
   "dependencies": {
     "iconv-lite": "^0.7.3",

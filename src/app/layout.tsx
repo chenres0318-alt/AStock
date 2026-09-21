@@ -10,7 +10,7 @@ const plex = IBM_Plex_Mono({
 
 export const metadata: Metadata = {
   title: "AStock 看盘",
-  description: "A股实时行情看盘工具：指数、自选、分时K线、板块与涨跌停",
+  description: "A股实时行情看盘工具：指数、自选、分时K线、板块、选股与涨跌停",
   icons: { icon: "/favicon.svg" },
 };
 

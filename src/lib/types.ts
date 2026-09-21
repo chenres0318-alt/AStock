@@ -83,7 +83,16 @@ export type SectorItem = {
   leaderCode: string | null;
   upCount: number | null;
   downCount: number | null;
-  source: "bk" | "etf";
+  source: "bk" | "etf" | "sina";
+};
+
+export type BoardMember = {
+  code: string;
+  name: string;
+  price: number | null;
+  pct: number | null;
+  amount: number | null;
+  turnover: number | null;
 };
 
 export type MarketPhase =
@@ -103,3 +112,19 @@ export type MarketStatus = {
 };
 
 export type KlinePeriod = "day" | "week" | "month";
+
+export type ScreenerHit = {
+  code: string;
+  name: string;
+  boardCode: string;
+  boardName: string;
+  price: number;
+  pct: number | null;
+  turnover: number | null;
+  threeDayPct: number | null;
+  ma5: number;
+  dif: number;
+  dea: number;
+  hist: number;
+  reasons: string[];
+};
