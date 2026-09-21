@@ -1,0 +1,30 @@
+{
+  "name": "astock",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A股实时看盘工具",
+  "scripts": {
+    "dev": "next dev --turbopack --hostname 0.0.0.0 --port 3000",
+    "build": "next build",
+    "start": "next start --hostname 0.0.0.0 --port 3000",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "iconv-lite": "^0.7.3",
+    "lightweight-charts": "^4.2.3",
+    "next": "^15.5.9",
+    "react": "19.1.0",
+    "react-dom": "19.1.0"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "^15.5.9",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}
