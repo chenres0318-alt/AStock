@@ -195,10 +195,10 @@ export default function Screener() {
         <div className="text-sm">技术选股：先板块、再成分股</div>
         <div className="mt-2 grid gap-2 text-xs text-mute md:grid-cols-2">
           <p>
-            板块条件：收盘站上 5 日均线；5 日均线拐头向上；MACD 处于死叉（DIF 在 DEA 下方）；绿柱连续缩短并靠近 0 轴。
+            板块条件：近期首次站上 5 日均线（刚从均线下方站上，代表行情刚启动）；MACD 金叉或死叉，并且靠近 0 轴。
           </p>
           <p>
-            股票在入选板块内再筛：同样满足上述形态，且近 3 日涨幅不超过 4%，换手率不低于 2%。不含 ST / 北交所。
+            股票在入选板块内再筛：同样满足上述形态，且近 3 日涨幅不超过 5%。不含 ST / 北交所。
           </p>
         </div>
       </section>
