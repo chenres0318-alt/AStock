@@ -15,12 +15,18 @@ export type TechFlags = {
   histPrev: number;
   histPrev2: number;
   aboveMa5: boolean;
-  ma5TurnUp: boolean;
+  firstStandMa5: boolean;
+  daysAboveMa5: number;
+  goldenCross: boolean;
   deathCross: boolean;
-  greenShrinking: boolean;
   nearZeroAxis: boolean;
   threeDayPct: number | null;
 };
+
+export const FIRST_STAND_MAX_DAYS = 3;
+export const FIRST_STAND_MIN_BELOW = 3;
+export const STOCK_THREE_DAY_CAP = 5;
+export const MACD_NEAR_ZERO_PCT = 2;
 
 function emaSeries(values: number[], period: number): Array<number | null> {
   const out: Array<number | null> = Array(values.length).fill(null);
@@ -65,27 +71,46 @@ export function macdSeries(closes: number[]): Array<MacdPoint | null> {
   return out;
 }
 
+function consecutiveMa5(
+  closes: number[],
+  index: number,
+  above: boolean,
+): number {
+  let n = 0;
+  for (let k = index; k >= 4; k -= 1) {
+    const ma = maAt(closes, 5, k);
+    if (ma == null) break;
+    const isAbove = closes[k] > ma;
+    if (above ? !isAbove : isAbove) break;
+    n += 1;
+  }
+  return n;
+}
+
 export function analyzeCloses(closes: number[]): TechFlags | null {
   if (closes.length < 40) return null;
   const i = closes.length - 1;
   const ma5 = maAt(closes, 5, i);
   const ma5Prev = maAt(closes, 5, i - 1);
   const ma5Prev2 = maAt(closes, 5, i - 2);
-  const ma5Prev3 = maAt(closes, 5, i - 3);
   const macd = macdSeries(closes);
   const cur = macd[i];
   const prev = macd[i - 1];
   const prev2 = macd[i - 2];
-  if (ma5 == null || ma5Prev == null || ma5Prev2 == null || ma5Prev3 == null || !cur || !prev || !prev2) return null;
+  if (ma5 == null || ma5Prev == null || ma5Prev2 == null || !cur || !prev || !prev2) return null;
 
-  const histWindow = macd
-    .slice(Math.max(0, i - 39), i + 1)
-    .map((item) => (item ? Math.abs(item.hist) : 0));
-  const peak = Math.max(...histWindow, 0.0001);
-  const nearZeroAxis = cur.hist < 0 && Math.abs(cur.hist) <= peak * 0.35;
+  const lineMag = Math.max(Math.abs(cur.dif), Math.abs(cur.dea));
+  const nearZeroAxis = closes[i] > 0 && (lineMag / closes[i]) * 100 <= MACD_NEAR_ZERO_PCT;
+
+  const daysAboveMa5 = consecutiveMa5(closes, i, true);
+  const daysBelowBefore = daysAboveMa5 > 0 ? consecutiveMa5(closes, i - daysAboveMa5, false) : 0;
+  const firstStandMa5 =
+    daysAboveMa5 >= 1 &&
+    daysAboveMa5 <= FIRST_STAND_MAX_DAYS &&
+    daysBelowBefore >= FIRST_STAND_MIN_BELOW;
 
   const threeDayPct =
-    closes.length >= 4 && closes[i - 3] > 0 ? ((closes[i] / closes[i - 3] - 1) * 100) : null;
+    closes.length >= 4 && closes[i - 3] > 0 ? (closes[i] / closes[i - 3] - 1) * 100 : null;
 
   return {
     close: closes[i],
@@ -98,21 +123,21 @@ export function analyzeCloses(closes: number[]): TechFlags | null {
     histPrev: prev.hist,
     histPrev2: prev2.hist,
     aboveMa5: closes[i] > ma5,
-    ma5TurnUp: ma5 > ma5Prev && (ma5Prev <= ma5Prev2 || ma5Prev2 <= ma5Prev3),
+    firstStandMa5,
+    daysAboveMa5,
+    goldenCross: cur.dif > cur.dea,
     deathCross: cur.dif < cur.dea,
-    greenShrinking: cur.hist < 0 && prev.hist < 0 && prev2.hist < 0 && cur.hist > prev.hist && prev.hist > prev2.hist,
     nearZeroAxis,
     threeDayPct,
   };
 }
 
 export function passesBoardTech(tech: TechFlags): boolean {
-  return tech.aboveMa5 && tech.ma5TurnUp && tech.deathCross && tech.greenShrinking && tech.nearZeroAxis;
+  return tech.firstStandMa5 && tech.nearZeroAxis && (tech.goldenCross || tech.deathCross);
 }
 
-export function passesStockTech(tech: TechFlags, turnover: number | null): boolean {
+export function passesStockTech(tech: TechFlags): boolean {
   if (!passesBoardTech(tech)) return false;
-  if (tech.threeDayPct == null || tech.threeDayPct > 4) return false;
-  if (turnover == null || turnover < 2) return false;
+  if (tech.threeDayPct == null || tech.threeDayPct > STOCK_THREE_DAY_CAP) return false;
   return true;
 }

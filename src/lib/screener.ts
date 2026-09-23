@@ -13,11 +13,11 @@ const STOCK_DEADLINE_MS = 95_000;
 
 function reasonsOf(tech: TechFlags): string[] {
   const rows: string[] = [];
-  if (tech.aboveMa5) rows.push("站上五日线");
-  if (tech.ma5TurnUp) rows.push("5日均线拐头向上");
-  if (tech.deathCross) rows.push("MACD死叉期间");
-  if (tech.greenShrinking) rows.push("绿柱缩短");
-  if (tech.nearZeroAxis) rows.push("绿柱靠近0轴");
+  if (tech.firstStandMa5) rows.push("近期首次站上五日线");
+  else if (tech.aboveMa5) rows.push("站上五日线");
+  if (tech.goldenCross && tech.nearZeroAxis) rows.push("MACD金叉接近0轴");
+  else if (tech.deathCross && tech.nearZeroAxis) rows.push("MACD死叉接近0轴");
+  else if (tech.nearZeroAxis) rows.push("MACD接近0轴");
   return rows;
 }
 
@@ -193,8 +193,8 @@ export async function screenStocks(boardCodes: string[]): Promise<{ scanned: num
 
   for (const board of wanted) {
     if (Date.now() > deadline) break;
-    const members = (await listBoardMembers(board.code, 30, "turnover")).filter(
-      (item) => isHsAShare(item.code, item.name) && item.turnover != null && item.turnover >= 2,
+    const members = (await listBoardMembers(board.code, 40, "amount")).filter((item) =>
+      isHsAShare(item.code, item.name),
     );
     grouped.push({ board, members });
   }
@@ -222,7 +222,7 @@ export async function screenStocks(boardCodes: string[]): Promise<{ scanned: num
     try {
       const bars = await stockKline(member.code);
       const tech = analyzeCloses(bars.map((bar) => bar.close));
-      if (!tech || !passesStockTech(tech, member.turnover)) continue;
+        if (!tech || !passesStockTech(tech)) continue;
       items.push(
         toHit(tech, {
           code: member.code,
