@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 const LINKS = [
   { href: "/", label: "看盘" },
   { href: "/screener", label: "选股" },
+  { href: "/backtest", label: "回测" },
 ];
 
 export default function AppHeader({
