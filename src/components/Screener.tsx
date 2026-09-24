@@ -136,9 +136,10 @@ export default function Screener() {
       <AppHeader />
 
       <section className="panel px-4 py-3">
-        <div className="text-sm">选股：近 5 日首次站上五日线，MACD 多头排列或空头减弱</div>
+        <div className="text-sm">选股：近 5 日首次站上五日线，MACD 多头排列或空头减弱（20 日线下只留大阳反包）</div>
         <div className="mt-2 max-w-4xl text-xs leading-5 text-mute">
-          当日收盘站上 5 日均线，且近 5 个交易日里这是第一次。MACD 为多头排列（DIF 大于 DEA 且 DEA 大于 0）或空头减弱（绿柱缩短）。扫描成交额靠前的沪深
+          当日收盘站上 5 日均线，且近 5 个交易日里这是第一次。MACD 为多头排列（DIF 大于 DEA 且 DEA 大于 0）或空头减弱（绿柱缩短）。股价在 20
+          日均线下方时，空头减弱只保留当天涨幅至少 5% 或振幅至少 8% 的阳线反包，用来去掉下跌中继里反复轻站五日线的假买点。扫描成交额靠前的沪深
           A 股，不含 ST / 北交所。看盘页日 K 用同一规则标出历史买点。
         </div>
       </section>
@@ -172,7 +173,7 @@ export default function Screener() {
         />
         {loading ? (
           <div className="px-4 py-8 text-center text-sm text-mute">
-            正在拉取沪深 A 股日线，匹配近 5 日首次站上五日线与 MACD 条件，大约需要一分钟。
+            正在拉取沪深 A 股日线，匹配近 5 日首次站上五日线与 MACD 条件（下跌趋势会过滤弱反抽），大约需要一分钟。
           </div>
         ) : (
           <HitTable items={hits} onOpen={openStock} />

@@ -52,6 +52,14 @@ function bearBounceStand(): number[] {
   return closes;
 }
 
+/** Decline then a tiny poke above MA5 — the 中国平安-style false buy. */
+function weakWeaveStand(): number[] {
+  const closes = fallingCloses(50, 22, 0.16);
+  const last = closes[closes.length - 1];
+  closes.push(Number((last * 1.018).toFixed(4)));
+  return closes;
+}
+
 const sma10 = [22.27, 22.19, 22.08, 22.17, 22.18, 22.13, 22.23, 22.43, 22.24, 22.29];
 almost(maAt(sma10, 10, 9)!, sma10.reduce((sum, value) => sum + value, 0) / 10);
 
@@ -97,8 +105,18 @@ const bounceBars = barsFromCloses(bearBounceStand());
 const bounce = analyzeBars(bounceBars)!;
 assert(bounce.firstStandMa5, "bounce from a decline should first stand on MA5");
 assert(bounce.macdBearWeak || bounce.macdBull, "decline bounce should show weakening bear or flipped MACD");
-assert(passesScreen(bounce), "first stand plus weakening MACD should pass");
+assert(bounce.strongReclaim, "8% bounce should count as a strong reclaim");
+assert(passesScreen(bounce), "first stand plus strong MACD reclaim should pass");
 assert(findBuyPoints(bounceBars).some((point) => point.time === bounceBars[bounceBars.length - 1].time));
+assert(screenReasons(bounce).includes("大阳反包") || !bounce.belowMa20, "below-MA20 bounce should be labeled 大阳反包");
+
+const weaveBars = barsFromCloses(weakWeaveStand());
+const weave = analyzeBars(weaveBars)!;
+assert(weave.firstStandMa5, "tiny poke can still first-stand MA5");
+assert(weave.belowMa20, "slow decline weave should remain below MA20");
+assert(weave.strongReclaim === false, "1.8% poke is not a strong reclaim");
+assert(!passesScreen(weave), "downtrend weave below MA20 should not be a buy");
+assert(!findBuyPoints(weaveBars).some((point) => point.time === weaveBars[weaveBars.length - 1].time));
 
 console.log("indicators.check ok", {
   bull: { firstStandMa5: bull.firstStandMa5, macdBull: bull.macdBull, macdBearWeak: bull.macdBearWeak, dea: bull.dea.toFixed(3) },
