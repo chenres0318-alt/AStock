@@ -41,8 +41,8 @@ function HitTable({
             <th className="px-3 py-2 font-normal">股票</th>
             <th className="px-3 py-2 font-normal text-right">现价 / MA5</th>
             <th className="px-3 py-2 font-normal text-right">涨跌幅</th>
-            <th className="px-3 py-2 font-normal text-right">振幅</th>
-            <th className="px-3 py-2 font-normal text-right">换手</th>
+            <th className="px-3 py-2 font-normal text-right">DIF</th>
+            <th className="px-3 py-2 font-normal text-right">DEA</th>
             <th className="px-3 py-2 font-normal">条件</th>
             <th className="px-3 py-2 font-normal"></th>
           </tr>
@@ -61,12 +61,8 @@ function HitTable({
                 <div className="num text-[11px] text-mute">{formatPrice(item.ma5)}</div>
               </td>
               <td className={`num px-3 py-2 text-right ${toneClass(item.pct)}`}>{formatPct(item.pct)}</td>
-              <td className="num px-3 py-2 text-right text-mute">
-                {item.amplitudePct == null ? "--" : `${item.amplitudePct.toFixed(2)}%`}
-              </td>
-              <td className="num px-3 py-2 text-right">
-                {item.turnover == null ? "--" : `${item.turnover.toFixed(2)}%`}
-              </td>
+              <td className={`num px-3 py-2 text-right ${toneClass(item.dif)}`}>{item.dif.toFixed(3)}</td>
+              <td className={`num px-3 py-2 text-right ${toneClass(item.dea)}`}>{item.dea.toFixed(3)}</td>
               <td className="px-3 py-2">
                 <div className="flex flex-wrap gap-1">
                   {item.reasons.map((reason) => (
@@ -140,11 +136,10 @@ export default function Screener() {
       <AppHeader />
 
       <section className="panel px-4 py-3">
-        <div className="text-sm">选股：五日线拐头向上，当日放量红柱站上五日线</div>
+        <div className="text-sm">选股：近 5 日首次站上五日线，MACD 多头排列或空头减弱</div>
         <div className="mt-2 max-w-4xl text-xs leading-5 text-mute">
-          当天 5 日均线拐头向上；此前大部分时间 5 日线向下，且股价运行在 5 日线下方。当日收盘站上 5 日线，K
-          线为放量红柱（阳线且成交量不低于近 5 日均量的 1.2 倍）。换手率不低于 2.5%，振幅不低于 2%。扫描成交额靠前的沪深
-          A 股，不含 ST / 北交所，不再先筛板块。
+          当日收盘站上 5 日均线，且近 5 个交易日里这是第一次。MACD 为多头排列（DIF 大于 DEA 且 DEA 大于 0）或空头减弱（绿柱缩短）。扫描成交额靠前的沪深
+          A 股，不含 ST / 北交所。看盘页日 K 用同一规则标出历史买点。
         </div>
       </section>
 
@@ -177,7 +172,7 @@ export default function Screener() {
         />
         {loading ? (
           <div className="px-4 py-8 text-center text-sm text-mute">
-            正在拉取换手不低于 2.5% 的沪深 A 股日线，匹配五日线拐头与放量红柱，大约需要一分钟。
+            正在拉取沪深 A 股日线，匹配近 5 日首次站上五日线与 MACD 条件，大约需要一分钟。
           </div>
         ) : (
           <HitTable items={hits} onOpen={openStock} />

@@ -10,19 +10,19 @@ import type { KBar, RankItem, ScreenerHit } from "./types";
 const SCAN_DEADLINE_MS = 95_000;
 const UNIVERSE_SIZE = 360;
 const KLINE_CONCURRENCY = 8;
-const MIN_TURNOVER = 2.5;
+const MIN_BARS = 40;
 
 async function stockKline(code: string): Promise<KBar[]> {
   try {
     return await cached(`screener-kline:${code}`, 10 * 60_000, async () => {
       try {
         const bars = await fetchTencentKline(code, "day", 90);
-        if (bars.length >= 20) return bars;
+        if (bars.length >= MIN_BARS) return bars;
       } catch {
         // try Sina
       }
       const bars = await fetchSinaKline(code, 90);
-      if (bars.length >= 20) return bars;
+      if (bars.length >= MIN_BARS) return bars;
       throw new Error(`kline unavailable: ${code}`);
     });
   } catch {
@@ -58,8 +58,10 @@ function toHit(
     turnover: meta.turnover,
     amplitudePct: tech.amplitudePct,
     ma5: tech.ma5,
+    dif: tech.dif,
+    dea: tech.dea,
     hist: tech.hist,
-    reasons: screenReasons(tech, meta.turnover),
+    reasons: screenReasons(tech),
   };
 }
 
@@ -70,9 +72,7 @@ export async function screenStocks(): Promise<{
   source: string;
 }> {
   const { items: ranked, source } = await liquidUniverse(UNIVERSE_SIZE);
-  const candidates = ranked.filter(
-    (item) => isHsAShare(item.code, item.name) && item.turnover != null && item.turnover >= MIN_TURNOVER,
-  );
+  const candidates = ranked.filter((item) => isHsAShare(item.code, item.name));
   const deadline = Date.now() + SCAN_DEADLINE_MS;
 
   await mapPool(candidates, KLINE_CONCURRENCY, async (item) => {
@@ -91,11 +91,11 @@ export async function screenStocks(): Promise<{
     scanned += 1;
     try {
       const bars = await stockKline(item.code);
-      if (bars.length < 20) continue;
+      if (bars.length < MIN_BARS) continue;
       const last = bars[bars.length - 1];
       if (!last.volume) continue;
       const tech = analyzeBars(bars);
-      if (!tech || !passesScreen(tech, item.turnover)) continue;
+      if (!tech || !passesScreen(tech)) continue;
       items.push(
         toHit(tech, {
           code: item.code,
@@ -110,6 +110,6 @@ export async function screenStocks(): Promise<{
     }
   }
 
-  items.sort((a, b) => (b.turnover ?? -1) - (a.turnover ?? -1));
+  items.sort((a, b) => (b.hist ?? -Infinity) - (a.hist ?? -Infinity));
   return { scanned, universe: candidates.length, items, source };
 }
