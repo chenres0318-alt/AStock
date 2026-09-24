@@ -34,8 +34,9 @@ export async function getOverview(codes: string[]) {
 }
 
 export async function getKline(code: string, period: KlinePeriod): Promise<KBar[]> {
-  return cached(`kline:${toTencentCode(code)}:${period}`, 20_000, () =>
-    fetchTencentKline(code, period),
+  const count = period === "day" ? 500 : 180;
+  return cached(`kline:${toTencentCode(code)}:${period}:${count}`, 20_000, () =>
+    fetchTencentKline(code, period, count),
   );
 }
 

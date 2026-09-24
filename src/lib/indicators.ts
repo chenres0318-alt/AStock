@@ -69,10 +69,8 @@ export function macdSeries(closes: number[]): Array<MacdPoint | null> {
 
 const MA5_LOOK = 8;
 
-export function analyzeBars(bars: KBar[]): ScreenFlags | null {
-  if (bars.length < 20) return null;
-  const i = bars.length - 1;
-  const closes = bars.map((bar) => bar.close);
+export function analyzeBarsAt(bars: KBar[], i: number, closes = bars.map((bar) => bar.close)): ScreenFlags | null {
+  if (i < 19 || i >= bars.length) return null;
   const ma5 = maAt(closes, 5, i);
   const ma5Prev = maAt(closes, 5, i - 1);
   const ma5Prev2 = maAt(closes, 5, i - 2);
@@ -130,17 +128,14 @@ export function analyzeBars(bars: KBar[]): ScreenFlags | null {
   const volAvg = volN ? volSum / volN : 0;
   const volumeUp = volAvg > 0 && bars[i].volume >= volAvg * 1.2;
 
-  const macd = macdSeries(closes);
-  const cur = macd[i];
-
   return {
     close: bars[i].close,
     open: bars[i].open,
     ma5,
     ma5Prev,
-    dif: cur?.dif ?? 0,
-    dea: cur?.dea ?? 0,
-    hist: cur?.hist ?? 0,
+    dif: 0,
+    dea: 0,
+    hist: 0,
     dayPct,
     amplitudePct,
     aboveMa5: closes[i] > ma5,
@@ -150,6 +145,39 @@ export function analyzeBars(bars: KBar[]): ScreenFlags | null {
     redBar,
     volumeUp,
   };
+}
+
+export function analyzeBars(bars: KBar[]): ScreenFlags | null {
+  if (bars.length < 20) return null;
+  const flags = analyzeBarsAt(bars, bars.length - 1);
+  if (!flags) return null;
+  const macd = macdSeries(bars.map((bar) => bar.close));
+  const cur = macd[bars.length - 1];
+  return {
+    ...flags,
+    dif: cur?.dif ?? 0,
+    dea: cur?.dea ?? 0,
+    hist: cur?.hist ?? 0,
+  };
+}
+
+export type BuyPoint = {
+  time: string;
+  close: number;
+  turnover: number | null;
+};
+
+export function findBuyPoints(bars: KBar[]): BuyPoint[] {
+  const points: BuyPoint[] = [];
+  const closes = bars.map((bar) => bar.close);
+  for (let i = 19; i < bars.length; i += 1) {
+    const tech = analyzeBarsAt(bars, i, closes);
+    if (!tech) continue;
+    const turnover = bars[i].turnover ?? null;
+    if (!passesScreen(tech, turnover)) continue;
+    points.push({ time: bars[i].time, close: bars[i].close, turnover });
+  }
+  return points;
 }
 
 export function screenReasons(tech: ScreenFlags, turnover: number | null): string[] {
