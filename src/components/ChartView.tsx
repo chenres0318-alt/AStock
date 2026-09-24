@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ColorType,
   CrosshairMode,
@@ -13,7 +13,8 @@ import {
   type Time,
   type UTCTimestamp,
 } from "lightweight-charts";
-import { buildRedRibbon, maAt, type RibbonPoint } from "@/lib/indicators";
+import { formatPrice } from "@/lib/format";
+import { buildRedRibbon, klineRangeChange, maAt, type RibbonPoint } from "@/lib/indicators";
 import type { KBar, Quote, TrendPoint } from "@/lib/types";
 
 export type ChartMode = "trend" | "day" | "week" | "month";
@@ -110,6 +111,31 @@ function magnifiedPriceRange(chart: IChartApi, bars: KBar[]): AutoscaleInfo | nu
   return { priceRange: { minValue: mid - half, maxValue: mid + half } };
 }
 
+type BarSpan = { from: string; to: string };
+
+function selectionBox(chart: IChartApi, from: string, to: string): { left: number; width: number } | null {
+  const start = from <= to ? from : to;
+  const end = from <= to ? to : from;
+  const scale = chart.timeScale();
+  const x1 = scale.timeToCoordinate(start as Time);
+  const x2 = scale.timeToCoordinate(end as Time);
+  if (x1 == null || x2 == null) return null;
+  const spacing = scale.options().barSpacing;
+  const left = Math.min(x1, x2) - spacing / 2;
+  const right = Math.max(x1, x2) + spacing / 2;
+  return { left, width: Math.max(spacing, right - left) };
+}
+
+function barTimeAt(chart: IChartApi, bars: KBar[], x: number): string | null {
+  if (bars.length === 0) return null;
+  const time = chart.timeScale().coordinateToTime(x);
+  if (typeof time === "string") return time;
+  const logical = chart.timeScale().coordinateToLogical(x);
+  if (logical == null) return null;
+  const index = Math.min(bars.length - 1, Math.max(0, Math.round(logical)));
+  return bars[index]?.time ?? null;
+}
+
 export default function ChartView({
   mode,
   onMode,
@@ -137,9 +163,34 @@ export default function ChartView({
   const barsRef = useRef(bars);
   const modeRef = useRef(mode);
   const rangeKeyRef = useRef("");
+  const dragRef = useRef<BarSpan | null>(null);
+  const pickedRef = useRef<BarSpan | null>(null);
+  const placeRef = useRef<() => void>(() => {});
+  const [rangeMode, setRangeMode] = useState(false);
+  const [picked, setPicked] = useState<BarSpan | null>(null);
+  const [highlight, setHighlight] = useState<{ left: number; width: number } | null>(null);
+  const seriesKey = `${mode}:${bars[0]?.time ?? ""}:${bars.at(-1)?.time ?? ""}`;
+  const [trackedKey, setTrackedKey] = useState(seriesKey);
+  if (trackedKey !== seriesKey) {
+    setTrackedKey(seriesKey);
+    setRangeMode(false);
+    setPicked(null);
+    setHighlight(null);
+    dragRef.current = null;
+  }
   viewRef.current = { mode, barCount: bars.length };
   barsRef.current = bars;
   modeRef.current = mode;
+  pickedRef.current = trackedKey === seriesKey ? picked : null;
+  placeRef.current = () => {
+    const chart = chartRef.current;
+    const span = dragRef.current ?? pickedRef.current;
+    if (!chart || !span || modeRef.current === "trend") {
+      setHighlight(null);
+      return;
+    }
+    setHighlight(selectionBox(chart, span.from, span.to));
+  };
 
   useEffect(() => {
     const el = boxRef.current;
@@ -182,8 +233,12 @@ export default function ChartView({
       chart.timeScale().applyOptions({
         barSpacing: Math.min(96, Math.max(2, next)),
       });
+      requestAnimationFrame(() => placeRef.current());
     };
-    el.addEventListener("wheel", onWheel, { passive: false });
+    const wheelHost = el.parentElement ?? el;
+    wheelHost.addEventListener("wheel", onWheel, { passive: false });
+    const onVisible = () => placeRef.current();
+    chart.timeScale().subscribeVisibleLogicalRangeChange(onVisible);
     const autoscaleInfoProvider = (original: () => AutoscaleInfo | null) => {
       if (modeRef.current === "trend") return original();
       return magnifiedPriceRange(chart, barsRef.current) ?? original();
@@ -242,10 +297,12 @@ export default function ChartView({
     const ro = new ResizeObserver(() => {
       const { mode: currentMode, barCount } = viewRef.current;
       applyTimeScale(chart, currentMode, barCount, false);
+      requestAnimationFrame(() => placeRef.current());
     });
     ro.observe(el);
     return () => {
-      el.removeEventListener("wheel", onWheel);
+      wheelHost.removeEventListener("wheel", onWheel);
+      chart.timeScale().unsubscribeVisibleLogicalRangeChange(onVisible);
       ro.disconnect();
       chart.remove();
       chartRef.current = null;
@@ -377,7 +434,48 @@ export default function ChartView({
     const resetRange = rangeKeyRef.current !== rangeKey;
     rangeKeyRef.current = rangeKey;
     applyTimeScale(chart, mode, bars.length, resetRange);
+    requestAnimationFrame(() => placeRef.current());
   }, [bars, trend, mode]);
+
+  const stats = useMemo(() => {
+    if (!picked || mode === "trend") return null;
+    return klineRangeChange(bars, picked.from, picked.to);
+  }, [picked, bars, mode]);
+
+  const timeFromClientX = (clientX: number) => {
+    const chart = chartRef.current;
+    const box = boxRef.current;
+    if (!chart || !box) return null;
+    return barTimeAt(chart, barsRef.current, clientX - box.getBoundingClientRect().left);
+  };
+
+  const onRangePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    const time = timeFromClientX(event.clientX);
+    if (!time) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    const next = { from: time, to: time };
+    dragRef.current = next;
+    setPicked(next);
+    const chart = chartRef.current;
+    setHighlight(chart ? selectionBox(chart, time, time) : null);
+  };
+
+  const onRangePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const drag = dragRef.current;
+    if (!drag) return;
+    const time = timeFromClientX(event.clientX);
+    if (!time || time === drag.to) return;
+    const next = { from: drag.from, to: time };
+    dragRef.current = next;
+    setPicked(next);
+    const chart = chartRef.current;
+    setHighlight(chart ? selectionBox(chart, next.from, next.to) : null);
+  };
+
+  const onRangePointerUp = () => {
+    dragRef.current = null;
+  };
   const tabs: Array<{ id: ChartMode; label: string }> = [
     { id: "trend", label: "分时" },
     { id: "day", label: "日K" },
@@ -388,7 +486,7 @@ export default function ChartView({
   return (
     <section className="panel flex h-[380px] shrink-0 flex-col overflow-hidden">
       <div className="flex items-center justify-between border-b border-line px-3 py-2">
-        <div className="flex gap-1">
+        <div className="flex items-center gap-1">
           {tabs.map((tab) => (
             <button
               key={tab.id}
@@ -401,6 +499,32 @@ export default function ChartView({
               {tab.label}
             </button>
           ))}
+          <span className="mx-1 h-3 w-px bg-line" />
+          <button
+            type="button"
+            aria-pressed={rangeMode}
+            disabled={mode === "trend"}
+            onClick={() => {
+              if (mode === "trend") return;
+              if (rangeMode) {
+                dragRef.current = null;
+                setPicked(null);
+                setHighlight(null);
+                setRangeMode(false);
+                return;
+              }
+              setRangeMode(true);
+            }}
+            className={`rounded px-2.5 py-1 text-xs ${
+              mode === "trend"
+                ? "cursor-not-allowed text-mute/40"
+                : rangeMode
+                  ? "bg-gold text-bg"
+                  : "text-mute hover:bg-panel-2 hover:text-ink"
+            }`}
+          >
+            区间统计
+          </button>
         </div>
         <div className="text-[11px] text-mute">
           {quote?.name ?? ""}{" "}
@@ -413,10 +537,69 @@ export default function ChartView({
       </div>
       <div className="relative min-h-0 flex-1">
         <div ref={boxRef} className="absolute inset-0" />
+        {highlight && mode !== "trend" ? (
+          <div
+            className="pointer-events-none absolute bottom-0 top-0 z-10 bg-gold/15"
+            style={{
+              left: highlight.left,
+              width: highlight.width,
+              boxShadow: "inset 0 0 0 1px rgba(228,180,84,0.7)",
+            }}
+          />
+        ) : null}
+        {stats && highlight ? <RangeChip stats={stats} highlight={highlight} plotWidth={boxRef.current?.clientWidth ?? 0} /> : null}
+        {rangeMode && mode !== "trend" && !stats ? (
+          <div className="pointer-events-none absolute left-3 top-2 z-30 rounded bg-panel/80 px-2 py-1 text-[11px] text-mute">
+            拖拽选择 K 线区间
+          </div>
+        ) : null}
+        {rangeMode && mode !== "trend" ? (
+          <div
+            className="absolute inset-0 z-20 cursor-crosshair"
+            onPointerDown={onRangePointerDown}
+            onPointerMove={onRangePointerMove}
+            onPointerUp={onRangePointerUp}
+            onPointerCancel={onRangePointerUp}
+          />
+        ) : null}
         {loading ? (
-          <div className="absolute inset-0 grid place-items-center bg-panel/40 text-sm text-mute">行情图加载中…</div>
+          <div className="absolute inset-0 z-40 grid place-items-center bg-panel/40 text-sm text-mute">行情图加载中…</div>
         ) : null}
       </div>
     </section>
+  );
+}
+
+function RangeChip({
+  stats,
+  highlight,
+  plotWidth,
+}: {
+  stats: NonNullable<ReturnType<typeof klineRangeChange>>;
+  highlight: { left: number; width: number };
+  plotWidth: number;
+}) {
+  const sameYear = stats.from.slice(0, 4) === stats.to.slice(0, 4);
+  const dates = sameYear
+    ? `${stats.from.slice(0, 4)}  ${stats.from.slice(5)} → ${stats.to.slice(5)}`
+    : `${stats.from} → ${stats.to}`;
+  const tone = stats.pct > 0 ? "text-up" : stats.pct < 0 ? "text-down" : "text-flat";
+  const pct = `${stats.pct > 0 ? "+" : ""}${(stats.pct * 100).toFixed(2)}%`;
+  const center = highlight.left + highlight.width / 2;
+  const margin = 110;
+  const rightLimit = Math.max(margin, plotWidth - 72 - margin);
+  const left = Math.min(Math.max(center, margin), rightLimit);
+  return (
+    <div
+      className="num pointer-events-none absolute z-30 -translate-x-1/2 rounded border border-line bg-panel/95 px-2 py-1 text-[11px] leading-4 shadow"
+      style={{ left, top: 8 }}
+    >
+      <div className="text-mute">
+        {dates} · {stats.count}根
+      </div>
+      <div>
+        {formatPrice(stats.start)} → {formatPrice(stats.end)} <span className={tone}>{pct}</span>
+      </div>
+    </div>
   );
 }
