@@ -42,11 +42,18 @@ function formatChartTime(time: unknown, withDate: boolean): string {
   }).format(new Date(ts * 1000));
 }
 
-function ribbonSeriesData(points: RibbonPoint[], layer: number, side: "up" | "down") {
-  return points.map((point) => {
-    if (point.direction[layer] === side) return { time: point.time, value: point.values[layer] };
-    return { time: point.time };
-  });
+function ribbonSeriesData(points: RibbonPoint[], layer: number) {
+  const data: Array<{ time: string; value: number; color: string }> = [];
+  for (const point of points) {
+    const direction = point.direction[layer];
+    if (direction == null) continue;
+    data.push({
+      time: point.time,
+      value: point.values[layer],
+      color: direction === "up" ? UP : RIBBON_CYAN,
+    });
+  }
+  return data;
 }
 
 function ma5Line(bars: KBar[]): Array<{ time: string; value: number }> {
@@ -215,16 +222,6 @@ export default function ChartView({
           autoscaleInfoProvider,
         }),
       );
-      ribbons.push(
-        chart.addLineSeries({
-          color: RIBBON_CYAN,
-          lineWidth: 1,
-          priceLineVisible: false,
-          lastValueVisible: false,
-          crosshairMarkerVisible: false,
-          autoscaleInfoProvider,
-        }),
-      );
     }
     ribbonRef.current = ribbons;
     const vol = chart.addHistogramSeries({
@@ -336,9 +333,8 @@ export default function ChartView({
     line.setMarkers([]);
     avg.setData([]);
     const ribbon = buildRedRibbon(bars);
-    ribbonRef.current.forEach((series, index) => {
-      const layer = Math.floor(index / 2);
-      series.setData(ribbonSeriesData(ribbon.points, layer, index % 2 === 0 ? "up" : "down"));
+    ribbonRef.current.forEach((series, layer) => {
+      series.setData(ribbonSeriesData(ribbon.points, layer));
     });
     candle.setData(
       bars.map((bar) => ({
