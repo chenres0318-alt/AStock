@@ -1,4 +1,4 @@
-import { adxSeries, analyzeBars, buildRedRibbon, findBuyPoints, findTrendSwingBuys, maAt, macdSeries, passesScreen, screenReasons, tdSequential } from "./indicators.ts";
+import { adxSeries, analyzeBars, buildRedRibbon, findBuyPoints, findTrendSwingBuys, klineRangeChange, maAt, macdSeries, passesScreen, screenReasons, tdSequential } from "./indicators.ts";
 import type { KBar } from "./types.ts";
 
 function assert(cond: unknown, message: string) {
@@ -235,6 +235,14 @@ assert(!ribbonSwing.points[firstBuyAt - 1].direction.every((item) => item === "u
 const chop = Array.from({ length: 160 }, (_, i) => barAt(i, 20 + Math.sin(i / 2) * 0.08));
 assert(buildRedRibbon(chop).signals.every((item) => item.side !== "buy"), "a tight box does not produce a ribbon buy");
 assert(adxSeries(chop).every((value) => value == null || value <= 22), "a tight box stays at or below the ADX gate");
+
+const rangeBars = [10, 11, 12].map((close, index) => barAt(index, close));
+const forward = klineRangeChange(rangeBars, rangeBars[0].time, rangeBars[2].time);
+assert(forward?.count === 3 && forward.from === rangeBars[0].time && forward.to === rangeBars[2].time, "range change uses close to close");
+almost(forward?.pct ?? NaN, 0.2);
+const reversed = klineRangeChange(rangeBars, rangeBars[2].time, rangeBars[0].time);
+assert(reversed?.from === forward?.from && reversed?.to === forward?.to && reversed?.count === 3, "a right-to-left drag uses the same interval");
+assert(klineRangeChange([], "a", "b") === null, "an empty range has no change");
 
 console.log("indicators.check ok", {
   bull: { firstStandMa5: bull.firstStandMa5, macdBull: bull.macdBull, macdBearWeak: bull.macdBearWeak, dea: bull.dea.toFixed(3) },

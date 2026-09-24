@@ -419,3 +419,22 @@ export function buildRedRibbon(bars: KBar[]): { points: RibbonPoint[]; signals: 
   }
   return { points, signals };
 }
+
+/** 区间涨跌：起点收盘到终点收盘。from / to 顺序不限。 */
+export function klineRangeChange(bars: KBar[], from: string, to: string) {
+  const start = from <= to ? from : to;
+  const end = from <= to ? to : from;
+  const slice = bars.filter((bar) => bar.time >= start && bar.time <= end);
+  if (slice.length === 0 || !(slice[0].close > 0)) return null;
+  const first = slice[0];
+  const last = slice[slice.length - 1];
+  return {
+    from: first.time,
+    to: last.time,
+    start: first.close,
+    end: last.close,
+    change: last.close - first.close,
+    pct: last.close / first.close - 1,
+    count: slice.length,
+  };
+}
