@@ -141,12 +141,10 @@ export default function Screener() {
 
       <section className="panel px-4 py-3">
         <div className="text-sm">选股：五日线拐头向上，当日放量红柱站上五日线</div>
-        <div className="mt-2 grid gap-2 text-xs text-mute md:grid-cols-2">
-          <p>
-            当天 5 日均线拐头向上；此前大部分时间 5 日线向下，且股价运行在 5 日线下方。当日收盘站上 5 日线，K
-            线为放量红柱（阳线且成交量大于近 5 日均量）。
-          </p>
-          <p>换手率不低于 2.5%，振幅不低于 2%。扫描成交额靠前的沪深 A 股，不含 ST / 北交所，不再先筛板块。</p>
+        <div className="mt-2 max-w-4xl text-xs leading-5 text-mute">
+          当天 5 日均线拐头向上；此前大部分时间 5 日线向下，且股价运行在 5 日线下方。当日收盘站上 5 日线，K
+          线为放量红柱（阳线且成交量不低于近 5 日均量的 1.2 倍）。换手率不低于 2.5%，振幅不低于 2%。扫描成交额靠前的沪深
+          A 股，不含 ST / 北交所，不再先筛板块。
         </div>
       </section>
 
