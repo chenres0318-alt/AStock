@@ -116,13 +116,13 @@ export type KlinePeriod = "day" | "week" | "month";
 export type ScreenerHit = {
   code: string;
   name: string;
-  boardCode: string;
-  boardName: string;
   price: number;
   pct: number | null;
   turnover: number | null;
   threeDayPct: number | null;
+  pullbackPct: number | null;
   ma5: number;
+  ma10: number;
   dif: number;
   dea: number;
   hist: number;
