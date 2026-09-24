@@ -311,8 +311,8 @@ export default function ChartView({
           {loading
             ? "加载中…"
             : mode === "trend"
-              ? "黄线现价 蓝线均价 · 红涨九转 绿跌九转"
-              : "黄线MA5 · 红涨九转 绿跌九转"}
+              ? "黄线现价 蓝线均价 · 九转当前从 1 标，走完才留下"
+              : "黄线MA5 · 九转当前从 1 标，走完才留下"}
         </div>
       </div>
       <div className="relative min-h-0 flex-1">

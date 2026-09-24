@@ -155,28 +155,48 @@ export type TdMark<T = string> = {
   side: "up" | "down";
 };
 
-/** TD Setup：收盘价与 4 根之前比较，同向连续计数，满 9 后若仍同向则从 1 重新计。 */
+/**
+ * TD Setup。新的一段必须先出现价格翻转（本根相对 4 根前的方向，和前一根相反），
+ * 然后连续 9 根都满足才保留 1–9。中途断开的整段丢掉。数满 9 后不再顺延重计，
+ * 要等下一次翻转。正在走的一段从 1 就开始标，方便当天看到翻转；
+ * 没走完的历史段不保留，避免事后看起来每个 1 都成功。
+ */
 export function tdSequential<T>(points: Array<{ time: T; close: number }>): Array<TdMark<T>> {
-  const marks: Array<TdMark<T>> = [];
-  let up = 0;
-  let down = 0;
+  const completed: Array<TdMark<T>> = [];
+  let active: Array<TdMark<T>> | null = null;
+
   for (let i = 4; i < points.length; i += 1) {
     const close = points[i].close;
-    const ref = points[i - 4].close;
-    if (close > ref) {
-      down = 0;
-      up = up >= 9 ? 1 : up + 1;
-      marks.push({ time: points[i].time, count: up, side: "up" });
-    } else if (close < ref) {
-      up = 0;
-      down = down >= 9 ? 1 : down + 1;
-      marks.push({ time: points[i].time, count: down, side: "down" });
-    } else {
-      up = 0;
-      down = 0;
+    const up = close > points[i - 4].close;
+    const down = close < points[i - 4].close;
+    let bearishFlip = up;
+    let bullishFlip = down;
+    if (i >= 5) {
+      const prevUp = points[i - 1].close > points[i - 5].close;
+      const prevDown = points[i - 1].close < points[i - 5].close;
+      bearishFlip = up && !prevUp;
+      bullishFlip = down && !prevDown;
     }
+
+    if (active) {
+      const side = active[0].side;
+      const keeps = side === "up" ? up : down;
+      if (keeps && active.length < 9) {
+        active.push({ time: points[i].time, count: active.length + 1, side });
+        if (active.length === 9) {
+          completed.push(...active);
+          active = null;
+        }
+        continue;
+      }
+      active = null;
+    }
+
+    if (bearishFlip) active = [{ time: points[i].time, count: 1, side: "up" }];
+    else if (bullishFlip) active = [{ time: points[i].time, count: 1, side: "down" }];
   }
-  return marks;
+
+  return active ? completed.concat(active) : completed;
 }
 
 export function findBuyPoints(bars: KBar[]): BuyPoint[] {
