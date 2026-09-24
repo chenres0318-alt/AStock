@@ -67,7 +67,7 @@ export function macdSeries(closes: number[]): Array<MacdPoint | null> {
   return out;
 }
 
-const MA5_LOOK = 10;
+const MA5_LOOK = 8;
 
 export function analyzeBars(bars: KBar[]): ScreenFlags | null {
   if (bars.length < 20) return null;
@@ -75,8 +75,20 @@ export function analyzeBars(bars: KBar[]): ScreenFlags | null {
   const closes = bars.map((bar) => bar.close);
   const ma5 = maAt(closes, 5, i);
   const ma5Prev = maAt(closes, 5, i - 1);
+  const ma5Prev2 = maAt(closes, 5, i - 2);
+  const ma5Prev3 = maAt(closes, 5, i - 3);
+  const ma5Prev4 = maAt(closes, 5, i - 4);
   const ma5Anchor = maAt(closes, 5, i - MA5_LOOK);
-  if (ma5 == null || ma5Prev == null || ma5Anchor == null) return null;
+  if (
+    ma5 == null ||
+    ma5Prev == null ||
+    ma5Prev2 == null ||
+    ma5Prev3 == null ||
+    ma5Prev4 == null ||
+    ma5Anchor == null
+  ) {
+    return null;
+  }
 
   let downSteps = 0;
   let slopeCount = 0;
@@ -87,8 +99,10 @@ export function analyzeBars(bars: KBar[]): ScreenFlags | null {
     slopeCount += 1;
     if (cur < prev) downSteps += 1;
   }
-  const priorMa5Down = slopeCount >= 6 && downSteps >= Math.ceil(slopeCount * 0.7) && ma5Prev < ma5Anchor;
-  const ma5TurnUp = ma5 > ma5Prev;
+  const consecutiveDown = ma5Prev < ma5Prev2 && ma5Prev2 < ma5Prev3 && ma5Prev3 < ma5Prev4;
+  const priorMa5Down =
+    slopeCount >= 5 && downSteps >= Math.ceil(slopeCount * 0.7) && ma5Prev < ma5Anchor && consecutiveDown;
+  const ma5TurnUp = ma5 > ma5Prev && ma5Prev <= ma5Prev2;
 
   let belowDays = 0;
   let belowCount = 0;

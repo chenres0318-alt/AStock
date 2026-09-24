@@ -139,6 +139,21 @@ assert(tight.redBar && tight.volumeUp && tight.aboveMa5 && tight.ma5TurnUp, "tig
 assert(tight.amplitudePct != null && tight.amplitudePct < 2, "tight high-low should keep amplitude under 2%");
 assert(!passesScreen(tight, 3), "amplitude below 2% should fail");
 
+const alreadyTurned = declineThen({});
+const first = alreadyTurned[alreadyTurned.length - 1];
+alreadyTurned.push({
+  time: "2025-03-01",
+  open: first.close * 1.002,
+  high: first.close * 1.04,
+  low: first.close * 0.998,
+  close: first.close * 1.03,
+  volume: 2500,
+});
+const late = analyzeBars(alreadyTurned)!;
+assert(late.ma5 > late.ma5Prev, "second up day can keep MA5 rising");
+assert(late.ma5TurnUp === false, "turn-up must happen today, not as a follow-through");
+assert(!passesScreen(late, 3), "already-turned MA5 should fail");
+
 console.log("indicators.check ok", {
   ma5: hit.ma5.toFixed(3),
   ma5Prev: hit.ma5Prev.toFixed(3),
