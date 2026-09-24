@@ -163,7 +163,7 @@ export default function Screener() {
         <PanelTitle
           title="按买点扫描个股"
           extra={
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
               {meta ? (
                 <span className="text-[10px] text-mute">
                   池 {meta.universe ?? meta.scanned} · 扫描 {meta.scanned} · 命中 {hits.length}

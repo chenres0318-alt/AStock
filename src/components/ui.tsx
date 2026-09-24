@@ -41,7 +41,7 @@ export function PanelTitle({
   extra?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between px-3 py-2 border-b border-line">
+    <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 border-b border-line">
       <h2 className="text-xs tracking-[0.16em] text-mute uppercase">{title}</h2>
       {extra}
     </div>
