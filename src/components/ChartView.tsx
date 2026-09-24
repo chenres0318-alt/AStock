@@ -484,7 +484,7 @@ export default function ChartView({
   ];
 
   return (
-    <section className="panel flex h-[380px] shrink-0 flex-col overflow-hidden">
+    <section className="panel flex min-h-[560px] flex-1 flex-col overflow-hidden xl:min-h-0">
       <div className="flex items-center justify-between border-b border-line px-3 py-2">
         <div className="flex items-center gap-1">
           {tabs.map((tab) => (

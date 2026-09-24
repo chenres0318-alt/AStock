@@ -27,7 +27,7 @@ export default function RankBoard({
   onPick: (code: string, name: string) => void;
 }) {
   return (
-    <section className="panel flex min-h-[200px] flex-col overflow-hidden">
+    <section className="panel flex min-h-[200px] flex-1 flex-col overflow-hidden xl:min-h-0">
       <PanelTitle
         title="市场热度"
         extra={

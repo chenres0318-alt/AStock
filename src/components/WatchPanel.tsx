@@ -80,7 +80,7 @@ export default function WatchPanel({
   );
 
   return (
-    <section className="panel flex min-h-[320px] flex-col overflow-hidden">
+    <section className="panel flex min-h-[320px] flex-col overflow-hidden xl:h-full xl:min-h-0">
       <PanelTitle title="自选股" extra={<span className="text-[10px] text-mute">按 / 搜索</span>} />
       <div className="relative border-b border-line px-3 py-2" ref={boxRef}>
         <input

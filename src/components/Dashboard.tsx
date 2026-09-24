@@ -178,7 +178,7 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-[1600px] flex-col gap-3 p-3">
+    <div className="flex min-h-dvh w-full flex-col gap-2 px-2 py-2 xl:h-dvh xl:overflow-hidden">
       <AppHeader
         trailing={
           <>
@@ -218,7 +218,7 @@ export default function Dashboard() {
 
       <IndexStrip indices={indices} selected={selected} onSelect={setSelected} />
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 xl:grid-cols-[280px_minmax(0,1fr)_300px]">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-2 xl:grid-cols-[232px_minmax(0,1fr)_240px]">
         <WatchPanel
           items={watchlist}
           quotes={quoteMap}
@@ -233,7 +233,7 @@ export default function Dashboard() {
             });
           }}
         />
-        <div className="flex min-h-0 flex-col gap-3">
+        <div className="flex min-h-[720px] min-w-0 flex-col gap-2 xl:min-h-0">
           <QuotePanel quote={current} />
           <ChartView
             mode={mode}
@@ -244,7 +244,7 @@ export default function Dashboard() {
             loading={chartLoading}
           />
         </div>
-        <div className="flex min-h-0 flex-col gap-3">
+        <div className="flex min-h-0 flex-col gap-2 xl:h-full">
           <SectorList items={sectors} onPick={pickStock} />
           <RankBoard tab={rankTab} onTab={setRankTab} items={rankMap[rankTab]} onPick={pickStock} />
         </div>
