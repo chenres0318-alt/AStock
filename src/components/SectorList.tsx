@@ -13,7 +13,7 @@ export default function SectorList({
   onPick: (code: string, name: string) => void;
 }) {
   return (
-    <section className="panel flex min-h-[220px] flex-1 flex-col overflow-hidden">
+    <section className="panel flex min-h-[220px] flex-1 flex-col overflow-hidden xl:min-h-0">
       <PanelTitle
         title="行业板块"
         extra={

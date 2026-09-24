@@ -34,7 +34,7 @@ export default function QuotePanel({ quote }: { quote: Quote | undefined }) {
   );
 
   return (
-    <section className="panel overflow-hidden">
+    <section className="panel shrink-0 overflow-hidden">
       <div className="flex flex-wrap items-end justify-between gap-4 px-4 py-3">
         <div>
           <div className="flex items-center gap-2">
@@ -54,7 +54,7 @@ export default function QuotePanel({ quote }: { quote: Quote | undefined }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-2 border-t border-line px-3 py-3 sm:grid-cols-4 lg:grid-cols-6">
+      <div className="grid grid-cols-3 gap-2 border-t border-line px-3 py-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-12">
         <Stat label="今开" value={formatPrice(quote.open)} tone={quote.preClose != null && quote.open != null ? quote.open - quote.preClose : 0} />
         <Stat label="最高" value={formatPrice(quote.high)} tone={quote.preClose != null && quote.high != null ? quote.high - quote.preClose : 0} />
         <Stat label="最低" value={formatPrice(quote.low)} tone={quote.preClose != null && quote.low != null ? quote.low - quote.preClose : 0} />
