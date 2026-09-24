@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useRef } from "react";
 import {
   ColorType,
   CrosshairMode,
@@ -13,8 +13,7 @@ import {
   type Time,
   type UTCTimestamp,
 } from "lightweight-charts";
-import { isHsAShare } from "@/lib/codes";
-import { findBuyPoints, maAt } from "@/lib/indicators";
+import { maAt, tdSequential } from "@/lib/indicators";
 import type { KBar, Quote, TrendPoint } from "@/lib/types";
 
 export type ChartMode = "trend" | "day" | "week" | "month";
@@ -39,6 +38,17 @@ function formatChartTime(time: unknown, withDate: boolean): string {
     minute: "2-digit",
     hourCycle: "h23",
   }).format(new Date(ts * 1000));
+}
+
+function tdChartMarkers(points: Array<{ time: Time; close: number }>): SeriesMarker<Time>[] {
+  return tdSequential(points).map((mark) => ({
+    time: mark.time,
+    position: mark.side === "up" ? "aboveBar" : "belowBar",
+    color: mark.side === "up" ? UP : DOWN,
+    shape: "circle",
+    text: String(mark.count),
+    size: mark.count === 9 ? 2 : 1,
+  }));
 }
 
 function ma5Line(bars: KBar[]): Array<{ time: string; value: number }> {
@@ -172,12 +182,6 @@ export default function ChartView({
     };
   }, []);
 
-  const markBuys = Boolean(quote && isHsAShare(quote.code, quote.name));
-  const buyCount = useMemo(
-    () => (mode === "day" && markBuys ? findBuyPoints(bars).length : 0),
-    [mode, markBuys, bars],
-  );
-
   useEffect(() => {
     const candle = candleRef.current;
     const vol = volRef.current;
@@ -237,11 +241,20 @@ export default function ChartView({
           title: "昨收",
         });
       }
+      line.setMarkers(
+        tdChartMarkers(
+          points.map((item) => ({
+            time: item.timestamp as UTCTimestamp,
+            close: item.price,
+          })),
+        ),
+      );
       applyTimeScale(chart, mode, trend.points.length);
       return;
     }
 
     line.setData(ma5Line(bars));
+    line.setMarkers([]);
     avg.setData([]);
     candle.setData(
       bars.map((bar) => ({
@@ -259,20 +272,16 @@ export default function ChartView({
         color: bar.close >= bar.open ? "rgba(255,92,92,0.6)" : "rgba(30,203,147,0.6)",
       })),
     );
-    const markers: SeriesMarker<Time>[] =
-      mode === "day" && markBuys
-        ? findBuyPoints(bars).map((point) => ({
-            time: point.time,
-            position: "belowBar",
-            color: UP,
-            shape: "arrowUp",
-            text: "买",
-            size: 1.4,
-          }))
-        : [];
-    candle.setMarkers(markers);
+    candle.setMarkers(
+      tdChartMarkers(
+        bars.map((bar) => ({
+          time: bar.time as Time,
+          close: bar.close,
+        })),
+      ),
+    );
     applyTimeScale(chart, mode, bars.length);
-  }, [bars, trend, mode, markBuys]);
+  }, [bars, trend, mode]);
   const tabs: Array<{ id: ChartMode; label: string }> = [
     { id: "trend", label: "分时" },
     { id: "day", label: "日K" },
@@ -302,10 +311,8 @@ export default function ChartView({
           {loading
             ? "加载中…"
             : mode === "trend"
-              ? "黄线现价 蓝线均价"
-              : mode === "day" && markBuys
-                ? `黄线MA5 · 红箭头买点 ${buyCount} 处`
-                : "黄线MA5"}
+              ? "黄线现价 蓝线均价 · 红涨九转 绿跌九转"
+              : "黄线MA5 · 红涨九转 绿跌九转"}
         </div>
       </div>
       <div className="relative min-h-0 flex-1">
