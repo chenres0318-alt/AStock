@@ -138,7 +138,7 @@ export function isStName(name: string): boolean {
 export function isHsAShare(code: string, name = ""): boolean {
   if (isStName(name)) return false;
   const tx = toTencentCode(code);
-  if (marketOf(tx) === "BJ") return false;
+  if (isIndexCode(tx) || marketOf(tx) === "BJ") return false;
   const id = bareCode(tx);
   return /^(60|68|00|30)\d{4}$/.test(id);
 }
