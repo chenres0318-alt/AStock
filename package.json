@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start --hostname 0.0.0.0 --port 3000",
     "lint": "eslint",
-    "check:indicators": "node --experimental-strip-types --no-warnings src/lib/indicators.check.ts"
+    "check:indicators": "node --experimental-strip-types --no-warnings src/lib/indicators.check.ts && node --experimental-strip-types --no-warnings src/lib/sell-setup.check.ts",
+    "backtest:buy-point": "node --experimental-strip-types --no-warnings scripts/buy-point-backtest.ts"
   },
   "dependencies": {
     "iconv-lite": "^0.7.3",
