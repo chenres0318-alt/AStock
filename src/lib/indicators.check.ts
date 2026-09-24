@@ -1,4 +1,4 @@
-import { analyzeBars, findBuyPoints, findTrendSwingBuys, maAt, macdSeries, passesScreen, screenReasons, tdSequential } from "./indicators.ts";
+import { adxSeries, analyzeBars, buildRedRibbon, findBuyPoints, findTrendSwingBuys, maAt, macdSeries, passesScreen, screenReasons, tdSequential } from "./indicators.ts";
 import type { KBar } from "./types.ts";
 
 function assert(cond: unknown, message: string) {
@@ -183,6 +183,58 @@ const chase = swing.map((bar, index) =>
 assert(!findTrendSwingBuys(chase).some((point) => point.time === swing.at(-1)?.time), "an 8%+ day is not chased");
 const gapped = swing.map((bar, index) => (index === swing.length - 1 ? { ...bar, open: bar.open + 2 } : bar));
 assert(!findTrendSwingBuys(gapped).some((point) => point.time === swing.at(-1)?.time), "opening through MA30 resistance is not a buy");
+
+function barAt(index: number, close: number, volume = 1000): KBar {
+  const open = close * 0.998;
+  return {
+    time: `2024-01-${String((index % 28) + 1).padStart(2, "0")}-${index}`,
+    open,
+    high: Math.max(open, close) * 1.004,
+    low: Math.min(open, close) * 0.996,
+    close,
+    volume,
+  };
+}
+
+const flat = Array.from({ length: 80 }, (_, i) => barAt(i, 20));
+const flatRibbon = buildRedRibbon(flat);
+assert(flatRibbon.signals.length === 0, "a flat tape has no ribbon trade");
+assert(flatRibbon.points.at(-1)?.direction.every((item) => item == null), "a flat ribbon does not paint up or down");
+
+const climb = Array.from({ length: 90 }, (_, i) => barAt(i, 10 + i * 0.2));
+const climbRibbon = buildRedRibbon(climb);
+assert(climbRibbon.points.at(-1)?.direction.every((item) => item === "up"), "a steady climb turns every ribbon layer up");
+
+const drop = Array.from({ length: 90 }, (_, i) => barAt(i, 40 - i * 0.2));
+assert(buildRedRibbon(drop).points.at(-1)?.direction.every((item) => item === "down"), "a steady drop turns every ribbon layer down");
+
+const swingPath: number[] = [];
+let price = 30;
+for (let i = 0; i < 70; i += 1) {
+  price *= 0.997;
+  swingPath.push(price);
+}
+for (let i = 0; i < 55; i += 1) {
+  price *= 1.012;
+  swingPath.push(price);
+}
+for (let i = 0; i < 40; i += 1) {
+  price *= 0.988;
+  swingPath.push(price);
+}
+const ribbonSwing = buildRedRibbon(swingPath.map((close, i) => barAt(i, close)));
+const ribbonBuys = ribbonSwing.signals.filter((item) => item.side === "buy");
+const ribbonSells = ribbonSwing.signals.filter((item) => item.side === "sell");
+assert(ribbonBuys.length >= 1, "a down-then-up swing with ADX>22 marks a buy");
+assert(ribbonSells.length >= 1, "the same swing marks a sell after the ribbon turns down");
+assert(ribbonBuys.every((item) => item.adx != null && item.adx > 22), "ribbon buys require ADX above 22");
+const firstBuyAt = ribbonSwing.points.findIndex((point) => point.time === ribbonBuys[0].time);
+assert(firstBuyAt > 0 && ribbonSwing.points[firstBuyAt].direction.every((item) => item === "up"), "buy day has all layers rising");
+assert(!ribbonSwing.points[firstBuyAt - 1].direction.every((item) => item === "up"), "buy day is the turn into a full red ribbon");
+
+const chop = Array.from({ length: 160 }, (_, i) => barAt(i, 20 + Math.sin(i / 2) * 0.08));
+assert(buildRedRibbon(chop).signals.every((item) => item.side !== "buy"), "a tight box does not produce a ribbon buy");
+assert(adxSeries(chop).every((value) => value == null || value <= 22), "a tight box stays at or below the ADX gate");
 
 console.log("indicators.check ok", {
   bull: { firstStandMa5: bull.firstStandMa5, macdBull: bull.macdBull, macdBearWeak: bull.macdBearWeak, dea: bull.dea.toFixed(3) },
