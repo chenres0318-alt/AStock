@@ -11,6 +11,7 @@ export type ScreenFlags = {
   open: number;
   ma5: number;
   ma5Prev: number;
+  ma20: number | null;
   dif: number;
   dea: number;
   hist: number;
@@ -20,6 +21,8 @@ export type ScreenFlags = {
   firstStandMa5: boolean;
   macdBull: boolean;
   macdBearWeak: boolean;
+  belowMa20: boolean;
+  strongReclaim: boolean;
 };
 
 function emaSeries(values: number[], period: number): Array<number | null> {
@@ -66,6 +69,9 @@ export function macdSeries(closes: number[]): Array<MacdPoint | null> {
 }
 
 const FIRST_STAND_LOOK = 5;
+/** 20 日线下方的空头减弱，只保留大阳 / 大振幅反包，避免下跌中继假买点。 */
+const STRONG_RECLAIM_DAY_PCT = 5;
+const STRONG_RECLAIM_AMP_PCT = 8;
 
 export function analyzeBarsAt(
   bars: KBar[],
@@ -104,12 +110,20 @@ export function analyzeBarsAt(
   const prevClose = bars[i - 1].close;
   const dayPct = prevClose > 0 ? ((bars[i].close / prevClose - 1) * 100) : null;
   const amplitudePct = prevClose > 0 ? ((bars[i].high - bars[i].low) / prevClose) * 100 : null;
+  const ma20 = maAt(closes, 20, i);
+  const belowMa20 = ma20 != null && closes[i] < ma20;
+  const strongReclaim = Boolean(
+    closes[i] >= bars[i].open &&
+      ((dayPct != null && dayPct >= STRONG_RECLAIM_DAY_PCT) ||
+        (amplitudePct != null && amplitudePct >= STRONG_RECLAIM_AMP_PCT)),
+  );
 
   return {
     close: bars[i].close,
     open: bars[i].open,
     ma5,
     ma5Prev,
+    ma20,
     dif: cur?.dif ?? 0,
     dea: cur?.dea ?? 0,
     hist: cur?.hist ?? 0,
@@ -119,6 +133,8 @@ export function analyzeBarsAt(
     firstStandMa5,
     macdBull,
     macdBearWeak,
+    belowMa20,
+    strongReclaim,
   };
 }
 
@@ -151,9 +167,15 @@ export function screenReasons(tech: ScreenFlags): string[] {
   if (tech.firstStandMa5) rows.push("近5日首次站上五日线");
   if (tech.macdBull) rows.push("MACD多头排列");
   else if (tech.macdBearWeak) rows.push("MACD空头减弱");
+  if (tech.macdBearWeak && tech.belowMa20 && tech.strongReclaim) rows.push("大阳反包");
   return rows;
 }
 
 export function passesScreen(tech: ScreenFlags): boolean {
-  return tech.firstStandMa5 && (tech.macdBull || tech.macdBearWeak);
+  if (!tech.firstStandMa5) return false;
+  if (tech.macdBull) return true;
+  if (!tech.macdBearWeak) return false;
+  // 20 日线下方的空头减弱，多数是下跌中继；只留下大阳 / 大振幅反包。
+  if (tech.belowMa20 && !tech.strongReclaim) return false;
+  return true;
 }
