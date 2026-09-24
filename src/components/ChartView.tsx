@@ -236,10 +236,20 @@ export default function ChartView({
             color: UP,
             shape: "arrowUp",
             text: "买",
+            size: 1.4,
           }))
         : [];
     candle.setMarkers(markers);
-    fitChart(chart);
+    requestAnimationFrame(() => {
+      if (mode === "day" && bars.length > 80) {
+        chart.timeScale().setVisibleLogicalRange({
+          from: bars.length - 80,
+          to: bars.length + 4,
+        });
+      } else {
+        chart.timeScale().fitContent();
+      }
+    });
   }, [bars, trend, mode, markBuys]);
   const tabs: Array<{ id: ChartMode; label: string }> = [
     { id: "trend", label: "分时" },
