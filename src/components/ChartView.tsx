@@ -12,13 +12,15 @@ import {
   type Time,
   type UTCTimestamp,
 } from "lightweight-charts";
-import { findTrendSwingBuys, maAt } from "@/lib/indicators";
+import { buildRedRibbon, maAt, type RibbonPoint } from "@/lib/indicators";
 import type { KBar, Quote, TrendPoint } from "@/lib/types";
 
 export type ChartMode = "trend" | "day" | "week" | "month";
 
 const UP = "#ff5c5c";
 const DOWN = "#1ecb93";
+const RIBBON_CYAN = "#2ad4c8";
+const RIBBON_LAYERS = 7;
 
 function formatChartTime(time: unknown, withDate: boolean): string {
   if (typeof time === "string") return withDate ? time : time.slice(5);
@@ -37,6 +39,13 @@ function formatChartTime(time: unknown, withDate: boolean): string {
     minute: "2-digit",
     hourCycle: "h23",
   }).format(new Date(ts * 1000));
+}
+
+function ribbonSeriesData(points: RibbonPoint[], layer: number, side: "up" | "down") {
+  return points.map((point) => {
+    if (point.direction[layer] === side) return { time: point.time, value: point.values[layer] };
+    return { time: point.time };
+  });
 }
 
 function ma5Line(bars: KBar[]): Array<{ time: string; value: number }> {
@@ -89,6 +98,7 @@ export default function ChartView({
   const candleRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const volRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const lineRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const ribbonRef = useRef<Array<ISeriesApi<"Line">>>([]);
   const avgRef = useRef<ISeriesApi<"Line"> | null>(null);
   const preCloseLineRef = useRef<IPriceLine | null>(null);
   const viewRef = useRef({ mode, barCount: bars.length });
@@ -143,6 +153,28 @@ export default function ChartView({
       priceLineVisible: false,
       lastValueVisible: false,
     });
+    const ribbons: Array<ISeriesApi<"Line">> = [];
+    for (let layer = 0; layer < RIBBON_LAYERS; layer += 1) {
+      ribbons.push(
+        chart.addLineSeries({
+          color: UP,
+          lineWidth: 1,
+          priceLineVisible: false,
+          lastValueVisible: false,
+          crosshairMarkerVisible: false,
+        }),
+      );
+      ribbons.push(
+        chart.addLineSeries({
+          color: RIBBON_CYAN,
+          lineWidth: 1,
+          priceLineVisible: false,
+          lastValueVisible: false,
+          crosshairMarkerVisible: false,
+        }),
+      );
+    }
+    ribbonRef.current = ribbons;
     const vol = chart.addHistogramSeries({
       priceFormat: { type: "volume" },
       priceScaleId: "",
@@ -170,7 +202,14 @@ export default function ChartView({
     };
   }, []);
 
-  const buyCount = useMemo(() => (mode === "day" ? findTrendSwingBuys(bars).length : 0), [mode, bars]);
+  const ribbonCounts = useMemo(() => {
+    if (mode === "trend") return { buy: 0, sell: 0 };
+    const { signals } = buildRedRibbon(bars);
+    return {
+      buy: signals.filter((item) => item.side === "buy").length,
+      sell: signals.filter((item) => item.side === "sell").length,
+    };
+  }, [mode, bars]);
 
   useEffect(() => {
     const candle = candleRef.current;
@@ -197,6 +236,7 @@ export default function ChartView({
       const points = trend.points.filter((item) => item.timestamp > 0 && item.time <= "15:00");
       candle.setData([]);
       candle.setMarkers([]);
+      ribbonRef.current.forEach((series) => series.setData([]));
       line.setData(
         points.map((item) => ({
           time: item.timestamp as UTCTimestamp,
@@ -239,6 +279,11 @@ export default function ChartView({
     line.setData(ma5Line(bars));
     line.setMarkers([]);
     avg.setData([]);
+    const ribbon = buildRedRibbon(bars);
+    ribbonRef.current.forEach((series, index) => {
+      const layer = Math.floor(index / 2);
+      series.setData(ribbonSeriesData(ribbon.points, layer, index % 2 === 0 ? "up" : "down"));
+    });
     candle.setData(
       bars.map((bar) => ({
         time: bar.time,
@@ -256,16 +301,25 @@ export default function ChartView({
       })),
     );
     candle.setMarkers(
-      mode === "day"
-        ? findTrendSwingBuys(bars).map((point) => ({
-            time: point.time,
-            position: "belowBar" as const,
-            color: UP,
-            shape: "arrowUp" as const,
-            text: "买",
-            size: 1.4,
-          }))
-        : [],
+      ribbon.signals.map((point) =>
+        point.side === "buy"
+          ? {
+              time: point.time,
+              position: "belowBar" as const,
+              color: UP,
+              shape: "arrowUp" as const,
+              text: "买",
+              size: 1.2,
+            }
+          : {
+              time: point.time,
+              position: "aboveBar" as const,
+              color: RIBBON_CYAN,
+              shape: "arrowDown" as const,
+              text: "卖",
+              size: 1.2,
+            },
+      ),
     );
     applyTimeScale(chart, mode, bars.length);
   }, [bars, trend, mode]);
@@ -299,9 +353,7 @@ export default function ChartView({
             ? "加载中…"
             : mode === "trend"
               ? "黄线现价 蓝线均价"
-              : mode === "day"
-                ? `黄线MA5 · 红箭头买点 ${buyCount} 处`
-                : "黄线MA5"}
+              : `黄线MA5 · 红青丝带 · 买 ${ribbonCounts.buy} 卖 ${ribbonCounts.sell}`}
         </div>
       </div>
       <div className="relative min-h-0 flex-1">

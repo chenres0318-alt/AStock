@@ -277,3 +277,145 @@ export function passesScreen(tech: ScreenFlags): boolean {
   if (tech.belowMa20 && !tech.strongReclaim) return false;
   return true;
 }
+
+/** 通达信 EMA：首值取当天，之后 Y = 2/(N+1)*X + (N-1)/(N+1)*Y'。 */
+function tdxEma(values: number[], period: number): number[] {
+  const out: number[] = [];
+  if (values.length === 0) return out;
+  const alpha = 2 / (period + 1);
+  let prev = values[0];
+  out.push(prev);
+  for (let i = 1; i < values.length; i += 1) {
+    prev = values[i] * alpha + prev * (1 - alpha);
+    out.push(prev);
+  }
+  return out;
+}
+
+const RIBBON_LAYERS = 7;
+const ADX_PERIOD = 14;
+const ADX_BUY_MIN = 22;
+
+function wilderSmooth(values: number[], period: number): Array<number | null> {
+  const out: Array<number | null> = Array(values.length).fill(null);
+  if (values.length < period) return out;
+  let sum = 0;
+  for (let i = 0; i < period; i += 1) sum += values[i];
+  let prev = sum / period;
+  out[period - 1] = prev;
+  for (let i = period; i < values.length; i += 1) {
+    prev = (prev * (period - 1) + values[i]) / period;
+    out[i] = prev;
+  }
+  return out;
+}
+
+/** 14 日 ADX，Wilder 平滑。下标与 K 线对齐，前期不足时为 null。 */
+export function adxSeries(bars: KBar[], period = ADX_PERIOD): Array<number | null> {
+  const out: Array<number | null> = Array(bars.length).fill(null);
+  if (bars.length < period * 2 + 1) return out;
+  const tr: number[] = [];
+  const plusDm: number[] = [];
+  const minusDm: number[] = [];
+  for (let i = 1; i < bars.length; i += 1) {
+    const bar = bars[i];
+    const prev = bars[i - 1];
+    tr.push(Math.max(bar.high - bar.low, Math.abs(bar.high - prev.close), Math.abs(bar.low - prev.close)));
+    const upMove = bar.high - prev.high;
+    const downMove = prev.low - bar.low;
+    plusDm.push(upMove > downMove && upMove > 0 ? upMove : 0);
+    minusDm.push(downMove > upMove && downMove > 0 ? downMove : 0);
+  }
+  const smoothTr = wilderSmooth(tr, period);
+  const smoothPlus = wilderSmooth(plusDm, period);
+  const smoothMinus = wilderSmooth(minusDm, period);
+  const dx: number[] = [];
+  for (let j = period - 1; j < tr.length; j += 1) {
+    const trValue = smoothTr[j];
+    const plus = smoothPlus[j];
+    const minus = smoothMinus[j];
+    if (trValue == null || plus == null || minus == null || !(trValue > 0)) {
+      dx.push(0);
+      continue;
+    }
+    const pdi = (100 * plus) / trValue;
+    const mdi = (100 * minus) / trValue;
+    const denom = pdi + mdi;
+    dx.push(denom > 0 ? (100 * Math.abs(pdi - mdi)) / denom : 0);
+  }
+  const adx = wilderSmooth(dx, period);
+  const dxStart = period - 1;
+  for (let k = 0; k < dx.length; k += 1) {
+    if (adx[k] == null) continue;
+    out[dxStart + k + 1] = adx[k];
+  }
+  return out;
+}
+
+export type RibbonPoint = {
+  time: string;
+  values: number[];
+  /** 相对前一根。首根或与前一根相等时为 null。 */
+  direction: Array<"up" | "down" | null>;
+};
+
+export type RibbonSignal = {
+  time: string;
+  side: "buy" | "sell";
+  close: number;
+  adx: number | null;
+};
+
+/**
+ * 通达信起涨红丝带。
+ * VAR1=(2*C+H+L+O)/5
+ * A1=(EMA(VAR1,3)+EMA(VAR1,6)+EMA(VAR1,12)+EMA(VAR1,24))/4
+ * A2..A7 逐层 EMA(2)
+ * 买：七层同时从「非全向上」变成全向上，且 ADX(14)>22。
+ * 卖：已有买点之后，七层同时从「非全向下」变成全向下。
+ */
+export function buildRedRibbon(bars: KBar[]): { points: RibbonPoint[]; signals: RibbonSignal[] } {
+  const points: RibbonPoint[] = [];
+  const signals: RibbonSignal[] = [];
+  if (bars.length === 0) return { points, signals };
+  const var1 = bars.map((bar) => (2 * bar.close + bar.high + bar.low + bar.open) / 5);
+  const ema3 = tdxEma(var1, 3);
+  const ema6 = tdxEma(var1, 6);
+  const ema12 = tdxEma(var1, 12);
+  const ema24 = tdxEma(var1, 24);
+  const a1 = var1.map((_, i) => (ema3[i] + ema6[i] + ema12[i] + ema24[i]) / 4);
+  const layers: number[][] = [a1];
+  for (let layer = 1; layer < RIBBON_LAYERS; layer += 1) layers.push(tdxEma(layers[layer - 1], 2));
+  const adx = adxSeries(bars);
+
+  const allRising: boolean[] = [];
+  const allFalling: boolean[] = [];
+  for (let i = 0; i < bars.length; i += 1) {
+    const direction: Array<"up" | "down" | null> = [];
+    for (let layer = 0; layer < RIBBON_LAYERS; layer += 1) {
+      if (i === 0 || layers[layer][i] === layers[layer][i - 1]) direction.push(null);
+      else direction.push(layers[layer][i] > layers[layer][i - 1] ? "up" : "down");
+    }
+    allRising.push(direction.every((item) => item === "up"));
+    allFalling.push(direction.every((item) => item === "down"));
+    points.push({
+      time: bars[i].time,
+      values: layers.map((layer) => layer[i]),
+      direction,
+    });
+  }
+
+  let inPosition = false;
+  for (let i = 1; i < bars.length; i += 1) {
+    const turnedUp = allRising[i] && !allRising[i - 1];
+    const turnedDown = allFalling[i] && !allFalling[i - 1];
+    if (!inPosition && turnedUp && adx[i] != null && adx[i]! > ADX_BUY_MIN) {
+      signals.push({ time: bars[i].time, side: "buy", close: bars[i].close, adx: adx[i] });
+      inPosition = true;
+    } else if (inPosition && turnedDown) {
+      signals.push({ time: bars[i].time, side: "sell", close: bars[i].close, adx: adx[i] });
+      inPosition = false;
+    }
+  }
+  return { points, signals };
+}
