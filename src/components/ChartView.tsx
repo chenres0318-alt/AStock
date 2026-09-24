@@ -41,10 +41,22 @@ function formatChartTime(time: unknown, withDate: boolean): string {
   }).format(new Date(ts * 1000));
 }
 
-function fitChart(chart: IChartApi) {
+function applyTimeScale(chart: IChartApi, mode: ChartMode, barCount: number) {
+  chart.timeScale().applyOptions({
+    timeVisible: mode === "trend",
+    secondsVisible: false,
+    fixLeftEdge: mode !== "day",
+    fixRightEdge: true,
+  });
   requestAnimationFrame(() => {
+    if (mode === "day" && barCount > 80) {
+      chart.timeScale().setVisibleLogicalRange({
+        from: barCount - 80,
+        to: barCount + 4,
+      });
+      return;
+    }
     chart.timeScale().fitContent();
-    window.setTimeout(() => chart.timeScale().fitContent(), 80);
   });
 }
 
@@ -70,6 +82,8 @@ export default function ChartView({
   const lineRef = useRef<ISeriesApi<"Line"> | null>(null);
   const avgRef = useRef<ISeriesApi<"Line"> | null>(null);
   const preCloseLineRef = useRef<IPriceLine | null>(null);
+  const viewRef = useRef({ mode, barCount: bars.length });
+  viewRef.current = { mode, barCount: bars.length };
 
   useEffect(() => {
     const el = boxRef.current;
@@ -135,7 +149,10 @@ export default function ChartView({
     lineRef.current = line;
     avgRef.current = avg;
     volRef.current = vol;
-    const ro = new ResizeObserver(() => fitChart(chart));
+    const ro = new ResizeObserver(() => {
+      const { mode: currentMode, barCount } = viewRef.current;
+      applyTimeScale(chart, currentMode, barCount);
+    });
     ro.observe(el);
     return () => {
       ro.disconnect();
@@ -158,15 +175,14 @@ export default function ChartView({
     const chart = chartRef.current;
     if (!candle || !vol || !line || !avg || !chart) return;
 
-    chart.timeScale().applyOptions({
-      timeVisible: mode === "trend",
-      secondsVisible: false,
-    });
-
     if (preCloseLineRef.current) {
       line.removePriceLine(preCloseLineRef.current);
       preCloseLineRef.current = null;
     }
+
+    chart.priceScale("right").applyOptions({
+      scaleMargins: { top: 0.06, bottom: mode === "day" ? 0.28 : 0.22 },
+    });
 
     if (mode === "trend") {
       const points = trend.points.filter((item) => item.timestamp > 0 && item.time <= "15:00");
@@ -206,7 +222,7 @@ export default function ChartView({
           title: "昨收",
         });
       }
-      fitChart(chart);
+      applyTimeScale(chart, mode, trend.points.length);
       return;
     }
 
@@ -240,16 +256,7 @@ export default function ChartView({
           }))
         : [];
     candle.setMarkers(markers);
-    requestAnimationFrame(() => {
-      if (mode === "day" && bars.length > 80) {
-        chart.timeScale().setVisibleLogicalRange({
-          from: bars.length - 80,
-          to: bars.length + 4,
-        });
-      } else {
-        chart.timeScale().fitContent();
-      }
-    });
+    applyTimeScale(chart, mode, bars.length);
   }, [bars, trend, mode, markBuys]);
   const tabs: Array<{ id: ChartMode; label: string }> = [
     { id: "trend", label: "分时" },
