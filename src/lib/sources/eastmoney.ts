@@ -1,7 +1,7 @@
 import { marketOf, toTencentCode } from "../codes";
 import { toNumber } from "../format";
 import { fetchJson, fetchUtf } from "../http";
-import type { BoardMember, KBar, SearchItem, SectorItem } from "../types";
+import type { BoardMember, KBar, RankItem, SearchItem, SectorItem } from "../types";
 
 type SuggestResponse = {
   QuotationCodeTable?: {
@@ -128,6 +128,40 @@ export async function fetchIndustryBoards(): Promise<SectorItem[]> {
     return [];
   }
   return out;
+}
+
+export async function fetchEastMoneyAmountRank(limit = 360): Promise<RankItem[]> {
+  const pz = 100;
+  const collected: RankItem[] = [];
+  const seen = new Set<string>();
+  for (let pn = 1; pn <= Math.ceil(limit / pz); pn += 1) {
+    const json = await clist(
+      `/api/qt/clist/get?pn=${pn}&pz=${pz}&po=1&np=1&fltt=2&invt=2&fid=f6` +
+        `&fs=m:0+t:6+f:!2,m:0+t:80+f:!2,m:1+t:2+f:!2,m:1+t:23+f:!2` +
+        `&fields=f12,f13,f14,f2,f3,f6,f8`,
+    );
+    const rows = json.data?.diff ?? [];
+    if (!rows.length) break;
+    for (const row of rows) {
+      const raw = `${row.f13 === 1 || row.f13 === "1" ? "1" : "0"}.${row.f12 ?? ""}`;
+      const code = toTencentCode(raw);
+      if (!/^\d{6}$/.test(code.slice(2)) || seen.has(code)) continue;
+      seen.add(code);
+      collected.push({
+        code,
+        name: String(row.f14 ?? ""),
+        price: toNumber(row.f2),
+        change: null,
+        pct: toNumber(row.f3),
+        volume: null,
+        amount: toNumber(row.f6),
+        turnover: toNumber(row.f8),
+      });
+      if (collected.length >= limit) return collected;
+    }
+    if (rows.length < pz) break;
+  }
+  return collected;
 }
 
 export async function fetchBoardMembers(board: string, limit = 80): Promise<BoardMember[]> {

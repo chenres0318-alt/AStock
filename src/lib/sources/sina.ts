@@ -23,10 +23,11 @@ async function fetchSinaNodeRows(
   num: number,
   sort: SinaNodeSort,
   asc: 0 | 1 = 0,
+  page = 1,
 ): Promise<SinaRankRow[]> {
   const url =
     `https://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeData` +
-    `?page=1&num=${num}&sort=${sort}&asc=${asc}&node=${encodeURIComponent(node)}&_s_r_a=page`;
+    `?page=${page}&num=${num}&sort=${sort}&asc=${asc}&node=${encodeURIComponent(node)}&_s_r_a=page`;
   const text = await retryOk(2, () =>
     fetchUtf(url, {
       referer: "https://vip.stock.finance.sina.com.cn/",
@@ -59,6 +60,25 @@ export async function fetchSinaRank(
 ): Promise<RankItem[]> {
   const rows = await fetchSinaNodeRows("hs_a", num, sort, asc);
   return rows.map(mapRankRow).filter((row) => row.code && row.name);
+}
+
+export async function fetchSinaHsAByAmount(limit = 360): Promise<RankItem[]> {
+  const pageSize = 80;
+  const out: RankItem[] = [];
+  const seen = new Set<string>();
+  for (let page = 1; page <= Math.ceil(limit / pageSize); page += 1) {
+    const rows = await fetchSinaNodeRows("hs_a", pageSize, "amount", 0, page);
+    if (!rows.length) break;
+    for (const row of rows) {
+      const item = mapRankRow(row);
+      if (!item.code || !item.name || seen.has(item.code)) continue;
+      seen.add(item.code);
+      out.push(item);
+      if (out.length >= limit) return out;
+    }
+    if (rows.length < pageSize) break;
+  }
+  return out;
 }
 
 export async function fetchSinaBoardMembers(
