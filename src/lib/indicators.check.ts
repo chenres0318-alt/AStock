@@ -127,7 +127,7 @@ const fallingTd = tdSequential(fallingCloses(14, 40, 1).map((close, i) => ({ tim
 assert(fallingTd.length === 9 && fallingTd[8]?.count === 9 && fallingTd[8].side === "down", "ninth consecutive lower close is down 9");
 
 const aborted = tdSequential([5, 5, 5, 5, 5, 8, 9, 10, 4].map((close, i) => ({ time: `a${i}`, close })));
-assert(aborted.length === 0, "a 3-bar rise that breaks is dropped, and the new one-bar flip stays hidden");
+assert(aborted.length === 1 && aborted[0].side === "down" && aborted[0].count === 1, "a broken rise is dropped, and the new live flip shows 1");
 
 const flatThenUp = tdSequential([
   { time: "a", close: 5 },
@@ -137,14 +137,13 @@ const flatThenUp = tdSequential([
   { time: "e", close: 5 },
   { time: "f", close: 8 },
 ]);
-assert(flatThenUp.length === 0, "a one-bar flip is not shown before the count reaches 6");
+assert(flatThenUp.length === 1 && flatThenUp[0].time === "f" && flatThenUp[0].count === 1, "the latest one-bar flip is visible the same day");
 
-const forming = tdSequential(risingCloses(10, 10, 1).map((close, i) => ({ time: `f${i}`, close })));
-assert(forming.length === 6 && forming[5]?.count === 6 && forming[5].side === "up", "an open setup is shown once it reaches 6");
-assert(tdSequential(risingCloses(8, 10, 1).map((close, i) => ({ time: `e${i}`, close }))).length === 0, "an open setup below 6 stays hidden");
+const forming = tdSequential(risingCloses(8, 10, 1).map((close, i) => ({ time: `f${i}`, close })));
+assert(forming.length === 4 && forming[0]?.count === 1 && forming[3]?.count === 4, "an open setup shows from 1, not only after 6");
 
 const broken = tdSequential([1, 2, 3, 4, 5, 6, 7, 8, 9, 5].map((close, i) => ({ time: `m${i}`, close })));
-assert(broken.length === 0, "an interrupted rise is dropped, and a one-bar flip is not shown");
+assert(broken.length === 1 && broken[0].side === "down" && broken[0].count === 1, "an interrupted rise is dropped, and the new flip shows 1");
 
 console.log("indicators.check ok", {
   bull: { firstStandMa5: bull.firstStandMa5, macdBull: bull.macdBull, macdBearWeak: bull.macdBearWeak, dea: bull.dea.toFixed(3) },

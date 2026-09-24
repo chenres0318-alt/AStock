@@ -158,10 +158,9 @@ export type TdMark<T = string> = {
 /**
  * TD Setup。新的一段必须先出现价格翻转（本根相对 4 根前的方向，和前一根相反），
  * 然后连续 9 根都满足才保留 1–9。中途断开的整段丢掉。数满 9 后不再顺延重计，
- * 要等下一次翻转。还在走的一段要数到 6 以上才先显示，避免 1、2、3 铺满。
+ * 要等下一次翻转。正在走的一段从 1 就开始标，方便当天看到翻转；
+ * 没走完的历史段不保留，避免事后看起来每个 1 都成功。
  */
-const TD_OPEN_SHOW_FROM = 6;
-
 export function tdSequential<T>(points: Array<{ time: T; close: number }>): Array<TdMark<T>> {
   const completed: Array<TdMark<T>> = [];
   let active: Array<TdMark<T>> | null = null;
@@ -197,8 +196,7 @@ export function tdSequential<T>(points: Array<{ time: T; close: number }>): Arra
     else if (bullishFlip) active = [{ time: points[i].time, count: 1, side: "down" }];
   }
 
-  if (active && active.length >= TD_OPEN_SHOW_FROM) return completed.concat(active);
-  return completed;
+  return active ? completed.concat(active) : completed;
 }
 
 export function findBuyPoints(bars: KBar[]): BuyPoint[] {
