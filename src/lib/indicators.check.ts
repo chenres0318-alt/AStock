@@ -1,4 +1,4 @@
-import { analyzeBars, maAt, macdSeries, passesBuySetup } from "./indicators.ts";
+import { analyzeBars, maAt, macdSeries, passesScreen, screenReasons } from "./indicators.ts";
 import type { KBar } from "./types.ts";
 
 function assert(cond: unknown, message: string) {
@@ -9,162 +9,139 @@ function almost(a: number, b: number, eps = 1e-6) {
   assert(Math.abs(a - b) < eps, `expected ${b}, got ${a}`);
 }
 
-function barsFrom(closes: number[], volumes: number[], last?: Partial<KBar>): KBar[] {
-  return closes.map((close, i) => {
-    const prev = i === 0 ? close : closes[i - 1];
-    const isLast = i === closes.length - 1 && last;
-    const open = isLast && last.open != null ? last.open : prev;
-    const high = isLast && last.high != null ? last.high : Math.max(open, close) * 1.006;
-    const low = isLast && last.low != null ? last.low : Math.min(open, close) * 0.994;
+type LastOpts = {
+  close?: number;
+  open?: number;
+  high?: number;
+  low?: number;
+  volume?: number;
+};
+
+function declineThen(last: LastOpts, days = 40, start = 20, step = 0.15): KBar[] {
+  const bars: KBar[] = [];
+  for (let i = 0; i < days; i += 1) {
+    const close = Number((start - i * step).toFixed(3));
+    const open = Number((close + 0.04).toFixed(3));
+    bars.push({
+      time: new Date(Date.UTC(2025, 0, 2 + i)).toISOString().slice(0, 10),
+      open,
+      high: Number((open + 0.02).toFixed(3)),
+      low: Number((close - 0.03).toFixed(3)),
+      close,
+      volume: 1000,
+    });
+  }
+  const prev = bars[bars.length - 1];
+  const close = last.close ?? Number((prev.close * 1.08).toFixed(3));
+  const open = last.open ?? Number((prev.close * 1.005).toFixed(3));
+  const high = last.high ?? Number((Math.max(open, close) * 1.01).toFixed(3));
+  const low = last.low ?? Number((Math.min(open, close) * 0.995).toFixed(3));
+  bars.push({
+    time: new Date(Date.UTC(2025, 0, 2 + days)).toISOString().slice(0, 10),
+    open,
+    high,
+    low,
+    close,
+    volume: last.volume ?? 2000,
+  });
+  return bars;
+}
+
+function risingBars(days = 50): KBar[] {
+  return Array.from({ length: days }, (_, i) => {
+    const close = Number((10 + i * 0.2).toFixed(3));
+    const open = Number((close - 0.05).toFixed(3));
+    const isLast = i === days - 1;
     return {
       time: new Date(Date.UTC(2025, 0, 2 + i)).toISOString().slice(0, 10),
       open,
-      high,
-      low,
+      high: Number((close * 1.006).toFixed(3)),
+      low: Number((open * 0.997).toFixed(3)),
       close,
-      volume: isLast && last.volume != null ? last.volume : volumes[i] ?? 1000,
+      volume: isLast ? 2400 : 1200,
     };
   });
-}
-
-function buildHarbinLike(opts?: {
-  undercut?: boolean;
-  weakYang?: boolean;
-  climaxVol?: boolean;
-  noDrop?: boolean;
-}): KBar[] {
-  const closes: number[] = [];
-  const volumes: number[] = [];
-  const lows: number[] = [];
-  const highs: number[] = [];
-  const opens: number[] = [];
-
-  let price = 10;
-  for (let i = 0; i < 42; i += 1) {
-    price += 0.08;
-    closes.push(Number(price.toFixed(3)));
-    volumes.push(1000 + (i % 5) * 40);
-    opens.push(price - 0.04);
-    highs.push(price + 0.06);
-    lows.push(price - 0.08);
-  }
-
-  const peak = price;
-  const dropDays = opts?.noDrop ? 3 : 12;
-  const floor = opts?.noDrop ? peak * 0.97 : peak * 0.78;
-  for (let i = 0; i < dropDays; i += 1) {
-    const t = (i + 1) / dropDays;
-    price = peak + (floor - peak) * t;
-    closes.push(Number(price.toFixed(3)));
-    volumes.push(opts?.noDrop ? 1100 : 2800 + i * 180);
-    opens.push(price + 0.08);
-    highs.push(price + 0.12);
-    lows.push(price - 0.15);
-  }
-
-  const swingLow = floor - 0.04;
-  const bounce = [floor + 0.35, floor + 0.48];
-  for (const value of bounce) {
-    closes.push(Number(value.toFixed(3)));
-    volumes.push(900);
-    opens.push(value - 0.08);
-    highs.push(value + 0.18);
-    lows.push(value - 0.1);
-  }
-
-  const second = opts?.undercut ? swingLow * 0.96 : swingLow + 0.03;
-  closes.push(Number(second.toFixed(3)));
-  volumes.push(820);
-  opens.push(second + 0.05);
-  highs.push(second + 0.12);
-  lows.push(second);
-  closes.push(Number((second + 0.08).toFixed(3)));
-  volumes.push(880);
-  opens.push(second);
-  highs.push(second + 0.16);
-  lows.push(second + 0.02);
-
-  closes.push(Number((second + 0.18).toFixed(3)));
-  volumes.push(1100);
-  opens.push(second + 0.1);
-  highs.push(second + 0.22);
-  lows.push(second + 0.06);
-
-  const prev = closes[closes.length - 1];
-  const lastClose = opts?.weakYang ? prev * 1.012 : prev * 1.102;
-  const lastOpen = opts?.weakYang ? prev * 1.002 : prev * 1.008;
-  closes.push(Number(lastClose.toFixed(3)));
-  volumes.push(opts?.climaxVol ? 9000 : 2400);
-  opens.push(lastOpen);
-  highs.push(lastClose);
-  lows.push(Math.min(lastOpen, prev) * 0.998);
-
-  return closes.map((close, i) => ({
-    time: new Date(Date.UTC(2025, 0, 2 + i)).toISOString().slice(0, 10),
-    open: Number(opens[i].toFixed(3)),
-    high: Number(highs[i].toFixed(3)),
-    low: Number(lows[i].toFixed(3)),
-    close,
-    volume: volumes[i],
-  }));
 }
 
 const sma10 = [22.27, 22.19, 22.08, 22.17, 22.18, 22.13, 22.23, 22.43, 22.24, 22.29];
 almost(maAt(sma10, 10, 9)!, sma10.reduce((sum, value) => sum + value, 0) / 10);
 
-assert(analyzeBars(Array.from({ length: 20 }, (_, i) => ({
-  time: `t${i}`,
-  open: 10,
-  high: 10.2,
-  low: 9.8,
-  close: 10 + i,
-  volume: 1000,
-}))) == null, "short series should be rejected");
-
-const rising = barsFrom(
-  Array.from({ length: 70 }, (_, i) => 10 + i * 0.2),
-  Array.from({ length: 70 }, () => 1200),
+assert(
+  analyzeBars(
+    Array.from({ length: 15 }, (_, i) => ({
+      time: `t${i}`,
+      open: 10,
+      high: 10.2,
+      low: 9.8,
+      close: 10 + i,
+      volume: 1000,
+    })),
+  ) == null,
+  "short series should be rejected",
 );
-const up = analyzeBars(rising)!;
-assert(up.aboveMa5, "rising close should sit above MA5");
-assert(up.threeDayPct != null && up.threeDayPct > 0, "rising 3-day gain should be positive");
-assert(!passesBuySetup(up), "steady uptrend should not pass the buy-point filter");
 
-const falling = barsFrom(
-  Array.from({ length: 80 }, (_, i) => 50 * Math.pow(0.99, i)),
-  Array.from({ length: 80 }, () => 1500),
-);
+const hit = analyzeBars(declineThen({}))!;
+assert(hit.priorMa5Down, "prior MA5 should mostly slope down");
+assert(hit.priorBelowMa5, "prior closes should sit below MA5");
+assert(hit.ma5TurnUp, "today MA5 should turn up");
+assert(hit.aboveMa5, "today close should stand above MA5");
+assert(hit.redBar, "today should be a yang bar");
+assert(hit.volumeUp, "today volume should expand vs prior 5-day average");
+assert(hit.amplitudePct != null && hit.amplitudePct >= 2, "today amplitude should be at least 2%");
+assert(passesScreen(hit, 2.5), "full MA5 turn-up + volume setup should pass");
+assert(passesScreen(hit, 2.49) === false, "turnover below 2.5% should fail");
+assert(passesScreen(hit, null) === false, "missing turnover should fail");
+
+const reasons = screenReasons(hit, 3.1);
+assert(reasons.includes("五日线此前向下"), "reasons should mention prior MA5 down");
+assert(reasons.includes("五日线拐头向上"), "reasons should mention MA5 turn-up");
+assert(reasons.includes("此前股价在五日线下方"), "reasons should mention prior price below MA5");
+assert(reasons.includes("收盘站上五日线"), "reasons should mention standing on MA5");
+assert(reasons.includes("放量红柱"), "reasons should mention volume yang");
+assert(reasons.includes("换手≥2.5%"), "reasons should mention turnover");
+assert(reasons.includes("振幅≥2%"), "reasons should mention amplitude");
+
+const rising = analyzeBars(risingBars())!;
+assert(rising.aboveMa5, "rising close should sit above MA5");
+assert(rising.priorMa5Down === false, "steady uptrend should not count as prior MA5 down");
+assert(!passesScreen(rising, 3), "steady uptrend should not pass");
+
+const falling = declineThen({ close: 13.9, open: 14.1, volume: 900 });
 const down = analyzeBars(falling)!;
 const macd = macdSeries(falling.map((bar) => bar.close)).at(-1)!;
 almost(macd.hist, 2 * (macd.dif - macd.dea));
-assert(down.aboveMa5 === false, "persistent decline should sit below MA5");
-assert(!passesBuySetup(down), "pure downtrend should not pass buy-point filter");
+assert(down.ma5TurnUp === false, "continued decline should not turn MA5 up");
+assert(down.aboveMa5 === false, "continued decline should stay below MA5");
+assert(!passesScreen(down, 3), "pure downtrend should not pass");
 
-const buy = analyzeBars(buildHarbinLike())!;
-assert(buy.holdsFloor, "second probe should hold the swing low");
-assert(buy.strongYang, "launch bar should be a big yang / limit-up");
-assert(buy.reclaimMa5, "launch bar should reclaim MA5");
-assert(buy.opensMas, "launch bar should open MA5/MA10");
-assert(buy.macdTurning, "MACD histogram should turn up from green");
-assert(buy.bottomShrinkVol, "bottom volume should shrink vs panic");
-assert(buy.pullbackPct != null && buy.pullbackPct >= 8, "setup needs a prior sharp drop");
-assert(passesBuySetup(buy), "Harbin / Youyan-like confirmation should pass");
-assert(buy.threeDayPct != null && buy.threeDayPct > 5, "real buy may exceed old 3-day 5% cap");
+const noTurn = analyzeBars(declineThen({ close: 14.5, open: 14.2, volume: 2000 }))!;
+assert(noTurn.aboveMa5, "modest bounce can still close above MA5");
+assert(noTurn.ma5TurnUp === false, "bounce below close[t-5] should not turn MA5 up");
+assert(!passesScreen(noTurn, 3), "stand without MA5 turn-up should fail");
 
-const weak = analyzeBars(buildHarbinLike({ weakYang: true }))!;
-assert(!weak.strongYang, "first stand without a big yang should not count as confirmation");
-assert(!passesBuySetup(weak), "false first MA5 stand should fail");
+const yin = analyzeBars(declineThen({ open: 16.2, volume: 2000 }))!;
+assert(yin.ma5TurnUp && yin.aboveMa5, "gapped yin can still reclaim MA5");
+assert(yin.redBar === false, "close below open is not a red bar");
+assert(!passesScreen(yin, 3), "yin bar should fail even with volume");
 
-const broken = analyzeBars(buildHarbinLike({ undercut: true }))!;
-assert(!broken.holdsFloor, "second probe that breaks the low should fail");
-assert(!passesBuySetup(broken), "broken swing low should not pass");
+const dry = analyzeBars(declineThen({ volume: 1000 }))!;
+assert(dry.redBar, "dry bounce can still be a yang");
+assert(dry.volumeUp === false, "volume equal to prior average is not 放量");
+assert(!passesScreen(dry, 3), "yang without volume expansion should fail");
 
-const chop = analyzeBars(buildHarbinLike({ noDrop: true }))!;
-assert(!passesBuySetup(chop), "no sharp pullback should not pass");
+const tight = analyzeBars(
+  declineThen({
+    high: 15.32,
+    low: 15.28,
+  }),
+)!;
+assert(tight.redBar && tight.volumeUp && tight.aboveMa5 && tight.ma5TurnUp, "tight range can still reclaim MA5");
+assert(tight.amplitudePct != null && tight.amplitudePct < 2, "tight high-low should keep amplitude under 2%");
+assert(!passesScreen(tight, 3), "amplitude below 2% should fail");
 
 console.log("indicators.check ok", {
-  hist: buy.hist.toFixed(4),
-  threeDayPct: buy.threeDayPct?.toFixed(2),
-  pullbackPct: buy.pullbackPct?.toFixed(2),
-  dayPct: buy.dayPct?.toFixed(2),
+  ma5: hit.ma5.toFixed(3),
+  ma5Prev: hit.ma5Prev.toFixed(3),
+  amplitudePct: hit.amplitudePct?.toFixed(2),
+  dayPct: hit.dayPct?.toFixed(2),
 });
