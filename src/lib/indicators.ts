@@ -149,6 +149,36 @@ export type BuyPoint = {
   close: number;
 };
 
+export type TdMark<T = string> = {
+  time: T;
+  count: number;
+  side: "up" | "down";
+};
+
+/** TD Setup：收盘价与 4 根之前比较，同向连续计数，满 9 后若仍同向则从 1 重新计。 */
+export function tdSequential<T>(points: Array<{ time: T; close: number }>): Array<TdMark<T>> {
+  const marks: Array<TdMark<T>> = [];
+  let up = 0;
+  let down = 0;
+  for (let i = 4; i < points.length; i += 1) {
+    const close = points[i].close;
+    const ref = points[i - 4].close;
+    if (close > ref) {
+      down = 0;
+      up = up >= 9 ? 1 : up + 1;
+      marks.push({ time: points[i].time, count: up, side: "up" });
+    } else if (close < ref) {
+      up = 0;
+      down = down >= 9 ? 1 : down + 1;
+      marks.push({ time: points[i].time, count: down, side: "down" });
+    } else {
+      up = 0;
+      down = 0;
+    }
+  }
+  return marks;
+}
+
 export function findBuyPoints(bars: KBar[]): BuyPoint[] {
   const points: BuyPoint[] = [];
   if (bars.length < 40) return points;

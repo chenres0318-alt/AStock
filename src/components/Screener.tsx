@@ -140,7 +140,7 @@ export default function Screener() {
         <div className="mt-2 max-w-4xl text-xs leading-5 text-mute">
           当日收盘站上 5 日均线，且近 5 个交易日里这是第一次。MACD 为多头排列（DIF 大于 DEA 且 DEA 大于 0）或空头减弱（绿柱缩短）。股价在 20
           日均线下方时，空头减弱只保留当天涨幅至少 5% 或振幅至少 8% 的阳线反包，用来去掉下跌中继里反复轻站五日线的假买点。扫描成交额靠前的沪深
-          A 股，不含 ST / 北交所。看盘页日 K 用同一规则标出历史买点。
+          A 股，不含 ST / 北交所。看盘图上的红绿数字是神奇九转，不标这里的买点。
         </div>
       </section>
 
