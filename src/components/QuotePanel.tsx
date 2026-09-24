@@ -33,9 +33,24 @@ export default function QuotePanel({ quote }: { quote: Quote | undefined }) {
     ...quote.asks.map((item) => item.volume ?? 0),
   );
 
+  const stats = [
+    { label: "今开", value: formatPrice(quote.open), tone: quote.preClose != null && quote.open != null ? quote.open - quote.preClose : 0 },
+    { label: "最高", value: formatPrice(quote.high), tone: quote.preClose != null && quote.high != null ? quote.high - quote.preClose : 0 },
+    { label: "最低", value: formatPrice(quote.low), tone: quote.preClose != null && quote.low != null ? quote.low - quote.preClose : 0 },
+    { label: "昨收", value: formatPrice(quote.preClose) },
+    { label: "成交量", value: formatHands(quote.volume) },
+    { label: "成交额", value: formatAmount(quote.amount) },
+    { label: "换手", value: quote.turnover == null ? "--" : `${quote.turnover.toFixed(2)}%` },
+    { label: "振幅", value: quote.amplitude == null ? "--" : `${quote.amplitude.toFixed(2)}%` },
+    { label: "市盈率", value: quote.pe == null ? "--" : quote.pe.toFixed(2) },
+    { label: "市净率", value: quote.pb == null ? "--" : quote.pb.toFixed(2) },
+    { label: "总市值", value: formatMv(quote.totalMv) },
+    { label: "流通值", value: formatMv(quote.floatMv) },
+  ];
+
   return (
     <section className="panel shrink-0 overflow-hidden">
-      <div className="flex flex-wrap items-end justify-between gap-4 px-4 py-3">
+      <div className="flex flex-wrap items-end justify-between gap-3 px-4 py-2">
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-xl font-medium">{quote.name}</h1>
@@ -44,33 +59,32 @@ export default function QuotePanel({ quote }: { quote: Quote | undefined }) {
             </span>
             {quote.halted ? <span className="rounded bg-flat/20 px-1.5 py-0.5 text-[10px] text-mute">停牌</span> : null}
           </div>
-          <div className="mt-1 text-xs text-mute">{displaySymbol(quote.code)}</div>
+          <div className="mt-0.5 text-xs text-mute">{displaySymbol(quote.code)}</div>
         </div>
         <div className="text-right">
-          <div className={`num text-4xl leading-none ${toneClass(quote.pct)}`}>{formatPrice(quote.price)}</div>
+          <div className={`num text-3xl leading-none ${toneClass(quote.pct)}`}>{formatPrice(quote.price)}</div>
           <div className={`num mt-1 text-sm ${toneClass(quote.pct)}`}>
             {formatSigned(quote.change)}　{formatPct(quote.pct)}
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-2 border-t border-line px-3 py-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-12">
-        <Stat label="今开" value={formatPrice(quote.open)} tone={quote.preClose != null && quote.open != null ? quote.open - quote.preClose : 0} />
-        <Stat label="最高" value={formatPrice(quote.high)} tone={quote.preClose != null && quote.high != null ? quote.high - quote.preClose : 0} />
-        <Stat label="最低" value={formatPrice(quote.low)} tone={quote.preClose != null && quote.low != null ? quote.low - quote.preClose : 0} />
-        <Stat label="昨收" value={formatPrice(quote.preClose)} />
-        <Stat label="成交量" value={formatHands(quote.volume)} />
-        <Stat label="成交额" value={formatAmount(quote.amount)} />
-        <Stat label="换手" value={quote.turnover == null ? "--" : `${quote.turnover.toFixed(2)}%`} />
-        <Stat label="振幅" value={quote.amplitude == null ? "--" : `${quote.amplitude.toFixed(2)}%`} />
-        <Stat label="市盈率" value={quote.pe == null ? "--" : quote.pe.toFixed(2)} />
-        <Stat label="市净率" value={quote.pb == null ? "--" : quote.pb.toFixed(2)} />
-        <Stat label="总市值" value={formatMv(quote.totalMv)} />
-        <Stat label="流通值" value={formatMv(quote.floatMv)} />
+      <div className="grid grid-cols-3 gap-2 border-t border-line px-3 py-2 sm:grid-cols-4 lg:grid-cols-6 xl:hidden">
+        {stats.map((item) => (
+          <Stat key={item.label} label={item.label} value={item.value} tone={item.tone} />
+        ))}
+      </div>
+      <div className="hidden flex-wrap gap-x-4 gap-y-1 border-t border-line px-4 py-1.5 text-[11px] xl:flex">
+        {stats.map((item) => (
+          <span key={item.label} className="whitespace-nowrap">
+            <span className="text-mute">{item.label}</span>{" "}
+            <span className={`num ${item.tone == null ? "" : toneClass(item.tone)}`}>{item.value}</span>
+          </span>
+        ))}
       </div>
 
       {isIndexCode(quote.code) ? null : (
-      <div className="grid gap-3 border-t border-line px-3 py-3 lg:grid-cols-[1fr_220px]">
+      <div className="grid gap-2 border-t border-line px-3 py-2 lg:grid-cols-[1fr_200px]">
         <div className="grid grid-cols-2 gap-4 text-xs">
           <div>
             <div className="mb-2 text-mute">卖盘</div>
@@ -105,7 +119,7 @@ export default function QuotePanel({ quote }: { quote: Quote | undefined }) {
             ))}
           </div>
         </div>
-        <div className="rounded-md bg-bg px-3 py-3 text-xs">
+        <div className="rounded-md bg-bg px-3 py-2 text-xs">
           <div className="text-mute">内外盘</div>
           <div className="mt-2 flex h-2 overflow-hidden rounded">
             <div
