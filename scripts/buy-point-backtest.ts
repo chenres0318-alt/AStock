@@ -285,14 +285,15 @@ function simulateStock(bars: KBar[], start: string, end: string, code: string, n
     if (bar.time > end) break;
   }
 
+  const windowed = bars.filter((b) => b.time >= start && b.time <= end);
   const lastEquity = curve.at(-1) ?? cash;
   const stats = tradeStats(trades.map((t) => t.ret));
   return {
     code,
     name,
-    first: bars[0]?.time ?? null,
-    last: bars.at(-1)?.time ?? null,
-    bars: bars.filter((b) => b.time >= start && b.time <= end).length,
+    first: windowed[0]?.time ?? null,
+    last: windowed.at(-1)?.time ?? null,
+    bars: windowed.length,
     endEquity: lastEquity,
     totalReturn: lastEquity / CASH0 - 1,
     maxDrawdown: curve.length ? maxDrawdown(curve) : 0,

@@ -36,18 +36,20 @@ function Metric({
 
 function PeriodCard({ label, periodKey }: { label: string; periodKey: PeriodKey }) {
   const block = report.periods[periodKey];
-  const p = block.portfolio;
+  const p = block.pooled;
+  const dd = block.portfolio.maxDrawdown;
   return (
     <section className="panel overflow-hidden">
       <PanelTitle title={`${label}  ·  ${block.start} 至 ${block.end}`} />
       <div className="grid gap-2 px-3 py-3 sm:grid-cols-2 lg:grid-cols-4">
         <Metric label="胜率" value={`${p.wins}/${p.tradeCount}　${ratioPct(p.winRate)}`} tone={p.winRate != null ? p.winRate - 0.5 : null} />
-        <Metric label="最大回撤（组合）" value={ratioPct(p.maxDrawdown)} tone={p.maxDrawdown} />
+        <Metric label="最大回撤（20万组合）" value={ratioPct(dd)} tone={dd} />
         <Metric label="盈亏比（均盈/|均亏|）" value={ratioNum(p.payoff)} tone={p.payoff != null ? p.payoff - 1 : null} />
         <Metric label="期望值（单笔平均）" value={ratioPct(p.expectancy)} tone={p.expectancy} />
       </div>
       <div className="px-3 pb-2 text-[11px] text-mute">
-        组合区间收益 {ratioPct(p.totalReturn)}，单笔中位数 {ratioPct(p.median)}。期望值被少数连板抬高时，中位数更接近普通一笔。
+        胜率 / 盈亏比 / 期望值按四只股票全部交易合计；回撤来自同一套买卖点的 20 万组合账户。组合区间收益{" "}
+        {ratioPct(block.portfolio.totalReturn)}，单笔中位数 {ratioPct(p.median)}。期望值被少数连板抬高时，中位数更接近普通一笔。
       </div>
       <div className="overflow-auto scroll-thin">
         <table className="w-full min-w-[720px] text-left text-sm">
