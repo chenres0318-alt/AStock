@@ -199,6 +199,54 @@ export function tdSequential<T>(points: Array<{ time: T; close: number }>): Arra
   return active ? completed.concat(active) : completed;
 }
 
+const VOLUME_BOOST = 1.15;
+const MAX_DAY_PCT = 8;
+const ATR_MIN = 0.02;
+const ATR_MAX = 0.05;
+
+function trueRange(bars: KBar[], index: number): number {
+  const prevClose = bars[index - 1].close;
+  const bar = bars[index];
+  return Math.max(bar.high - bar.low, Math.abs(bar.high - prevClose), Math.abs(bar.low - prevClose));
+}
+
+function atr14(bars: KBar[], index: number): number | null {
+  if (index < 14) return null;
+  let sum = 0;
+  for (let j = index - 13; j <= index; j += 1) sum += trueRange(bars, j);
+  return sum / 14;
+}
+
+/** 趋势波段买点。日线：收盘站上 30 日线，开盘还在昨日 30 日线压力之下。 */
+export function findTrendSwingBuys(bars: KBar[]): BuyPoint[] {
+  const points: BuyPoint[] = [];
+  if (bars.length < 40) return points;
+  const closes = bars.map((bar) => bar.close);
+  const macd = macdSeries(closes);
+  for (let i = 33; i < bars.length; i += 1) {
+    const ma30 = maAt(closes, 30, i);
+    const ma30Prev = maAt(closes, 30, i - 1);
+    const cur = macd[i];
+    const atr = atr14(bars, i);
+    if (ma30 == null || ma30Prev == null || cur == null || atr == null) continue;
+    const bar = bars[i];
+    const prevClose = bars[i - 1].close;
+    if (!(prevClose > 0) || !(bar.close > ma30) || !(bar.open <= ma30Prev)) continue;
+    const dayPct = (bar.close / prevClose - 1) * 100;
+    if (!(dayPct < MAX_DAY_PCT)) continue;
+    let volSum = 0;
+    for (let j = i - 5; j < i; j += 1) volSum += bars[j].volume;
+    const volAvg = volSum / 5;
+    if (!(volAvg > 0) || !(bar.volume >= volAvg * VOLUME_BOOST)) continue;
+    if (!(cur.dif + 1e-8 >= cur.dea)) continue;
+    const atrPct = atr / bar.close;
+    if (!(atrPct >= ATR_MIN && atrPct <= ATR_MAX)) continue;
+    if (bar.mainNet == null || !(bar.mainNet >= 0)) continue;
+    points.push({ time: bar.time, close: bar.close });
+  }
+  return points;
+}
+
 export function findBuyPoints(bars: KBar[]): BuyPoint[] {
   const points: BuyPoint[] = [];
   if (bars.length < 40) return points;

@@ -2,7 +2,7 @@ import { cached } from "./cache";
 import { DEFAULT_WATCHLIST, INDICES, SECTOR_ETFS, limitPercent, toTencentCode } from "./codes";
 import { firstOk } from "./http";
 import { getMarketStatus } from "./market-status";
-import { fetchEastMoneySearch, fetchEastMoneySectors } from "./sources/eastmoney";
+import { fetchEastMoneyMainNet, fetchEastMoneySearch, fetchEastMoneySectors } from "./sources/eastmoney";
 import { fetchSinaIndustries, fetchSinaRank, fetchSinaSuggest } from "./sources/sina";
 import { fetchTencentKline, fetchTencentQuotes, fetchTencentTrend } from "./sources/tencent";
 import type {
@@ -35,9 +35,16 @@ export async function getOverview(codes: string[]) {
 
 export async function getKline(code: string, period: KlinePeriod): Promise<KBar[]> {
   const count = period === "day" ? 500 : 180;
-  return cached(`kline:${toTencentCode(code)}:${period}:${count}`, 20_000, () =>
-    fetchTencentKline(code, period, count),
-  );
+  return cached(`kline:${toTencentCode(code)}:${period}:${count}:flow`, 20_000, async () => {
+    const bars = await fetchTencentKline(code, period, count);
+    if (period !== "day") return bars;
+    try {
+      const flow = await fetchEastMoneyMainNet(code, count);
+      return bars.map((bar) => ({ ...bar, mainNet: flow.get(bar.time) ?? null }));
+    } catch {
+      return bars;
+    }
+  });
 }
 
 export async function getTrend(code: string): Promise<{
