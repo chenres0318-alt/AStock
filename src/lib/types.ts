@@ -122,6 +122,8 @@ export type ScreenerHit = {
   turnover: number | null;
   amplitudePct: number | null;
   ma5: number;
+  dif: number;
+  dea: number;
   hist: number;
   reasons: string[];
 };
