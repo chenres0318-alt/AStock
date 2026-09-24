@@ -1,4 +1,4 @@
-import { marketOf, toTencentCode } from "../codes";
+import { marketOf, toEastMoneySecId, toTencentCode } from "../codes";
 import { toNumber } from "../format";
 import { fetchJson, fetchUtf } from "../http";
 import type { BoardMember, KBar, RankItem, SearchItem, SectorItem } from "../types";
@@ -41,6 +41,11 @@ const HOSTS = [
 const HIS_KLINE = [
   "https://push2his.eastmoney.com/api/qt/stock/kline/get",
   "https://86.push2his.eastmoney.com/api/qt/stock/kline/get",
+];
+
+const MAIN_FLOW = [
+  "https://push2his.eastmoney.com/api/qt/stock/fflow/daykline/get",
+  "https://86.push2his.eastmoney.com/api/qt/stock/fflow/daykline/get",
 ];
 
 async function clist(query: string): Promise<ClistResponse> {
@@ -207,6 +212,33 @@ function parseMaybeJsonp(text: string): KlineResponse {
     ? trimmed.replace(/^j\(/, "").replace(/\);?$/, "")
     : trimmed;
   return JSON.parse(jsonText) as KlineResponse;
+}
+
+/** 日线主力净流入，按日期。正数为净流入。 */
+export async function fetchEastMoneyMainNet(code: string, limit = 500): Promise<Map<string, number>> {
+  const secid = toEastMoneySecId(code);
+  const query =
+    `lmt=${limit}&klt=101&secid=${secid}&fields1=f1,f2,f3,f7&fields2=f51,f52`;
+  let lastError: unknown;
+  for (const base of MAIN_FLOW) {
+    try {
+      const json = await fetchJson<{ data?: { klines?: string[] } }>(`${base}?${query}`, {
+        referer: "https://quote.eastmoney.com/",
+        timeoutMs: 8000,
+      });
+      const rows = json.data?.klines ?? [];
+      const map = new Map<string, number>();
+      for (const row of rows) {
+        const [date, net] = String(row).split(",");
+        const value = toNumber(net);
+        if (date && value != null) map.set(date, value);
+      }
+      if (map.size) return map;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("主力资金不可用");
 }
 
 export async function fetchEastMoneyKline(secid: string, count = 80): Promise<KBar[]> {

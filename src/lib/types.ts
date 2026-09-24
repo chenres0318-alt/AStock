@@ -47,6 +47,8 @@ export type KBar = {
   close: number;
   volume: number;
   turnover?: number | null;
+  /** 主力净流入，元。小于 0 为净流出。日 K 才有。 */
+  mainNet?: number | null;
 };
 
 export type TrendPoint = {

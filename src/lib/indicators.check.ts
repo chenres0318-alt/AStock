@@ -1,4 +1,4 @@
-import { analyzeBars, findBuyPoints, maAt, macdSeries, passesScreen, screenReasons, tdSequential } from "./indicators.ts";
+import { analyzeBars, findBuyPoints, findTrendSwingBuys, maAt, macdSeries, passesScreen, screenReasons, tdSequential } from "./indicators.ts";
 import type { KBar } from "./types.ts";
 
 function assert(cond: unknown, message: string) {
@@ -144,6 +144,45 @@ assert(forming.length === 4 && forming[0]?.count === 1 && forming[3]?.count === 
 
 const broken = tdSequential([1, 2, 3, 4, 5, 6, 7, 8, 9, 5].map((close, i) => ({ time: `m${i}`, close })));
 assert(broken.length === 1 && broken[0].side === "down" && broken[0].count === 1, "an interrupted rise is dropped, and the new flip shows 1");
+
+function swingBars() {
+  const bars = Array.from({ length: 80 }, (_, i) => {
+    const close = 20 + i * 0.05;
+    return {
+      time: `2024-04-${String((i % 28) + 1).padStart(2, "0")}-${i}`,
+      open: Number((close * 0.997).toFixed(4)),
+      high: Number((close * 1.015).toFixed(4)),
+      low: Number((close * 0.985).toFixed(4)),
+      close,
+      volume: 1000,
+      mainNet: 100,
+    };
+  });
+  const i = bars.length - 1;
+  const closes = bars.map((bar) => bar.close);
+  const ma30 = maAt(closes, 30, i)!;
+  const ma30Prev = maAt(closes, 30, i - 1)!;
+  const prevClose = bars[i - 1].close;
+  const close = Math.max(ma30 + 0.05, prevClose * 1.03);
+  bars[i].open = ma30Prev;
+  bars[i].close = close;
+  bars[i].high = Math.max(bars[i].open, close) * 1.01;
+  bars[i].low = Math.min(bars[i].open, close) * 0.99;
+  bars[i].volume = 2000;
+  return bars;
+}
+
+const swing = swingBars();
+const swingHits = findTrendSwingBuys(swing);
+assert(swingHits.length === 1 && swingHits[0].time === swing.at(-1)?.time, "a qualified trend swing day is a buy");
+const outflow = swing.map((bar, index) => (index === swing.length - 1 ? { ...bar, mainNet: -1 } : bar));
+assert(!findTrendSwingBuys(outflow).some((point) => point.time === swing.at(-1)?.time), "main-force outflow is not a buy");
+const chase = swing.map((bar, index) =>
+  index === swing.length - 1 ? { ...bar, close: swing[index - 1].close * 1.09, high: swing[index - 1].close * 1.1 } : bar,
+);
+assert(!findTrendSwingBuys(chase).some((point) => point.time === swing.at(-1)?.time), "an 8%+ day is not chased");
+const gapped = swing.map((bar, index) => (index === swing.length - 1 ? { ...bar, open: bar.open + 2 } : bar));
+assert(!findTrendSwingBuys(gapped).some((point) => point.time === swing.at(-1)?.time), "opening through MA30 resistance is not a buy");
 
 console.log("indicators.check ok", {
   bull: { firstStandMa5: bull.firstStandMa5, macdBull: bull.macdBull, macdBearWeak: bull.macdBearWeak, dea: bull.dea.toFixed(3) },

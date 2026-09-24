@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import {
   ColorType,
   CrosshairMode,
@@ -9,11 +9,10 @@ import {
   type IChartApi,
   type IPriceLine,
   type ISeriesApi,
-  type SeriesMarker,
   type Time,
   type UTCTimestamp,
 } from "lightweight-charts";
-import { maAt, tdSequential } from "@/lib/indicators";
+import { findTrendSwingBuys, maAt } from "@/lib/indicators";
 import type { KBar, Quote, TrendPoint } from "@/lib/types";
 
 export type ChartMode = "trend" | "day" | "week" | "month";
@@ -38,17 +37,6 @@ function formatChartTime(time: unknown, withDate: boolean): string {
     minute: "2-digit",
     hourCycle: "h23",
   }).format(new Date(ts * 1000));
-}
-
-function tdChartMarkers(points: Array<{ time: Time; close: number }>): SeriesMarker<Time>[] {
-  return tdSequential(points).map((mark) => ({
-    time: mark.time,
-    position: mark.side === "up" ? "aboveBar" : "belowBar",
-    color: mark.side === "up" ? UP : DOWN,
-    shape: "circle",
-    text: String(mark.count),
-    size: mark.count === 9 ? 2 : 1,
-  }));
 }
 
 function ma5Line(bars: KBar[]): Array<{ time: string; value: number }> {
@@ -182,6 +170,8 @@ export default function ChartView({
     };
   }, []);
 
+  const buyCount = useMemo(() => (mode === "day" ? findTrendSwingBuys(bars).length : 0), [mode, bars]);
+
   useEffect(() => {
     const candle = candleRef.current;
     const vol = volRef.current;
@@ -241,14 +231,7 @@ export default function ChartView({
           title: "昨收",
         });
       }
-      line.setMarkers(
-        tdChartMarkers(
-          points.map((item) => ({
-            time: item.timestamp as UTCTimestamp,
-            close: item.price,
-          })),
-        ),
-      );
+      line.setMarkers([]);
       applyTimeScale(chart, mode, trend.points.length);
       return;
     }
@@ -273,12 +256,16 @@ export default function ChartView({
       })),
     );
     candle.setMarkers(
-      tdChartMarkers(
-        bars.map((bar) => ({
-          time: bar.time as Time,
-          close: bar.close,
-        })),
-      ),
+      mode === "day"
+        ? findTrendSwingBuys(bars).map((point) => ({
+            time: point.time,
+            position: "belowBar" as const,
+            color: UP,
+            shape: "arrowUp" as const,
+            text: "买",
+            size: 1.4,
+          }))
+        : [],
     );
     applyTimeScale(chart, mode, bars.length);
   }, [bars, trend, mode]);
@@ -311,8 +298,10 @@ export default function ChartView({
           {loading
             ? "加载中…"
             : mode === "trend"
-              ? "黄线现价 蓝线均价 · 九转当前从 1 标，走完才留下"
-              : "黄线MA5 · 九转当前从 1 标，走完才留下"}
+              ? "黄线现价 蓝线均价"
+              : mode === "day"
+                ? `黄线MA5 · 红箭头买点 ${buyCount} 处`
+                : "黄线MA5"}
         </div>
       </div>
       <div className="relative min-h-0 flex-1">
