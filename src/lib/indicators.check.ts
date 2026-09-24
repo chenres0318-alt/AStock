@@ -121,11 +121,13 @@ assert(!findBuyPoints(weaveBars).some((point) => point.time === weaveBars[weaveB
 const risingTd = tdSequential(risingCloses(20, 10, 1).map((close, i) => ({ time: `u${i}`, close })));
 assert(risingTd[0]?.side === "up" && risingTd[0].count === 1, "first bar above close[i-4] starts up count at 1");
 assert(risingTd[8]?.count === 9 && risingTd[8].side === "up", "ninth consecutive higher close is up 9");
-assert(risingTd[9]?.count === 1 && risingTd[9].side === "up", "count restarts at 1 after an up 9");
-assert(risingTd.every((mark) => mark.side === "up"), "steady rise should stay on the up sequence");
+assert(risingTd.length === 9, "a steady rise keeps one finished 9 and does not start another");
 
 const fallingTd = tdSequential(fallingCloses(14, 40, 1).map((close, i) => ({ time: `d${i}`, close })));
-assert(fallingTd[8]?.count === 9 && fallingTd[8].side === "down", "ninth consecutive lower close is down 9");
+assert(fallingTd.length === 9 && fallingTd[8]?.count === 9 && fallingTd[8].side === "down", "ninth consecutive lower close is down 9");
+
+const aborted = tdSequential([5, 5, 5, 5, 5, 8, 9, 10, 4].map((close, i) => ({ time: `a${i}`, close })));
+assert(aborted.length === 0, "a 3-bar rise that breaks is dropped, and the new one-bar flip stays hidden");
 
 const flatThenUp = tdSequential([
   { time: "a", close: 5 },
@@ -135,11 +137,14 @@ const flatThenUp = tdSequential([
   { time: "e", close: 5 },
   { time: "f", close: 8 },
 ]);
-assert(flatThenUp.length === 1 && flatThenUp[0].time === "f" && flatThenUp[0].count === 1, "equal close versus 4 bars ago resets, next rise starts at 1");
+assert(flatThenUp.length === 0, "a one-bar flip is not shown before the count reaches 6");
+
+const forming = tdSequential(risingCloses(10, 10, 1).map((close, i) => ({ time: `f${i}`, close })));
+assert(forming.length === 6 && forming[5]?.count === 6 && forming[5].side === "up", "an open setup is shown once it reaches 6");
+assert(tdSequential(risingCloses(8, 10, 1).map((close, i) => ({ time: `e${i}`, close }))).length === 0, "an open setup below 6 stays hidden");
 
 const broken = tdSequential([1, 2, 3, 4, 5, 6, 7, 8, 9, 5].map((close, i) => ({ time: `m${i}`, close })));
-assert(broken.at(-1)?.side === "down" && broken.at(-1)?.count === 1, "a close back under the bar 4 ago flips to down 1");
-assert(!broken.some((mark) => mark.side === "up" && mark.count === 9), "interrupted rise must not print an up 9");
+assert(broken.length === 0, "an interrupted rise is dropped, and a one-bar flip is not shown");
 
 console.log("indicators.check ok", {
   bull: { firstStandMa5: bull.firstStandMa5, macdBull: bull.macdBull, macdBearWeak: bull.macdBearWeak, dea: bull.dea.toFixed(3) },
