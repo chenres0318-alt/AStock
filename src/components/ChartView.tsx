@@ -6,6 +6,7 @@ import {
   CrosshairMode,
   LineStyle,
   createChart,
+  type AutoscaleInfo,
   type IChartApi,
   type IPriceLine,
   type ISeriesApi,
@@ -59,13 +60,14 @@ function ma5Line(bars: KBar[]): Array<{ time: string; value: number }> {
   return points;
 }
 
-function applyTimeScale(chart: IChartApi, mode: ChartMode, barCount: number) {
+function applyTimeScale(chart: IChartApi, mode: ChartMode, barCount: number, resetRange: boolean) {
   chart.timeScale().applyOptions({
     timeVisible: mode === "trend",
     secondsVisible: false,
     fixLeftEdge: mode !== "day",
     fixRightEdge: true,
   });
+  if (!resetRange) return;
   requestAnimationFrame(() => {
     if (mode === "day" && barCount > 80) {
       chart.timeScale().setVisibleLogicalRange({
@@ -76,6 +78,29 @@ function applyTimeScale(chart: IChartApi, mode: ChartMode, barCount: number) {
     }
     chart.timeScale().fitContent();
   });
+}
+
+/** 可见 K 线越少，价格轴收得越紧，红青丝带才不会挤成一条。 */
+function magnifiedPriceRange(chart: IChartApi, bars: KBar[]): AutoscaleInfo | null {
+  const range = chart.timeScale().getVisibleLogicalRange();
+  if (!range || bars.length === 0) return null;
+  const from = Math.max(0, Math.floor(range.from));
+  const to = Math.min(bars.length - 1, Math.ceil(range.to));
+  const count = to - from + 1;
+  if (count < 2 || count >= 42) return null;
+  let low = Infinity;
+  let high = -Infinity;
+  for (let i = from; i <= to; i += 1) {
+    low = Math.min(low, bars[i].low);
+    high = Math.max(high, bars[i].high);
+  }
+  if (!(high > low)) return null;
+  // 42 根仍用完整高低点。收到大约 20 根时，纵轴只留高低点的 45%，丝带层才会分开。
+  const tighten = Math.min(1, (42 - count) / 22);
+  const zoom = 1 - tighten * 0.55;
+  const mid = (low + high) / 2;
+  const half = Math.max((high - low) * zoom, mid * 0.015) / 2;
+  return { priceRange: { minValue: mid - half, maxValue: mid + half } };
 }
 
 export default function ChartView({
@@ -102,7 +127,12 @@ export default function ChartView({
   const avgRef = useRef<ISeriesApi<"Line"> | null>(null);
   const preCloseLineRef = useRef<IPriceLine | null>(null);
   const viewRef = useRef({ mode, barCount: bars.length });
+  const barsRef = useRef(bars);
+  const modeRef = useRef(mode);
+  const rangeKeyRef = useRef("");
   viewRef.current = { mode, barCount: bars.length };
+  barsRef.current = bars;
+  modeRef.current = mode;
 
   useEffect(() => {
     const el = boxRef.current;
@@ -132,19 +162,39 @@ export default function ChartView({
         tickMarkFormatter: (time: Time) => formatChartTime(time, false),
       },
       autoSize: true,
+      handleScale: {
+        mouseWheel: false,
+      },
     });
+    const onWheel = (event: WheelEvent) => {
+      if (event.deltaY === 0) return;
+      event.preventDefault();
+      const current = chart.timeScale().options().barSpacing;
+      const zoomIn = event.deltaY < 0;
+      const next = current * (zoomIn ? 1.35 : 1 / 1.35);
+      chart.timeScale().applyOptions({
+        barSpacing: Math.min(96, Math.max(2, next)),
+      });
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    const autoscaleInfoProvider = (original: () => AutoscaleInfo | null) => {
+      if (modeRef.current === "trend") return original();
+      return magnifiedPriceRange(chart, barsRef.current) ?? original();
+    };
     const candle = chart.addCandlestickSeries({
       upColor: UP,
       downColor: DOWN,
       borderVisible: false,
       wickUpColor: UP,
       wickDownColor: DOWN,
+      autoscaleInfoProvider,
     });
     const line = chart.addLineSeries({
       color: "#e4b454",
       lineWidth: 2,
       priceLineVisible: false,
       lastValueVisible: true,
+      autoscaleInfoProvider,
     });
     const avg = chart.addLineSeries({
       color: "#6ea8ff",
@@ -162,6 +212,7 @@ export default function ChartView({
           priceLineVisible: false,
           lastValueVisible: false,
           crosshairMarkerVisible: false,
+          autoscaleInfoProvider,
         }),
       );
       ribbons.push(
@@ -171,6 +222,7 @@ export default function ChartView({
           priceLineVisible: false,
           lastValueVisible: false,
           crosshairMarkerVisible: false,
+          autoscaleInfoProvider,
         }),
       );
     }
@@ -192,10 +244,11 @@ export default function ChartView({
     volRef.current = vol;
     const ro = new ResizeObserver(() => {
       const { mode: currentMode, barCount } = viewRef.current;
-      applyTimeScale(chart, currentMode, barCount);
+      applyTimeScale(chart, currentMode, barCount, false);
     });
     ro.observe(el);
     return () => {
+      el.removeEventListener("wheel", onWheel);
       ro.disconnect();
       chart.remove();
       chartRef.current = null;
@@ -272,7 +325,10 @@ export default function ChartView({
         });
       }
       line.setMarkers([]);
-      applyTimeScale(chart, mode, trend.points.length);
+      const trendKey = `trend:${trend.points.length}:${trend.points.at(-1)?.timestamp ?? ""}`;
+      const resetTrend = rangeKeyRef.current !== trendKey;
+      rangeKeyRef.current = trendKey;
+      applyTimeScale(chart, mode, trend.points.length, resetTrend);
       return;
     }
 
@@ -321,7 +377,10 @@ export default function ChartView({
             },
       ),
     );
-    applyTimeScale(chart, mode, bars.length);
+    const rangeKey = `${mode}:${bars.length}:${bars[0]?.time ?? ""}:${bars.at(-1)?.time ?? ""}`;
+    const resetRange = rangeKeyRef.current !== rangeKey;
+    rangeKeyRef.current = rangeKey;
+    applyTimeScale(chart, mode, bars.length, resetRange);
   }, [bars, trend, mode]);
   const tabs: Array<{ id: ChartMode; label: string }> = [
     { id: "trend", label: "分时" },
