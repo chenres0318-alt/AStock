@@ -14,7 +14,7 @@ import {
   type UTCTimestamp,
 } from "lightweight-charts";
 import { isHsAShare } from "@/lib/codes";
-import { findBuyPoints } from "@/lib/indicators";
+import { findBuyPoints, maAt } from "@/lib/indicators";
 import type { KBar, Quote, TrendPoint } from "@/lib/types";
 
 export type ChartMode = "trend" | "day" | "week" | "month";
@@ -39,6 +39,17 @@ function formatChartTime(time: unknown, withDate: boolean): string {
     minute: "2-digit",
     hourCycle: "h23",
   }).format(new Date(ts * 1000));
+}
+
+function ma5Line(bars: KBar[]): Array<{ time: string; value: number }> {
+  const closes = bars.map((bar) => bar.close);
+  const points: Array<{ time: string; value: number }> = [];
+  for (let i = 0; i < bars.length; i += 1) {
+    const ma = maAt(closes, 5, i);
+    if (ma == null) continue;
+    points.push({ time: bars[i].time, value: ma });
+  }
+  return points;
 }
 
 function applyTimeScale(chart: IChartApi, mode: ChartMode, barCount: number) {
@@ -183,6 +194,10 @@ export default function ChartView({
     chart.priceScale("right").applyOptions({
       scaleMargins: { top: 0.06, bottom: mode === "day" ? 0.28 : 0.22 },
     });
+    line.applyOptions({
+      lineWidth: mode === "trend" ? 2 : 1,
+      lastValueVisible: true,
+    });
 
     if (mode === "trend") {
       const points = trend.points.filter((item) => item.timestamp > 0 && item.time <= "15:00");
@@ -226,7 +241,7 @@ export default function ChartView({
       return;
     }
 
-    line.setData([]);
+    line.setData(ma5Line(bars));
     avg.setData([]);
     candle.setData(
       bars.map((bar) => ({
@@ -289,8 +304,8 @@ export default function ChartView({
             : mode === "trend"
               ? "黄线现价 蓝线均价"
               : mode === "day" && markBuys
-                ? `红箭头买点 ${buyCount} 处`
-                : ""}
+                ? `黄线MA5 · 红箭头买点 ${buyCount} 处`
+                : "黄线MA5"}
         </div>
       </div>
       <div className="relative min-h-0 flex-1">
