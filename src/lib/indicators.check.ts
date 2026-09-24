@@ -1,4 +1,4 @@
-import { analyzeBars, maAt, macdSeries, passesScreen, screenReasons } from "./indicators.ts";
+import { analyzeBars, findBuyPoints, maAt, macdSeries, passesScreen, screenReasons } from "./indicators.ts";
 import type { KBar } from "./types.ts";
 
 function assert(cond: unknown, message: string) {
@@ -153,6 +153,19 @@ const late = analyzeBars(alreadyTurned)!;
 assert(late.ma5 > late.ma5Prev, "second up day can keep MA5 rising");
 assert(late.ma5TurnUp === false, "turn-up must happen today, not as a follow-through");
 assert(!passesScreen(late, 3), "already-turned MA5 should fail");
+
+const marked = declineThen({});
+marked[marked.length - 1].turnover = 3.2;
+const hits = findBuyPoints(marked);
+assert(hits.length === 1, "historical scan should mark the turn-up bar");
+assert(hits[0].time === marked[marked.length - 1].time, "marker time should match the signal bar");
+
+marked[marked.length - 1].turnover = 2.4;
+assert(findBuyPoints(marked).length === 0, "historical scan should still require turnover ≥2.5%");
+
+const dryHistory = declineThen({ volume: 1000 });
+dryHistory[dryHistory.length - 1].turnover = 4;
+assert(findBuyPoints(dryHistory).length === 0, "historical scan should reject bars without volume expansion");
 
 console.log("indicators.check ok", {
   ma5: hit.ma5.toFixed(3),

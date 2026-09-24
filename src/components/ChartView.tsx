@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import {
   ColorType,
   CrosshairMode,
@@ -9,9 +9,12 @@ import {
   type IChartApi,
   type IPriceLine,
   type ISeriesApi,
+  type SeriesMarker,
   type Time,
   type UTCTimestamp,
 } from "lightweight-charts";
+import { isHsAShare } from "@/lib/codes";
+import { findBuyPoints } from "@/lib/indicators";
 import type { KBar, Quote, TrendPoint } from "@/lib/types";
 
 export type ChartMode = "trend" | "day" | "week" | "month";
@@ -38,10 +41,22 @@ function formatChartTime(time: unknown, withDate: boolean): string {
   }).format(new Date(ts * 1000));
 }
 
-function fitChart(chart: IChartApi) {
+function applyTimeScale(chart: IChartApi, mode: ChartMode, barCount: number) {
+  chart.timeScale().applyOptions({
+    timeVisible: mode === "trend",
+    secondsVisible: false,
+    fixLeftEdge: mode !== "day",
+    fixRightEdge: true,
+  });
   requestAnimationFrame(() => {
+    if (mode === "day" && barCount > 80) {
+      chart.timeScale().setVisibleLogicalRange({
+        from: barCount - 80,
+        to: barCount + 4,
+      });
+      return;
+    }
     chart.timeScale().fitContent();
-    window.setTimeout(() => chart.timeScale().fitContent(), 80);
   });
 }
 
@@ -67,6 +82,8 @@ export default function ChartView({
   const lineRef = useRef<ISeriesApi<"Line"> | null>(null);
   const avgRef = useRef<ISeriesApi<"Line"> | null>(null);
   const preCloseLineRef = useRef<IPriceLine | null>(null);
+  const viewRef = useRef({ mode, barCount: bars.length });
+  viewRef.current = { mode, barCount: bars.length };
 
   useEffect(() => {
     const el = boxRef.current;
@@ -132,7 +149,10 @@ export default function ChartView({
     lineRef.current = line;
     avgRef.current = avg;
     volRef.current = vol;
-    const ro = new ResizeObserver(() => fitChart(chart));
+    const ro = new ResizeObserver(() => {
+      const { mode: currentMode, barCount } = viewRef.current;
+      applyTimeScale(chart, currentMode, barCount);
+    });
     ro.observe(el);
     return () => {
       ro.disconnect();
@@ -140,6 +160,12 @@ export default function ChartView({
       chartRef.current = null;
     };
   }, []);
+
+  const markBuys = Boolean(quote && isHsAShare(quote.code, quote.name));
+  const buyCount = useMemo(
+    () => (mode === "day" && markBuys ? findBuyPoints(bars).length : 0),
+    [mode, markBuys, bars],
+  );
 
   useEffect(() => {
     const candle = candleRef.current;
@@ -149,19 +175,19 @@ export default function ChartView({
     const chart = chartRef.current;
     if (!candle || !vol || !line || !avg || !chart) return;
 
-    chart.timeScale().applyOptions({
-      timeVisible: mode === "trend",
-      secondsVisible: false,
-    });
-
     if (preCloseLineRef.current) {
       line.removePriceLine(preCloseLineRef.current);
       preCloseLineRef.current = null;
     }
 
+    chart.priceScale("right").applyOptions({
+      scaleMargins: { top: 0.06, bottom: mode === "day" ? 0.28 : 0.22 },
+    });
+
     if (mode === "trend") {
       const points = trend.points.filter((item) => item.timestamp > 0 && item.time <= "15:00");
       candle.setData([]);
+      candle.setMarkers([]);
       line.setData(
         points.map((item) => ({
           time: item.timestamp as UTCTimestamp,
@@ -196,7 +222,7 @@ export default function ChartView({
           title: "昨收",
         });
       }
-      fitChart(chart);
+      applyTimeScale(chart, mode, trend.points.length);
       return;
     }
 
@@ -218,9 +244,20 @@ export default function ChartView({
         color: bar.close >= bar.open ? "rgba(255,92,92,0.6)" : "rgba(30,203,147,0.6)",
       })),
     );
-    fitChart(chart);
-  }, [bars, trend, mode]);
-
+    const markers: SeriesMarker<Time>[] =
+      mode === "day" && markBuys
+        ? findBuyPoints(bars).map((point) => ({
+            time: point.time,
+            position: "belowBar",
+            color: UP,
+            shape: "arrowUp",
+            text: "买",
+            size: 1.4,
+          }))
+        : [];
+    candle.setMarkers(markers);
+    applyTimeScale(chart, mode, bars.length);
+  }, [bars, trend, mode, markBuys]);
   const tabs: Array<{ id: ChartMode; label: string }> = [
     { id: "trend", label: "分时" },
     { id: "day", label: "日K" },
@@ -246,7 +283,14 @@ export default function ChartView({
           ))}
         </div>
         <div className="text-[11px] text-mute">
-          {quote?.name ?? ""} {loading ? "加载中…" : mode === "trend" ? "黄线现价 蓝线均价" : ""}
+          {quote?.name ?? ""}{" "}
+          {loading
+            ? "加载中…"
+            : mode === "trend"
+              ? "黄线现价 蓝线均价"
+              : mode === "day" && markBuys
+                ? `红箭头买点 ${buyCount} 处`
+                : ""}
         </div>
       </div>
       <div className="relative min-h-0 flex-1">

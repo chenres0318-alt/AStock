@@ -46,6 +46,7 @@ export type KBar = {
   low: number;
   close: number;
   volume: number;
+  turnover?: number | null;
 };
 
 export type TrendPoint = {

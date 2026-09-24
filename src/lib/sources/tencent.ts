@@ -101,8 +101,9 @@ function parseKlineRows(rows: unknown[] | undefined): KBar[] {
     const high = toNumber(row[3]);
     const low = toNumber(row[4]);
     const volume = toNumber(row[5]);
+    const turnover = toNumber(row[7]);
     if (!time || open == null || close == null || high == null || low == null) continue;
-    bars.push({ time, open, high, low, close, volume: volume ?? 0 });
+    bars.push({ time, open, high, low, close, volume: volume ?? 0, turnover });
   }
   return bars;
 }
