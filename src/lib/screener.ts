@@ -1,6 +1,6 @@
 import { cached } from "./cache";
-import { isHsAShare, limitPercent } from "./codes";
-import { analyzeBars, buyReasons, passesBuySetup, type BuySetupFlags } from "./indicators";
+import { isHsAShare } from "./codes";
+import { analyzeBars, passesScreen, screenReasons, type ScreenFlags } from "./indicators";
 import { mapPool } from "./pool";
 import { fetchEastMoneyAmountRank } from "./sources/eastmoney";
 import { fetchSinaHsAByAmount, fetchSinaKline } from "./sources/sina";
@@ -10,18 +10,19 @@ import type { KBar, RankItem, ScreenerHit } from "./types";
 const SCAN_DEADLINE_MS = 95_000;
 const UNIVERSE_SIZE = 360;
 const KLINE_CONCURRENCY = 8;
+const MIN_TURNOVER = 2.5;
 
 async function stockKline(code: string): Promise<KBar[]> {
   try {
     return await cached(`screener-kline:${code}`, 10 * 60_000, async () => {
       try {
         const bars = await fetchTencentKline(code, "day", 90);
-        if (bars.length >= 50) return bars;
+        if (bars.length >= 20) return bars;
       } catch {
         // try Sina
       }
       const bars = await fetchSinaKline(code, 90);
-      if (bars.length >= 50) return bars;
+      if (bars.length >= 20) return bars;
       throw new Error(`kline unavailable: ${code}`);
     });
   } catch {
@@ -46,7 +47,7 @@ async function liquidUniverse(limit: number): Promise<{ items: RankItem[]; sourc
 }
 
 function toHit(
-  tech: BuySetupFlags,
+  tech: ScreenFlags,
   meta: { code: string; name: string; price?: number | null; pct: number | null; turnover: number | null },
 ): ScreenerHit {
   return {
@@ -55,14 +56,10 @@ function toHit(
     price: meta.price ?? tech.close,
     pct: meta.pct ?? tech.dayPct,
     turnover: meta.turnover,
-    threeDayPct: tech.threeDayPct,
-    pullbackPct: tech.pullbackPct,
+    amplitudePct: tech.amplitudePct,
     ma5: tech.ma5,
-    ma10: tech.ma10,
-    dif: tech.dif,
-    dea: tech.dea,
     hist: tech.hist,
-    reasons: buyReasons(tech),
+    reasons: screenReasons(tech, meta.turnover),
   };
 }
 
@@ -73,7 +70,9 @@ export async function screenStocks(): Promise<{
   source: string;
 }> {
   const { items: ranked, source } = await liquidUniverse(UNIVERSE_SIZE);
-  const candidates = ranked.filter((item) => isHsAShare(item.code, item.name));
+  const candidates = ranked.filter(
+    (item) => isHsAShare(item.code, item.name) && item.turnover != null && item.turnover >= MIN_TURNOVER,
+  );
   const deadline = Date.now() + SCAN_DEADLINE_MS;
 
   await mapPool(candidates, KLINE_CONCURRENCY, async (item) => {
@@ -92,11 +91,11 @@ export async function screenStocks(): Promise<{
     scanned += 1;
     try {
       const bars = await stockKline(item.code);
-      if (bars.length < 50) continue;
+      if (bars.length < 20) continue;
       const last = bars[bars.length - 1];
       if (!last.volume) continue;
-      const tech = analyzeBars(bars, limitPercent(item.code, item.name));
-      if (!tech || !passesBuySetup(tech)) continue;
+      const tech = analyzeBars(bars);
+      if (!tech || !passesScreen(tech, item.turnover)) continue;
       items.push(
         toHit(tech, {
           code: item.code,
@@ -111,12 +110,6 @@ export async function screenStocks(): Promise<{
     }
   }
 
-  items.sort((a, b) => {
-    const aLimit = a.reasons.includes("涨停确认") ? 1 : 0;
-    const bLimit = b.reasons.includes("涨停确认") ? 1 : 0;
-    if (aLimit !== bLimit) return bLimit - aLimit;
-    return (b.pct ?? -999) - (a.pct ?? -999);
-  });
-
+  items.sort((a, b) => (b.turnover ?? -1) - (a.turnover ?? -1));
   return { scanned, universe: candidates.length, items, source };
 }

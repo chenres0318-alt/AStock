@@ -119,12 +119,8 @@ export type ScreenerHit = {
   price: number;
   pct: number | null;
   turnover: number | null;
-  threeDayPct: number | null;
-  pullbackPct: number | null;
+  amplitudePct: number | null;
   ma5: number;
-  ma10: number;
-  dif: number;
-  dea: number;
   hist: number;
   reasons: string[];
 };
