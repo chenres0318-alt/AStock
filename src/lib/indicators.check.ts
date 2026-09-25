@@ -248,6 +248,32 @@ assert(
     10.95 / 10.6 - 1 < 0.07,
   "after an add, a 7% rise over the blended cost marks a reduce",
 );
+const afterReduce = buildRedRibbon(
+  [...ribbonBase, 10.6, 11.2, 11.35, 11.5, 12.09, 11.7, 11.2, 11.05].map((close, i) => barAt(i, close)),
+);
+const afterReduceAdds = afterReduce.signals.filter((item) => item.side === "add");
+const lastReduce = 12.09;
+assert(afterReduce.signals.filter((item) => item.side === "buy").length === 1, "the pullback after reduces is still the same buy");
+assert(11.2 / lastReduce - 1 > -0.08 && 11.05 / lastReduce - 1 < -0.08, "only the last bar exceeds an 8% drop from the reduce");
+assert(
+  afterReduceAdds.length === 1 &&
+    afterReduceAdds[0].time === afterReduce.points[47].time &&
+    (afterReduceAdds[0].gain ?? 0) < -0.08 &&
+    11.05 / 10.6 - 1 > 0,
+  "after a reduce, the next add waits for more than an 8% drop from that reduce close",
+);
+const blendedAfterReduce = (10.6 + 11.05) / 2;
+const secondAdd = buildRedRibbon(
+  [...ribbonBase, 10.6, 11.2, 11.35, 11.5, 12.09, 11.7, 11.2, 11.05, 10.7, 10.02].map((close, i) => barAt(i, close)),
+);
+const secondAdds = secondAdd.signals.filter((item) => item.side === "add");
+assert(
+  secondAdds.length === 2 &&
+    secondAdds[1].time === secondAdd.points[49].time &&
+    10.7 / blendedAfterReduce - 1 > -0.07 &&
+    (secondAdds[1].gain ?? 0) <= -0.07,
+  "after the post-reduce add, another 7% drop from the new blended cost marks the next add",
+);
 const slowCloses: number[] = [];
 let slow = 30;
 for (let i = 0; i < 50; i += 1) {
