@@ -372,7 +372,7 @@ export type RibbonSignal = {
  * VAR1=(2*C+H+L+O)/5
  * A1=(EMA(VAR1,3)+EMA(VAR1,6)+EMA(VAR1,12)+EMA(VAR1,24))/4
  * A2..A7 逐层 EMA(2)
- * 买：下跌中的青丝带逐步收拢且五日线向上；或者青丝带里已有层转红，同时五日线拐向上。
+ * 买：下跌中的青丝带收拢且五日线向上。连续收两天、五日线仍向上时标买；只收紧一天时，要五日线当天拐向上才标买。青丝带里已有层转红、五日线拐向上时也标买。
  * 红丝带收拢卖出，或红丝带里有层转青并且五日线拐向下卖出之后，若五日线重新拐向上且红丝带又向上发散，再标买。
  * 卖：青丝带又向下发散且五日线拐头向下；红丝带收拢且五日线拐头向下；或者红丝带里已有层转青，同时五日线拐向下。
  */
@@ -438,7 +438,7 @@ export function buildRedRibbon(bars: KBar[]): { points: RibbonPoint[]; signals: 
     };
     const someUp = direction.some((item) => item === "up");
     const someDown = direction.some((item) => item === "down");
-    const buyOnConverge = allDown && narrowingStep && maRising;
+    const buyOnConverge = allDown && ((narrowingStep && maRising) || (narrowing && maTurningUp));
     const buyOnTurningRed = !allDown && someUp && cameFrom("down") && maTurningUp;
     const sellOnCyanDiverge = allDown && widening && lowerFalling && maTurningDown;
     const sellOnRedContract = allUp && narrowing && maTurningDown;
