@@ -69,9 +69,31 @@ export function macdSeries(closes: number[]): Array<MacdPoint | null> {
 }
 
 const FIRST_STAND_LOOK = 5;
+/** 红丝带上，收盘高出五日线达到这个比例就标减仓。 */
+const MA5_STRETCH = 0.1;
 /** 20 日线下方的空头减弱，只保留大阳 / 大振幅反包，避免下跌中继假买点。 */
 const STRONG_RECLAIM_DAY_PCT = 5;
 const STRONG_RECLAIM_AMP_PCT = 8;
+
+/** 这根或向前 window-1 根里，有过一次近 5 日首次站上五日线。 */
+function recentFirstStand(closes: number[], i: number, window = FIRST_STAND_LOOK): boolean {
+  const from = Math.max(0, i - (window - 1));
+  for (let j = from; j <= i; j += 1) {
+    if (firstStandAboveMa5(closes, j)) return true;
+  }
+  return false;
+}
+
+/** 收盘站上五日线，且向前 look-1 根都没有站上。 */
+export function firstStandAboveMa5(closes: number[], i: number, look = FIRST_STAND_LOOK): boolean {
+  const ma5 = maAt(closes, 5, i);
+  if (ma5 == null || !(closes[i] > ma5)) return false;
+  for (let j = i - (look - 1); j < i; j += 1) {
+    const ma = maAt(closes, 5, j);
+    if (ma == null || closes[j] > ma) return false;
+  }
+  return true;
+}
 
 export function analyzeBarsAt(
   bars: KBar[],
@@ -85,16 +107,7 @@ export function analyzeBarsAt(
   if (ma5 == null || ma5Prev == null) return null;
 
   const aboveMa5 = closes[i] > ma5;
-  let firstStandMa5 = aboveMa5;
-  if (firstStandMa5) {
-    for (let j = i - (FIRST_STAND_LOOK - 1); j < i; j += 1) {
-      const ma = maAt(closes, 5, j);
-      if (ma == null || closes[j] > ma) {
-        firstStandMa5 = false;
-        break;
-      }
-    }
-  }
+  const firstStandMa5 = firstStandAboveMa5(closes, i);
 
   const cur = macd[i];
   const prev = macd[i - 1];
@@ -294,7 +307,6 @@ function tdxEma(values: number[], period: number): number[] {
 
 const RIBBON_LAYERS = 7;
 const ADX_PERIOD = 14;
-const ADX_BUY_MIN = 22;
 
 function wilderSmooth(values: number[], period: number): Array<number | null> {
   const out: Array<number | null> = Array(values.length).fill(null);
@@ -361,9 +373,10 @@ export type RibbonPoint = {
 
 export type RibbonSignal = {
   time: string;
-  side: "buy" | "sell";
+  side: "buy" | "reduce";
   close: number;
-  adx: number | null;
+  /** 收盘相对五日线的偏离。减仓日约为 0.1 以上。 */
+  stretch: number | null;
 };
 
 /**
@@ -371,8 +384,9 @@ export type RibbonSignal = {
  * VAR1=(2*C+H+L+O)/5
  * A1=(EMA(VAR1,3)+EMA(VAR1,6)+EMA(VAR1,12)+EMA(VAR1,24))/4
  * A2..A7 逐层 EMA(2)
- * 买：七层同时从「非全向上」变成全向上，且 ADX(14)>22。
- * 卖：已有买点之后，七层同时从「非全向下」变成全向下。
+ * 买：七层刚变成全红，并且这根或前 4 根里出现过近 5 日首次站上五日线。
+ * 丝带慢于价格，首次站上往往早于七层全部翻红，所以买点落在翻红这根。
+ * 减仓：红丝带仍全向上，收盘高出五日线达到约 10%。同一段偏离只标第一次。
  */
 export function buildRedRibbon(bars: KBar[]): { points: RibbonPoint[]; signals: RibbonSignal[] } {
   const points: RibbonPoint[] = [];
@@ -386,10 +400,7 @@ export function buildRedRibbon(bars: KBar[]): { points: RibbonPoint[]; signals: 
   const a1 = var1.map((_, i) => (ema3[i] + ema6[i] + ema12[i] + ema24[i]) / 4);
   const layers: number[][] = [a1];
   for (let layer = 1; layer < RIBBON_LAYERS; layer += 1) layers.push(tdxEma(layers[layer - 1], 2));
-  const adx = adxSeries(bars);
-
   const allRising: boolean[] = [];
-  const allFalling: boolean[] = [];
   for (let i = 0; i < bars.length; i += 1) {
     const direction: Array<"up" | "down" | null> = [];
     for (let layer = 0; layer < RIBBON_LAYERS; layer += 1) {
@@ -397,7 +408,6 @@ export function buildRedRibbon(bars: KBar[]): { points: RibbonPoint[]; signals: 
       else direction.push(layers[layer][i] > layers[layer][i - 1] ? "up" : "down");
     }
     allRising.push(direction.every((item) => item === "up"));
-    allFalling.push(direction.every((item) => item === "down"));
     points.push({
       time: bars[i].time,
       values: layers.map((layer) => layer[i]),
@@ -405,17 +415,21 @@ export function buildRedRibbon(bars: KBar[]): { points: RibbonPoint[]; signals: 
     });
   }
 
-  let inPosition = false;
+  const closes = bars.map((bar) => bar.close);
+  let stretched = false;
   for (let i = 1; i < bars.length; i += 1) {
     const turnedUp = allRising[i] && !allRising[i - 1];
-    const turnedDown = allFalling[i] && !allFalling[i - 1];
-    if (!inPosition && turnedUp && adx[i] != null && adx[i]! > ADX_BUY_MIN) {
-      signals.push({ time: bars[i].time, side: "buy", close: bars[i].close, adx: adx[i] });
-      inPosition = true;
-    } else if (inPosition && turnedDown) {
-      signals.push({ time: bars[i].time, side: "sell", close: bars[i].close, adx: adx[i] });
-      inPosition = false;
+    const ma5 = maAt(closes, 5, i);
+    const stretch = ma5 != null && ma5 > 0 ? closes[i] / ma5 - 1 : null;
+    const bought = turnedUp && recentFirstStand(closes, i);
+    if (bought) {
+      signals.push({ time: bars[i].time, side: "buy", close: bars[i].close, stretch });
     }
+    const extended = allRising[i] && stretch != null && stretch >= MA5_STRETCH;
+    if (extended && !stretched && !bought) {
+      signals.push({ time: bars[i].time, side: "reduce", close: bars[i].close, stretch });
+    }
+    stretched = extended;
   }
   return { points, signals };
 }
