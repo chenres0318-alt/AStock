@@ -314,7 +314,7 @@ export default function ChartView({
     const { signals } = buildRedRibbon(bars);
     return {
       buy: signals.filter((item) => item.side === "buy").length,
-      sell: signals.filter((item) => item.side === "sell").length,
+      reduce: signals.filter((item) => item.side === "reduce").length,
     };
   }, [mode, bars]);
 
@@ -423,9 +423,9 @@ export default function ChartView({
           : {
               time: point.time,
               position: "aboveBar" as const,
-              color: RIBBON_CYAN,
+              color: "#e4b454",
               shape: "arrowDown" as const,
-              text: "卖",
+              text: "减仓",
               size: 1.2,
             },
       ),
@@ -532,7 +532,7 @@ export default function ChartView({
             ? "加载中…"
             : mode === "trend"
               ? "黄线现价 蓝线均价"
-              : `黄线MA5 · 红青丝带 · 买 ${ribbonCounts.buy} 卖 ${ribbonCounts.sell}`}
+              : `黄线MA5 · 红青丝带 · 买 ${ribbonCounts.buy} 减仓 ${ribbonCounts.reduce}`}
         </div>
       </div>
       <div className="relative min-h-0 flex-1">

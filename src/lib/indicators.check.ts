@@ -208,32 +208,63 @@ assert(climbRibbon.points.at(-1)?.direction.every((item) => item === "up"), "a s
 const drop = Array.from({ length: 90 }, (_, i) => barAt(i, 40 - i * 0.2));
 assert(buildRedRibbon(drop).points.at(-1)?.direction.every((item) => item === "down"), "a steady drop turns every ribbon layer down");
 
-const swingPath: number[] = [];
-let price = 30;
-for (let i = 0; i < 70; i += 1) {
-  price *= 0.997;
-  swingPath.push(price);
+const ribbonBase = Array.from({ length: 40 }, () => 10);
+const ribbonLift = [10.6, 11.24, 11.91];
+const ribbonRally = buildRedRibbon([...ribbonBase, ...ribbonLift].map((close, i) => barAt(i, close)));
+const ribbonBuys = ribbonRally.signals.filter((item) => item.side === "buy");
+const ribbonReduces = ribbonRally.signals.filter((item) => item.side === "reduce");
+assert(ribbonBuys.length === 1 && ribbonBuys[0].time === ribbonRally.points[40].time, "cyan-to-red plus a first MA5 stand marks one buy");
+const buyAt = 40;
+assert(ribbonRally.points[buyAt].direction.every((item) => item === "up"), "buy day has all layers rising");
+assert(!ribbonRally.points[buyAt - 1].direction.every((item) => item === "up"), "buy day is the turn into a full red ribbon");
+assert(ribbonReduces.length === 1, "a red ribbon about 10% above MA5 marks one reduce");
+assert((ribbonReduces[0].stretch ?? 0) >= 0.1, "the reduce day is at least 10% above MA5");
+assert(ribbonReduces[0].time !== ribbonBuys[0].time, "the same bar is not both a buy and a reduce");
+const stillExtended = buildRedRibbon(
+  [...ribbonBase, ...ribbonLift, 12.6, 13.4, 14.2].map((close, i) => barAt(i, close)),
+);
+assert(
+  stillExtended.signals.filter((item) => item.side === "reduce").length === 1,
+  "later bars still 10% above MA5 do not add another reduce",
+);
+const slowCloses: number[] = [];
+let slow = 30;
+for (let i = 0; i < 50; i += 1) {
+  slow *= 0.985;
+  slowCloses.push(slow);
 }
-for (let i = 0; i < 55; i += 1) {
-  price *= 1.012;
-  swingPath.push(price);
+for (let i = 0; i < 20; i += 1) {
+  slow *= 1.006;
+  slowCloses.push(slow);
 }
-for (let i = 0; i < 40; i += 1) {
-  price *= 0.988;
-  swingPath.push(price);
+assert(
+  buildRedRibbon(slowCloses.map((close, i) => barAt(i, close))).signals.every((item) => item.side !== "buy"),
+  "a red turn more than five bars after the first MA5 stand is not a buy",
+);
+const laggedCloses: number[] = [];
+let lagged = 30;
+for (let i = 0; i < 50; i += 1) {
+  lagged *= 0.985;
+  laggedCloses.push(lagged);
 }
-const ribbonSwing = buildRedRibbon(swingPath.map((close, i) => barAt(i, close)));
-const ribbonBuys = ribbonSwing.signals.filter((item) => item.side === "buy");
-const ribbonSells = ribbonSwing.signals.filter((item) => item.side === "sell");
-assert(ribbonBuys.length >= 1, "a down-then-up swing with ADX>22 marks a buy");
-assert(ribbonSells.length >= 1, "the same swing marks a sell after the ribbon turns down");
-assert(ribbonBuys.every((item) => item.adx != null && item.adx > 22), "ribbon buys require ADX above 22");
-const firstBuyAt = ribbonSwing.points.findIndex((point) => point.time === ribbonBuys[0].time);
-assert(firstBuyAt > 0 && ribbonSwing.points[firstBuyAt].direction.every((item) => item === "up"), "buy day has all layers rising");
-assert(!ribbonSwing.points[firstBuyAt - 1].direction.every((item) => item === "up"), "buy day is the turn into a full red ribbon");
+for (let i = 0; i < 12; i += 1) {
+  lagged *= 1.02;
+  laggedCloses.push(lagged);
+}
+const laggedRibbon = buildRedRibbon(laggedCloses.map((close, i) => barAt(i, close)));
+const laggedBuys = laggedRibbon.signals.filter((item) => item.side === "buy");
+assert(laggedBuys.length === 1 && laggedBuys[0].time === laggedRibbon.points[55].time, "a red turn within five bars of the first MA5 stand is the buy");
+assert(laggedRibbon.points[51].direction.some((item) => item !== "up"), "the first MA5 stand can arrive before every layer is red");
+assert(
+  buildRedRibbon(drop).signals.every((item) => item.side !== "reduce"),
+  "a falling ribbon does not mark a reduce",
+);
 
 const chop = Array.from({ length: 160 }, (_, i) => barAt(i, 20 + Math.sin(i / 2) * 0.08));
-assert(buildRedRibbon(chop).signals.every((item) => item.side !== "buy"), "a tight box does not produce a ribbon buy");
+assert(
+  buildRedRibbon(chop).signals.every((item) => item.side !== "reduce"),
+  "a tight box never stretches 10% above MA5",
+);
 assert(adxSeries(chop).every((value) => value == null || value <= 22), "a tight box stays at or below the ADX gate");
 
 const rangeBars = [10, 11, 12].map((close, index) => barAt(index, close));
