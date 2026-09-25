@@ -69,32 +69,9 @@ export function macdSeries(closes: number[]): Array<MacdPoint | null> {
 }
 
 const FIRST_STAND_LOOK = 5;
-/** 相对持仓成本每上涨或下跌这一档，标一次减仓或加仓。 */
-const REDUCE_STEP = 0.07;
-/** 减仓之后，收盘相对上一次减仓价再跌超过这一档，才标下一次加仓。 */
-const ADD_AFTER_REDUCE = 0.08;
-/** 清仓之后这几根 K 线不标任何信号。 */
-const QUIET_AFTER_CLEAR = 3;
 /** 20 日线下方的空头减弱，只保留大阳 / 大振幅反包，避免下跌中继假买点。 */
 const STRONG_RECLAIM_DAY_PCT = 5;
 const STRONG_RECLAIM_AMP_PCT = 8;
-
-/** DIF 上一根还在 DEA 上（含相等），这一根落到 DEA 下。 */
-function macdDeathCross(series: Array<MacdPoint | null>, index: number): boolean {
-  const prev = series[index - 1];
-  const cur = series[index];
-  if (!prev || !cur) return false;
-  return prev.dif + 1e-8 >= prev.dea && cur.dif < cur.dea;
-}
-
-/** 这根或向前 window-1 根里，有过一次近 5 日首次站上五日线。 */
-function recentFirstStand(closes: number[], i: number, window = FIRST_STAND_LOOK): boolean {
-  const from = Math.max(0, i - (window - 1));
-  for (let j = from; j <= i; j += 1) {
-    if (firstStandAboveMa5(closes, j)) return true;
-  }
-  return false;
-}
 
 /** 收盘站上五日线，且向前 look-1 根都没有站上。 */
 export function firstStandAboveMa5(closes: number[], i: number, look = FIRST_STAND_LOOK): boolean {
@@ -385,9 +362,8 @@ export type RibbonPoint = {
 
 export type RibbonSignal = {
   time: string;
-  side: "buy" | "add" | "reduce" | "clear";
+  side: "sell";
   close: number;
-  /** 触发这笔信号的涨跌幅。成本档加减仓和清仓相对当时持仓成本；减仓后的加仓相对上一次减仓收盘。加仓为负，减仓为正。 */
   gain: number | null;
 };
 
@@ -396,13 +372,8 @@ export type RibbonSignal = {
  * VAR1=(2*C+H+L+O)/5
  * A1=(EMA(VAR1,3)+EMA(VAR1,6)+EMA(VAR1,12)+EMA(VAR1,24))/4
  * A2..A7 逐层 EMA(2)
- * 买：七层刚变成全红，并且这根或前 4 根里出现过近 5 日首次站上五日线。
- * 丝带慢于价格，首次站上往往早于七层全部翻红，所以买点落在翻红这根。
- * 加仓 / 减仓：成本是买入价和其后各次加仓价的等权平均，减仓不改变成本。
- * 收盘相对这个成本每下跌 7% 标一次加仓，每上涨 7% 标一次减仓。加仓后按新成本重新分档。
- * 减仓之后，要先相对上一次减仓收盘再跌超过 8%，才标下一次加仓；这次加仓仍计入成本。
- * 买入之后，DIF 下穿 DEA 为 MACD 死叉，标一次清仓并结束这笔持仓。
- * 清仓之后的三根 K 线不标任何信号。安静期过后，收盘再次站上五日线且七层红丝带全红，再标一次买入。
+ * 收盘在全红丝带上沿之上就开始持有，图上不标买点。
+ * 持有到收盘跌破丝带下沿，标一次卖。
  */
 export function buildRedRibbon(bars: KBar[]): { points: RibbonPoint[]; signals: RibbonSignal[] } {
   const points: RibbonPoint[] = [];
@@ -431,70 +402,17 @@ export function buildRedRibbon(bars: KBar[]): { points: RibbonPoint[]; signals: 
     });
   }
 
-  const closes = bars.map((bar) => bar.close);
-  const macd = macdSeries(closes);
-  let cost: number | null = null;
-  let units = 0;
-  let reduceSteps = 0;
-  let addSteps = 0;
-  let lastReduceClose: number | null = null;
-  let awaitingReentry = false;
-  let quietBars = 0;
-  const takeAdd = (index: number, gain: number) => {
-    signals.push({ time: bars[index].time, side: "add", close: bars[index].close, gain });
-    cost = ((cost as number) * units + closes[index]) / (units + 1);
-    units += 1;
-    addSteps = 0;
-    reduceSteps = 0;
-    lastReduceClose = null;
-  };
+  let holding = false;
   for (let i = 1; i < bars.length; i += 1) {
-    if (quietBars > 0) {
-      quietBars -= 1;
-      continue;
-    }
-    const turnedUp = allRising[i] && !allRising[i - 1];
-    const ma5 = maAt(closes, 5, i);
-    const aboveMa5 = ma5 != null && closes[i] > ma5;
-    const opened = turnedUp && recentFirstStand(closes, i);
-    const reentry = awaitingReentry && aboveMa5 && allRising[i];
-    const bought = opened || reentry;
-    if (bought) {
-      signals.push({ time: bars[i].time, side: "buy", close: bars[i].close, gain: null });
-      cost = bars[i].close;
-      units = 1;
-      reduceSteps = 0;
-      addSteps = 0;
-      lastReduceClose = null;
-      awaitingReentry = false;
-    }
-    if (cost != null && cost > 0 && units > 0 && !bought && macdDeathCross(macd, i)) {
-      signals.push({ time: bars[i].time, side: "clear", close: bars[i].close, gain: closes[i] / cost - 1 });
-      cost = null;
-      units = 0;
-      reduceSteps = 0;
-      addSteps = 0;
-      lastReduceClose = null;
-      awaitingReentry = true;
-      quietBars = QUIET_AFTER_CLEAR;
-    } else if (cost != null && cost > 0 && units > 0 && !bought) {
-      const gain = closes[i] / cost - 1;
-      const fromReduce = lastReduceClose != null && lastReduceClose > 0 ? closes[i] / lastReduceClose - 1 : null;
-      if (fromReduce != null && fromReduce < -ADD_AFTER_REDUCE) {
-        takeAdd(i, fromReduce);
-      } else if (fromReduce != null && fromReduce < 0) {
-        // 减仓后的回撤还没超过 8%，先不加仓。
-      } else if (gain < 0) {
-        const steps = Math.floor((-gain + 1e-9) / REDUCE_STEP);
-        if (steps > addSteps) takeAdd(i, gain);
-      } else if (gain > 0) {
-        const steps = Math.floor((gain + 1e-9) / REDUCE_STEP);
-        if (steps > reduceSteps) {
-          signals.push({ time: bars[i].time, side: "reduce", close: bars[i].close, gain });
-          reduceSteps = steps;
-          lastReduceClose = closes[i];
-        }
-      }
+    const values = points[i].values;
+    const top = Math.max(...values);
+    const bottom = Math.min(...values);
+    const aboveRed = allRising[i] && bars[i].close > top;
+    const belowRibbon = bars[i].close < bottom;
+    if (!holding && aboveRed) holding = true;
+    else if (holding && belowRibbon) {
+      signals.push({ time: bars[i].time, side: "sell", close: bars[i].close, gain: null });
+      holding = false;
     }
   }
   return { points, signals };

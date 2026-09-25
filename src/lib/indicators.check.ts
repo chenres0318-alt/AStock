@@ -208,100 +208,47 @@ assert(climbRibbon.points.at(-1)?.direction.every((item) => item === "up"), "a s
 const drop = Array.from({ length: 90 }, (_, i) => barAt(i, 40 - i * 0.2));
 assert(buildRedRibbon(drop).points.at(-1)?.direction.every((item) => item === "down"), "a steady drop turns every ribbon layer down");
 
-const ribbonBase = Array.from({ length: 40 }, () => 10);
-const ribbonLift = [10.6, 11.2, 11.35, 11.5, 12.09];
-const ribbonRally = buildRedRibbon([...ribbonBase, ...ribbonLift].map((close, i) => barAt(i, close)));
-const ribbonBuys = ribbonRally.signals.filter((item) => item.side === "buy");
-const ribbonReduces = ribbonRally.signals.filter((item) => item.side === "reduce");
-assert(ribbonBuys.length === 1 && ribbonBuys[0].time === ribbonRally.points[40].time, "cyan-to-red plus a first MA5 stand marks one buy");
-const buyAt = 40;
-assert(ribbonRally.points[buyAt].direction.every((item) => item === "up"), "buy day has all layers rising");
-assert(!ribbonRally.points[buyAt - 1].direction.every((item) => item === "up"), "buy day is the turn into a full red ribbon");
-assert(ribbonReduces.length === 2, "after a buy, each new 7% step from the buy close marks a reduce");
-assert(ribbonReduces[0].time === ribbonRally.points[42].time && (ribbonReduces[0].gain ?? 0) >= 0.07, "the first reduce is the 7% step");
-assert(ribbonReduces[1].time === ribbonRally.points[44].time && (ribbonReduces[1].gain ?? 0) >= 0.14, "the second reduce is the 14% step");
-assert(
-  ribbonReduces.every((item) => item.time !== ribbonBuys[0].time),
-  "the buy bar itself is not a reduce",
-);
-const dipPath = [...ribbonBase, 10.6, 10.2, 9.85, 9.7, 9.11];
-const dipped = buildRedRibbon(dipPath.map((close, i) => barAt(i, close)));
-const adds = dipped.signals.filter((item) => item.side === "add");
-assert(dipped.signals.filter((item) => item.side === "buy").length === 1, "the dip path still has the one buy");
-assert(adds.length === 1, "a 7% drop still adds while MACD has not crossed down");
-assert(adds[0].time === dipped.points[42].time && (adds[0].gain ?? 0) <= -0.07, "the first add is 7% under the buy");
-const dipClears = dipped.signals.filter((item) => item.side === "clear");
-assert(
-  dipClears.length === 1 && dipClears[0].time === dipped.points[43].time,
-  "the first MACD death cross after the buy clears the position",
-);
-assert(
-  dipped.signals.every((item) => item.side !== "add" || item.time === dipped.points[42].time),
-  "after the clear, a deeper drop does not add again",
-);
-assert(
-  dipped.signals.every((item) => item.side !== "reduce"),
-  "a decline from the buy does not mark a reduce",
-);
-const rebound = buildRedRibbon([...ribbonBase, 10.6, 10.2, 9.85, 9.9, 10.1, 10.4, 10.7, 10.95].map((close, i) => barAt(i, close)));
-const reboundReduce = rebound.signals.filter((item) => item.side === "reduce");
-const reboundClears = rebound.signals.filter((item) => item.side === "clear");
-assert(
-  reboundClears.length === 1 && reboundClears[0].time === rebound.points[43].time && reboundReduce.length === 0,
-  "a death cross clears before a later rebound can reduce",
-);
-const reboundBuys = rebound.signals.filter((item) => item.side === "buy");
-assert(
-  rebound.signals.every((item) => item.time !== rebound.points[44].time && item.time !== rebound.points[45].time && item.time !== rebound.points[46].time),
-  "the three bars after a clear carry no signal",
-);
-assert(
-  reboundBuys.length === 2 && reboundBuys[1].time === rebound.points[47].time,
-  "after the three quiet bars, a close back above MA5 on a red ribbon buys again",
-);
-const afterReduce = buildRedRibbon(
-  [...ribbonBase, 10.6, 11.2, 11.35, 11.5, 12.09, 11.7, 11.2, 11.05].map((close, i) => barAt(i, close)),
-);
-const afterReduceAdds = afterReduce.signals.filter((item) => item.side === "add");
-const lastReduce = 12.09;
-assert(afterReduce.signals.filter((item) => item.side === "buy").length === 1, "the pullback after reduces is still the same buy");
-assert(11.2 / lastReduce - 1 > -0.08 && 11.05 / lastReduce - 1 < -0.08, "only the last bar exceeds an 8% drop from the reduce");
-assert(
-  afterReduceAdds.length === 1 &&
-    afterReduceAdds[0].time === afterReduce.points[47].time &&
-    (afterReduceAdds[0].gain ?? 0) < -0.08 &&
-    11.05 / 10.6 - 1 > 0,
-  "after a reduce, the next add waits for more than an 8% drop from that reduce close",
-);
-const blendedAfterReduce = (10.6 + 11.05) / 2;
-const secondAdd = buildRedRibbon(
-  [...ribbonBase, 10.6, 11.2, 11.35, 11.5, 12.09, 11.7, 11.2, 11.05, 10.7, 10.02].map((close, i) => barAt(i, close)),
-);
-const secondAdds = secondAdd.signals.filter((item) => item.side === "add");
-const secondClears = secondAdd.signals.filter((item) => item.side === "clear");
-assert(10.7 / blendedAfterReduce - 1 > -0.07, "the bar before the death cross is not yet another 7% add");
-assert(
-  secondAdds.length === 1 && secondAdds[0].time === secondAdd.points[47].time,
-  "the 8% drop from the last reduce still adds while MACD stays bullish",
-);
-assert(
-  secondClears.length === 1 && secondClears[0].time === secondAdd.points[49].time,
-  "a later MACD death cross clears instead of adding again",
-);
-const slowCloses: number[] = [];
-let slow = 30;
-for (let i = 0; i < 50; i += 1) {
-  slow *= 0.985;
-  slowCloses.push(slow);
+function ribbonBand(point: { values: number[]; direction: Array<"up" | "down" | null> }) {
+  return {
+    top: Math.max(...point.values),
+    bottom: Math.min(...point.values),
+    red: point.direction.every((item) => item === "up"),
+  };
 }
-for (let i = 0; i < 20; i += 1) {
-  slow *= 1.006;
-  slowCloses.push(slow);
-}
+
+const heldClimb = buildRedRibbon(Array.from({ length: 90 }, (_, i) => barAt(i, 10 + i * 0.2)));
+const climbTop = ribbonBand(heldClimb.points.at(-1)!);
+assert(heldClimb.points.at(-1)!.values.length > 0 && climbTop.red && 10 + 89 * 0.2 > climbTop.top, "a steady climb finishes above a red ribbon");
+assert(heldClimb.signals.length === 0, "holding above a red ribbon does not mark a buy or a sell");
+
+const roundTripCloses = [
+  ...Array.from({ length: 80 }, (_, i) => 10 + i * 0.15),
+  ...Array.from({ length: 30 }, (_, i) => 10 + 79 * 0.15 - (i + 1) * 0.45),
+];
+const roundTrip = buildRedRibbon(roundTripCloses.map((close, i) => barAt(i, close)));
+const sells = roundTrip.signals.filter((item) => item.side === "sell");
+const sellIndex = roundTrip.points.findIndex((point) => point.time === sells[0]?.time);
+assert(sells.length === 1 && sellIndex > 80, "falling through the ribbon marks one sell");
+const sellBand = ribbonBand(roundTrip.points[sellIndex]);
+assert(roundTripCloses[sellIndex] < sellBand.bottom, "the sell is the close under the ribbon");
 assert(
-  buildRedRibbon(slowCloses.map((close, i) => barAt(i, close))).signals.every((item) => item.side !== "buy"),
-  "a red turn more than five bars after the first MA5 stand is not a buy",
+  roundTrip.points.slice(sellIndex + 1).every((point) => point.time !== sells[0].time),
+  "staying under the ribbon does not mark another sell",
 );
+const heldBefore = roundTrip.points.slice(0, sellIndex).some((point, index) => {
+  const band = ribbonBand(point);
+  return band.red && roundTripCloses[index] > band.top;
+});
+assert(heldBefore, "the sell comes after a close above the red ribbon");
+
+const secondTripCloses = [
+  ...roundTripCloses,
+  ...Array.from({ length: 40 }, (_, i) => roundTripCloses.at(-1)! + (i + 1) * 0.35),
+  ...Array.from({ length: 25 }, (_, i) => roundTripCloses.at(-1)! + 40 * 0.35 - (i + 1) * 0.5),
+];
+const secondTrip = buildRedRibbon(secondTripCloses.map((close, i) => barAt(i, close)));
+assert(secondTrip.signals.filter((item) => item.side === "sell").length === 2, "a later drop back under the ribbon marks a second sell");
+
 const laggedCloses: number[] = [];
 let lagged = 30;
 for (let i = 0; i < 50; i += 1) {
@@ -313,19 +260,9 @@ for (let i = 0; i < 12; i += 1) {
   laggedCloses.push(lagged);
 }
 const laggedRibbon = buildRedRibbon(laggedCloses.map((close, i) => barAt(i, close)));
-const laggedBuys = laggedRibbon.signals.filter((item) => item.side === "buy");
-assert(laggedBuys.length === 1 && laggedBuys[0].time === laggedRibbon.points[55].time, "a red turn within five bars of the first MA5 stand is the buy");
 assert(laggedRibbon.points[51].direction.some((item) => item !== "up"), "the first MA5 stand can arrive before every layer is red");
-assert(
-  buildRedRibbon(drop).signals.every((item) => item.side !== "reduce"),
-  "a falling ribbon does not mark a reduce",
-);
 
 const chop = Array.from({ length: 160 }, (_, i) => barAt(i, 20 + Math.sin(i / 2) * 0.08));
-assert(
-  buildRedRibbon(chop).signals.every((item) => item.side !== "reduce"),
-  "a tight box never rises 7% from a buy",
-);
 assert(adxSeries(chop).every((value) => value == null || value <= 22), "a tight box stays at or below the ADX gate");
 
 const rangeBars = [10, 11, 12].map((close, index) => barAt(index, close));
