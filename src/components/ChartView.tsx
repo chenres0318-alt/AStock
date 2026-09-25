@@ -508,7 +508,7 @@ export default function ChartView({
 
   return (
     <section className="panel flex min-h-[560px] flex-1 flex-col overflow-hidden xl:min-h-0">
-      <div className="flex items-center justify-between border-b border-line px-3 py-2">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-line px-3 py-2">
         <div className="flex items-center gap-1">
           {tabs.map((tab) => (
             <button
@@ -549,7 +549,7 @@ export default function ChartView({
             区间统计
           </button>
         </div>
-        <div className="text-[11px] text-mute">
+        <div className="min-w-0 text-[11px] leading-4 text-mute">
           {quote?.name ?? ""}{" "}
           {loading
             ? "加载中…"
