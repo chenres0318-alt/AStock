@@ -252,12 +252,12 @@ assert(
 );
 const reboundBuys = rebound.signals.filter((item) => item.side === "buy");
 assert(
-  reboundBuys.length === 2 && reboundBuys[1].time === rebound.points[45].time,
-  "after a clear, a close back above MA5 on a red ribbon buys again",
+  rebound.signals.every((item) => item.time !== rebound.points[44].time && item.time !== rebound.points[45].time && item.time !== rebound.points[46].time),
+  "the three bars after a clear carry no signal",
 );
 assert(
-  rebound.signals.every((item) => item.time !== rebound.points[44].time),
-  "a close still under MA5 after the clear is not a new buy",
+  reboundBuys.length === 2 && reboundBuys[1].time === rebound.points[47].time,
+  "after the three quiet bars, a close back above MA5 on a red ribbon buys again",
 );
 const afterReduce = buildRedRibbon(
   [...ribbonBase, 10.6, 11.2, 11.35, 11.5, 12.09, 11.7, 11.2, 11.05].map((close, i) => barAt(i, close)),

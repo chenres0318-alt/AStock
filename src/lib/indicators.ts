@@ -73,6 +73,8 @@ const FIRST_STAND_LOOK = 5;
 const REDUCE_STEP = 0.07;
 /** 减仓之后，收盘相对上一次减仓价再跌超过这一档，才标下一次加仓。 */
 const ADD_AFTER_REDUCE = 0.08;
+/** 清仓之后这几根 K 线不标任何信号。 */
+const QUIET_AFTER_CLEAR = 3;
 /** 20 日线下方的空头减弱，只保留大阳 / 大振幅反包，避免下跌中继假买点。 */
 const STRONG_RECLAIM_DAY_PCT = 5;
 const STRONG_RECLAIM_AMP_PCT = 8;
@@ -400,7 +402,7 @@ export type RibbonSignal = {
  * 收盘相对这个成本每下跌 7% 标一次加仓，每上涨 7% 标一次减仓。加仓后按新成本重新分档。
  * 减仓之后，要先相对上一次减仓收盘再跌超过 8%，才标下一次加仓；这次加仓仍计入成本。
  * 买入之后，DIF 下穿 DEA 为 MACD 死叉，标一次清仓并结束这笔持仓。
- * 清仓之后，收盘再次站上五日线且七层红丝带全红，再标一次买入。
+ * 清仓之后的三根 K 线不标任何信号。安静期过后，收盘再次站上五日线且七层红丝带全红，再标一次买入。
  */
 export function buildRedRibbon(bars: KBar[]): { points: RibbonPoint[]; signals: RibbonSignal[] } {
   const points: RibbonPoint[] = [];
@@ -437,6 +439,7 @@ export function buildRedRibbon(bars: KBar[]): { points: RibbonPoint[]; signals: 
   let addSteps = 0;
   let lastReduceClose: number | null = null;
   let awaitingReentry = false;
+  let quietBars = 0;
   const takeAdd = (index: number, gain: number) => {
     signals.push({ time: bars[index].time, side: "add", close: bars[index].close, gain });
     cost = ((cost as number) * units + closes[index]) / (units + 1);
@@ -446,6 +449,10 @@ export function buildRedRibbon(bars: KBar[]): { points: RibbonPoint[]; signals: 
     lastReduceClose = null;
   };
   for (let i = 1; i < bars.length; i += 1) {
+    if (quietBars > 0) {
+      quietBars -= 1;
+      continue;
+    }
     const turnedUp = allRising[i] && !allRising[i - 1];
     const ma5 = maAt(closes, 5, i);
     const aboveMa5 = ma5 != null && closes[i] > ma5;
@@ -469,6 +476,7 @@ export function buildRedRibbon(bars: KBar[]): { points: RibbonPoint[]; signals: 
       addSteps = 0;
       lastReduceClose = null;
       awaitingReentry = true;
+      quietBars = QUIET_AFTER_CLEAR;
     } else if (cost != null && cost > 0 && units > 0 && !bought) {
       const gain = closes[i] / cost - 1;
       const fromReduce = lastReduceClose != null && lastReduceClose > 0 ? closes[i] / lastReduceClose - 1 : null;
