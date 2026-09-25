@@ -373,8 +373,8 @@ export type RibbonSignal = {
  * A1=(EMA(VAR1,3)+EMA(VAR1,6)+EMA(VAR1,12)+EMA(VAR1,24))/4
  * A2..A7 逐层 EMA(2)
  * 买：下跌中的青丝带逐步收拢且五日线向上；或者青丝带里已有层转红，同时五日线拐向上。
+ * 红丝带收拢卖出，或红丝带里有层转青并且五日线拐向下卖出之后，若五日线重新拐向上且红丝带又向上发散，再标买。
  * 卖：青丝带又向下发散且五日线拐头向下；红丝带收拢且五日线拐头向下；或者红丝带里已有层转青，同时五日线拐向下。
- * 卖出之后重新等待下一次买点。
  */
 export function buildRedRibbon(bars: KBar[]): { points: RibbonPoint[]; signals: RibbonSignal[] } {
   const points: RibbonPoint[] = [];
@@ -407,6 +407,8 @@ export function buildRedRibbon(bars: KBar[]): { points: RibbonPoint[]; signals: 
     return Math.max(...values) - Math.min(...values);
   };
   let holding = false;
+  let reboundBuy = false;
+  let sawHookUp = false;
   for (let i = 6; i < bars.length; i += 1) {
     const direction = points[i].direction;
     const allUp = direction.every((item) => item === "up");
@@ -441,12 +443,31 @@ export function buildRedRibbon(bars: KBar[]): { points: RibbonPoint[]; signals: 
     const sellOnCyanDiverge = allDown && widening && lowerFalling && maTurningDown;
     const sellOnRedContract = allUp && narrowing && maTurningDown;
     const sellOnTurningCyan = !allUp && someDown && cameFrom("up") && maTurningDown;
+    const upperRising = Math.max(...points[i].values) > Math.max(...points[i - 1].values);
+    const divergingUp = allUp && spread > spreadPrev && upperRising;
     if (holding && (sellOnCyanDiverge || sellOnRedContract || sellOnTurningCyan)) {
       signals.push({ time: bars[i].time, side: "sell", close: bars[i].close, gain: null });
       holding = false;
-    } else if (!holding && (buyOnConverge || buyOnTurningRed)) {
-      signals.push({ time: bars[i].time, side: "buy", close: bars[i].close, gain: null });
-      holding = true;
+      reboundBuy = sellOnRedContract || sellOnTurningCyan;
+      sawHookUp = false;
+    } else if (!holding) {
+      if (reboundBuy && maTurningUp) sawHookUp = true;
+      const reboundReady = reboundBuy && sawHookUp && divergingUp && maRising;
+      if (reboundBuy && (allDown || (sawHookUp && maTurningDown && !reboundReady))) {
+        reboundBuy = false;
+        sawHookUp = false;
+      }
+      if (reboundReady && reboundBuy) {
+        signals.push({ time: bars[i].time, side: "buy", close: bars[i].close, gain: null });
+        holding = true;
+        reboundBuy = false;
+        sawHookUp = false;
+      } else if (buyOnConverge || buyOnTurningRed) {
+        signals.push({ time: bars[i].time, side: "buy", close: bars[i].close, gain: null });
+        holding = true;
+        reboundBuy = false;
+        sawHookUp = false;
+      }
     }
   }
   return { points, signals };

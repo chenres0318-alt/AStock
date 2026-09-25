@@ -356,6 +356,46 @@ assert(
   "a red ribbon turning cyan as MA5 hooks down marks a sell",
 );
 
+const reboundCloses = [...Array.from({ length: 50 }, (_, i) => 30 - i * 0.2)];
+let reboundPrice = reboundCloses.at(-1)!;
+for (let i = 0; i < 6; i += 1) {
+  reboundPrice += 0.08;
+  reboundCloses.push(reboundPrice);
+}
+for (let i = 0; i < 28; i += 1) {
+  reboundPrice += 0.18;
+  reboundCloses.push(reboundPrice);
+}
+for (let i = 0; i < 8; i += 1) {
+  reboundPrice -= 0.04;
+  reboundCloses.push(reboundPrice);
+}
+for (let i = 0; i < 6; i += 1) {
+  reboundPrice += 0.35;
+  reboundCloses.push(reboundPrice);
+}
+const rebound = buildRedRibbon(reboundCloses.map((close, index) => barAt(index, close)));
+const reboundSellAt = rebound.points.findIndex((point) => point.time === rebound.signals.find((item) => item.side === "sell")?.time);
+const reboundBuy = rebound.signals.filter((item) => item.side === "buy").at(-1);
+const reboundBuyAt = rebound.points.findIndex((point) => point.time === reboundBuy?.time);
+const reboundSpread = ribbonSpread(rebound.points[reboundBuyAt].values);
+const reboundSpreadPrev = ribbonSpread(rebound.points[reboundBuyAt - 1].values);
+const reboundMa = maAt(reboundCloses, 5, reboundBuyAt);
+const reboundMaPrev = maAt(reboundCloses, 5, reboundBuyAt - 1);
+const reboundMaPrev2 = maAt(reboundCloses, 5, reboundBuyAt - 2);
+assert(
+  reboundSellAt < reboundBuyAt &&
+    rebound.points[reboundSellAt].direction.every((item) => item === "up") &&
+    rebound.points[reboundBuyAt].direction.every((item) => item === "up") &&
+    reboundSpread > reboundSpreadPrev &&
+    reboundMa != null &&
+    reboundMaPrev != null &&
+    reboundMaPrev2 != null &&
+    reboundMa > reboundMaPrev &&
+    reboundMaPrev <= reboundMaPrev2,
+  "after a red-ribbon sell, a fresh MA5 hook and an upward fan marks another buy",
+);
+
 const laggedCloses: number[] = [];
 let lagged = 30;
 for (let i = 0; i < 50; i += 1) {
