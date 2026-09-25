@@ -228,12 +228,25 @@ const dipPath = [...ribbonBase, 10.6, 10.2, 9.85, 9.7, 9.11];
 const dipped = buildRedRibbon(dipPath.map((close, i) => barAt(i, close)));
 const adds = dipped.signals.filter((item) => item.side === "add");
 assert(dipped.signals.filter((item) => item.side === "buy").length === 1, "the dip path still has the one buy");
-assert(adds.length === 2, "after a buy, each new 7% drop from the buy close marks an add");
-assert(adds[0].time === dipped.points[42].time && (adds[0].gain ?? 0) <= -0.07, "the first add is the 7% drop");
-assert(adds[1].time === dipped.points[44].time && (adds[1].gain ?? 0) <= -0.14, "the second add is the 14% drop");
+assert(adds.length === 2, "after a buy, another 7% drop from the blended cost marks the next add");
+assert(adds[0].time === dipped.points[42].time && (adds[0].gain ?? 0) <= -0.07, "the first add is 7% under the buy");
+const blended = (10.6 + 9.85) / 2;
+assert(
+  adds[1].time === dipped.points[44].time && 9.11 / blended - 1 <= -0.07 && (adds[1].gain ?? 0) > -0.14,
+  "the second add is 7% under the average of the buy and the first add",
+);
 assert(
   dipped.signals.every((item) => item.side !== "reduce"),
   "a decline from the buy does not mark a reduce",
+);
+const rebound = buildRedRibbon([...ribbonBase, 10.6, 10.2, 9.85, 9.9, 10.1, 10.4, 10.7, 10.95].map((close, i) => barAt(i, close)));
+const reboundReduce = rebound.signals.filter((item) => item.side === "reduce");
+assert(
+  reboundReduce.length === 1 &&
+    reboundReduce[0].time === rebound.points[47].time &&
+    (reboundReduce[0].gain ?? 0) >= 0.07 &&
+    10.95 / 10.6 - 1 < 0.07,
+  "after an add, a 7% rise over the blended cost marks a reduce",
 );
 const slowCloses: number[] = [];
 let slow = 30;
