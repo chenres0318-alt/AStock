@@ -307,6 +307,55 @@ assert(
   "a red ribbon that starts narrowing as MA5 turns down marks a sell",
 );
 
+const turnCloses = [...Array.from({ length: 70 }, (_, i) => 40 - i * 0.25)];
+let turnPrice = turnCloses.at(-1)!;
+for (let i = 0; i < 3; i += 1) {
+  turnPrice += 0.35;
+  turnCloses.push(turnPrice);
+}
+for (let i = 0; i < 20; i += 1) {
+  turnPrice += 0.2;
+  turnCloses.push(turnPrice);
+}
+for (let i = 0; i < 3; i += 1) {
+  turnPrice -= 0.35;
+  turnCloses.push(turnPrice);
+}
+const turnRibbon = buildRedRibbon(turnCloses.map((close, index) => barAt(index, close)));
+const turnBuyAt = turnRibbon.points.findIndex((point) => point.time === turnRibbon.signals[0]?.time);
+const turnSell = turnRibbon.signals.find((item) => item.side === "sell");
+const turnSellAt = turnRibbon.points.findIndex((point) => point.time === turnSell?.time);
+const turnBuyMa = maAt(turnCloses, 5, turnBuyAt);
+const turnBuyMaPrev = maAt(turnCloses, 5, turnBuyAt - 1);
+const turnBuyMaPrev2 = maAt(turnCloses, 5, turnBuyAt - 2);
+const turnSellMa = maAt(turnCloses, 5, turnSellAt);
+const turnSellMaPrev = maAt(turnCloses, 5, turnSellAt - 1);
+const turnSellMaPrev2 = maAt(turnCloses, 5, turnSellAt - 2);
+const cameFromDown = turnRibbon.points.slice(Math.max(1, turnBuyAt - 8), turnBuyAt).some((point) => point.direction.every((item) => item === "down"));
+assert(
+  turnRibbon.signals[0]?.side === "buy" &&
+    turnRibbon.points[turnBuyAt].direction.some((item) => item === "up") &&
+    !turnRibbon.points[turnBuyAt].direction.every((item) => item === "down") &&
+    cameFromDown &&
+    turnBuyMa != null &&
+    turnBuyMaPrev != null &&
+    turnBuyMaPrev2 != null &&
+    turnBuyMa > turnBuyMaPrev &&
+    turnBuyMaPrev <= turnBuyMaPrev2,
+  "a cyan ribbon turning red as MA5 hooks up marks a buy",
+);
+assert(
+  turnSellAt > turnBuyAt &&
+    turnRibbon.points[turnSellAt - 1].direction.every((item) => item === "up") &&
+    turnRibbon.points[turnSellAt].direction.some((item) => item === "down") &&
+    turnSellMa != null &&
+    turnSellMaPrev != null &&
+    turnSellMaPrev2 != null &&
+    turnSellMa < turnSellMaPrev &&
+    turnSellMaPrev >= turnSellMaPrev2,
+  "a red ribbon turning cyan as MA5 hooks down marks a sell",
+);
+
 const laggedCloses: number[] = [];
 let lagged = 30;
 for (let i = 0; i < 50; i += 1) {

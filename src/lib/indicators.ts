@@ -372,8 +372,8 @@ export type RibbonSignal = {
  * VAR1=(2*C+H+L+O)/5
  * A1=(EMA(VAR1,3)+EMA(VAR1,6)+EMA(VAR1,12)+EMA(VAR1,24))/4
  * A2..A7 逐层 EMA(2)
- * 买：下跌中的青丝带（七层都向下）逐步收拢，不再向下发散，并且五日线拐头或继续向上。
- * 卖：青丝带又向下发散，同时五日线拐头向下；或者上涨中的红丝带开始收拢、往下收缩，同时五日线拐头向下。
+ * 买：下跌中的青丝带逐步收拢且五日线向上；或者青丝带里已有层转红，同时五日线拐向上。
+ * 卖：青丝带又向下发散且五日线拐头向下；红丝带收拢且五日线拐头向下；或者红丝带里已有层转青，同时五日线拐向下。
  * 卖出之后重新等待下一次买点。
  */
 export function buildRedRibbon(bars: KBar[]): { points: RibbonPoint[]; signals: RibbonSignal[] } {
@@ -423,14 +423,28 @@ export function buildRedRibbon(bars: KBar[]): { points: RibbonPoint[]; signals: 
     const ma5Prev2 = maAt(closes, 5, i - 2);
     if (ma5 == null || ma5Prev == null || ma5Prev2 == null) continue;
     const maRising = ma5 > ma5Prev;
+    const maTurningUp = maRising && ma5Prev <= ma5Prev2;
     const maTurningDown = ma5 < ma5Prev && ma5Prev >= ma5Prev2;
-    const buy = allDown && narrowingStep && maRising;
+    const allOf = (index: number, side: "up" | "down") => points[index].direction.every((item) => item === side);
+    const cameFrom = (side: "up" | "down") => {
+      const other = side === "up" ? "down" : "up";
+      for (let j = i - 1; j >= Math.max(1, i - 8); j -= 1) {
+        if (allOf(j, other)) return false;
+        if (allOf(j, side)) return true;
+      }
+      return false;
+    };
+    const someUp = direction.some((item) => item === "up");
+    const someDown = direction.some((item) => item === "down");
+    const buyOnConverge = allDown && narrowingStep && maRising;
+    const buyOnTurningRed = !allDown && someUp && cameFrom("down") && maTurningUp;
     const sellOnCyanDiverge = allDown && widening && lowerFalling && maTurningDown;
     const sellOnRedContract = allUp && narrowing && maTurningDown;
-    if (holding && (sellOnCyanDiverge || sellOnRedContract)) {
+    const sellOnTurningCyan = !allUp && someDown && cameFrom("up") && maTurningDown;
+    if (holding && (sellOnCyanDiverge || sellOnRedContract || sellOnTurningCyan)) {
       signals.push({ time: bars[i].time, side: "sell", close: bars[i].close, gain: null });
       holding = false;
-    } else if (!holding && buy) {
+    } else if (!holding && (buyOnConverge || buyOnTurningRed)) {
       signals.push({ time: bars[i].time, side: "buy", close: bars[i].close, gain: null });
       holding = true;
     }
