@@ -209,7 +209,7 @@ const drop = Array.from({ length: 90 }, (_, i) => barAt(i, 40 - i * 0.2));
 assert(buildRedRibbon(drop).points.at(-1)?.direction.every((item) => item === "down"), "a steady drop turns every ribbon layer down");
 
 const ribbonBase = Array.from({ length: 40 }, () => 10);
-const ribbonLift = [10.6, 11.24, 11.91];
+const ribbonLift = [10.6, 11.2, 11.35, 11.5, 12.09];
 const ribbonRally = buildRedRibbon([...ribbonBase, ...ribbonLift].map((close, i) => barAt(i, close)));
 const ribbonBuys = ribbonRally.signals.filter((item) => item.side === "buy");
 const ribbonReduces = ribbonRally.signals.filter((item) => item.side === "reduce");
@@ -217,15 +217,12 @@ assert(ribbonBuys.length === 1 && ribbonBuys[0].time === ribbonRally.points[40].
 const buyAt = 40;
 assert(ribbonRally.points[buyAt].direction.every((item) => item === "up"), "buy day has all layers rising");
 assert(!ribbonRally.points[buyAt - 1].direction.every((item) => item === "up"), "buy day is the turn into a full red ribbon");
-assert(ribbonReduces.length === 1, "a red ribbon about 10% above MA5 marks one reduce");
-assert((ribbonReduces[0].stretch ?? 0) >= 0.1, "the reduce day is at least 10% above MA5");
-assert(ribbonReduces[0].time !== ribbonBuys[0].time, "the same bar is not both a buy and a reduce");
-const stillExtended = buildRedRibbon(
-  [...ribbonBase, ...ribbonLift, 12.6, 13.4, 14.2].map((close, i) => barAt(i, close)),
-);
+assert(ribbonReduces.length === 2, "after a buy, each new 7% step from the buy close marks a reduce");
+assert(ribbonReduces[0].time === ribbonRally.points[42].time && (ribbonReduces[0].gain ?? 0) >= 0.07, "the first reduce is the 7% step");
+assert(ribbonReduces[1].time === ribbonRally.points[44].time && (ribbonReduces[1].gain ?? 0) >= 0.14, "the second reduce is the 14% step");
 assert(
-  stillExtended.signals.filter((item) => item.side === "reduce").length === 1,
-  "later bars still 10% above MA5 do not add another reduce",
+  ribbonReduces.every((item) => item.time !== ribbonBuys[0].time),
+  "the buy bar itself is not a reduce",
 );
 const slowCloses: number[] = [];
 let slow = 30;
@@ -263,7 +260,7 @@ assert(
 const chop = Array.from({ length: 160 }, (_, i) => barAt(i, 20 + Math.sin(i / 2) * 0.08));
 assert(
   buildRedRibbon(chop).signals.every((item) => item.side !== "reduce"),
-  "a tight box never stretches 10% above MA5",
+  "a tight box never rises 7% from a buy",
 );
 assert(adxSeries(chop).every((value) => value == null || value <= 22), "a tight box stays at or below the ADX gate");
 
