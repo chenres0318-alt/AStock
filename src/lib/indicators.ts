@@ -374,7 +374,7 @@ export type RibbonSignal = {
  * A2..A7 逐层 EMA(2)
  * 买：下跌中的青丝带收拢且五日线向上。连续收两天、五日线仍向上时标买；只收紧一天时，要五日线当天拐向上才标买。青丝带里已有层转红、五日线拐向上时也标买。
  * 红丝带收拢卖出，或红丝带里有层转青并且五日线拐向下卖出之后，若五日线重新拐向上且红丝带又向上发散，再标买。
- * 卖：青丝带又向下发散且五日线拐头向下；红丝带收拢且五日线拐头向下；或者红丝带里已有层转青，同时五日线拐向下。
+ * 卖：青丝带又向下发散且五日线拐头向下；五日线先拐头、之后又拐向下，青丝带再向下发散时也标卖。红丝带收拢且五日线拐头向下；或者红丝带里已有层转青，同时五日线拐向下。
  */
 export function buildRedRibbon(bars: KBar[]): { points: RibbonPoint[]; signals: RibbonSignal[] } {
   const points: RibbonPoint[] = [];
@@ -409,6 +409,8 @@ export function buildRedRibbon(bars: KBar[]): { points: RibbonPoint[]; signals: 
   let holding = false;
   let reboundBuy = false;
   let sawHookUp = false;
+  let maHookedUp = false;
+  let maHookedDownAgain = false;
   for (let i = 6; i < bars.length; i += 1) {
     const direction = points[i].direction;
     const allUp = direction.every((item) => item === "up");
@@ -438,14 +440,21 @@ export function buildRedRibbon(bars: KBar[]): { points: RibbonPoint[]; signals: 
     };
     const someUp = direction.some((item) => item === "up");
     const someDown = direction.some((item) => item === "down");
+    if (maTurningUp) {
+      maHookedUp = true;
+      maHookedDownAgain = false;
+    } else if (maHookedUp && maTurningDown) {
+      maHookedDownAgain = true;
+    }
     const buyOnConverge = allDown && ((narrowingStep && maRising) || (narrowing && maTurningUp));
     const buyOnTurningRed = !allDown && someUp && cameFrom("down") && maTurningUp;
     const sellOnCyanDiverge = allDown && widening && lowerFalling && maTurningDown;
+    const sellOnCyanDivergeAfterRehook = allDown && widening && lowerFalling && maHookedDownAgain && ma5 < ma5Prev;
     const sellOnRedContract = allUp && narrowing && maTurningDown;
     const sellOnTurningCyan = !allUp && someDown && cameFrom("up") && maTurningDown;
     const upperRising = Math.max(...points[i].values) > Math.max(...points[i - 1].values);
     const divergingUp = allUp && spread > spreadPrev && upperRising;
-    if (holding && (sellOnCyanDiverge || sellOnRedContract || sellOnTurningCyan)) {
+    if (holding && (sellOnCyanDiverge || sellOnCyanDivergeAfterRehook || sellOnRedContract || sellOnTurningCyan)) {
       signals.push({ time: bars[i].time, side: "sell", close: bars[i].close, gain: null });
       holding = false;
       reboundBuy = sellOnRedContract || sellOnTurningCyan;

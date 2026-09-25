@@ -305,6 +305,51 @@ assert(
   "a fully cyan ribbon that tightens for one day as MA5 hooks up marks a buy",
 );
 
+const rehookCloses = [...Array.from({ length: 70 }, (_, i) => 40 - i * 0.2)];
+let rehookPrice = rehookCloses.at(-1)!;
+for (let i = 0; i < 7; i += 1) {
+  rehookPrice += 0.06;
+  rehookCloses.push(rehookPrice);
+}
+rehookPrice -= 0.25;
+rehookCloses.push(rehookPrice);
+rehookPrice -= 0.2;
+rehookCloses.push(rehookPrice);
+const rehook = buildRedRibbon(rehookCloses.map((close, index) => barAt(index, close)));
+const rehookSell = rehook.signals.at(-1);
+const rehookSellAt = rehook.points.findIndex((point) => point.time === rehookSell?.time);
+const rehookPrevAt = rehookSellAt - 1;
+const rehookSpread = ribbonSpread(rehook.points[rehookSellAt].values);
+const rehookSpreadPrev = ribbonSpread(rehook.points[rehookPrevAt].values);
+const rehookSpreadPrev2 = ribbonSpread(rehook.points[rehookSellAt - 2].values);
+const rehookMa = maAt(rehookCloses, 5, rehookSellAt);
+const rehookMaPrev = maAt(rehookCloses, 5, rehookPrevAt);
+const rehookMaPrev2 = maAt(rehookCloses, 5, rehookSellAt - 2);
+const rehookHookMa = maAt(rehookCloses, 5, rehookPrevAt);
+const rehookHookMaPrev = maAt(rehookCloses, 5, rehookPrevAt - 1);
+const rehookHookMaPrev2 = maAt(rehookCloses, 5, rehookPrevAt - 2);
+assert(
+  rehook.signals.some((item) => item.side === "buy") &&
+    rehookSell?.side === "sell" &&
+    rehookSellAt === rehook.points.length - 1 &&
+    rehook.signals.every((item) => item.time !== rehook.points[rehookPrevAt].time) &&
+    rehook.points[rehookSellAt].direction.every((item) => item === "down") &&
+    rehookSpread > rehookSpreadPrev &&
+    rehookSpread > rehookSpreadPrev2 &&
+    Math.min(...rehook.points[rehookSellAt].values) < Math.min(...rehook.points[rehookPrevAt].values) &&
+    rehookMa != null &&
+    rehookMaPrev != null &&
+    rehookMaPrev2 != null &&
+    rehookMa < rehookMaPrev &&
+    rehookMaPrev < rehookMaPrev2 &&
+    rehookHookMa != null &&
+    rehookHookMaPrev != null &&
+    rehookHookMaPrev2 != null &&
+    rehookHookMa < rehookHookMaPrev &&
+    rehookHookMaPrev >= rehookHookMaPrev2,
+  "a cyan ribbon that fans out after MA5 has already hooked down marks a sell",
+);
+
 const redCloses = [...Array.from({ length: 50 }, (_, i) => 30 - i * 0.2)];
 let redPrice = redCloses.at(-1)!;
 for (let i = 0; i < 6; i += 1) {
