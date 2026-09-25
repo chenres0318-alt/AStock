@@ -228,12 +228,16 @@ const dipPath = [...ribbonBase, 10.6, 10.2, 9.85, 9.7, 9.11];
 const dipped = buildRedRibbon(dipPath.map((close, i) => barAt(i, close)));
 const adds = dipped.signals.filter((item) => item.side === "add");
 assert(dipped.signals.filter((item) => item.side === "buy").length === 1, "the dip path still has the one buy");
-assert(adds.length === 2, "after a buy, another 7% drop from the blended cost marks the next add");
+assert(adds.length === 1, "a 7% drop still adds while MACD has not crossed down");
 assert(adds[0].time === dipped.points[42].time && (adds[0].gain ?? 0) <= -0.07, "the first add is 7% under the buy");
-const blended = (10.6 + 9.85) / 2;
+const dipClears = dipped.signals.filter((item) => item.side === "clear");
 assert(
-  adds[1].time === dipped.points[44].time && 9.11 / blended - 1 <= -0.07 && (adds[1].gain ?? 0) > -0.14,
-  "the second add is 7% under the average of the buy and the first add",
+  dipClears.length === 1 && dipClears[0].time === dipped.points[43].time,
+  "the first MACD death cross after the buy clears the position",
+);
+assert(
+  dipped.signals.every((item) => item.side !== "add" || item.time === dipped.points[42].time),
+  "after the clear, a deeper drop does not add again",
 );
 assert(
   dipped.signals.every((item) => item.side !== "reduce"),
@@ -241,12 +245,10 @@ assert(
 );
 const rebound = buildRedRibbon([...ribbonBase, 10.6, 10.2, 9.85, 9.9, 10.1, 10.4, 10.7, 10.95].map((close, i) => barAt(i, close)));
 const reboundReduce = rebound.signals.filter((item) => item.side === "reduce");
+const reboundClears = rebound.signals.filter((item) => item.side === "clear");
 assert(
-  reboundReduce.length === 1 &&
-    reboundReduce[0].time === rebound.points[47].time &&
-    (reboundReduce[0].gain ?? 0) >= 0.07 &&
-    10.95 / 10.6 - 1 < 0.07,
-  "after an add, a 7% rise over the blended cost marks a reduce",
+  reboundClears.length === 1 && reboundClears[0].time === rebound.points[43].time && reboundReduce.length === 0,
+  "a death cross clears before a later rebound can reduce",
 );
 const afterReduce = buildRedRibbon(
   [...ribbonBase, 10.6, 11.2, 11.35, 11.5, 12.09, 11.7, 11.2, 11.05].map((close, i) => barAt(i, close)),
@@ -267,12 +269,15 @@ const secondAdd = buildRedRibbon(
   [...ribbonBase, 10.6, 11.2, 11.35, 11.5, 12.09, 11.7, 11.2, 11.05, 10.7, 10.02].map((close, i) => barAt(i, close)),
 );
 const secondAdds = secondAdd.signals.filter((item) => item.side === "add");
+const secondClears = secondAdd.signals.filter((item) => item.side === "clear");
+assert(10.7 / blendedAfterReduce - 1 > -0.07, "the bar before the death cross is not yet another 7% add");
 assert(
-  secondAdds.length === 2 &&
-    secondAdds[1].time === secondAdd.points[49].time &&
-    10.7 / blendedAfterReduce - 1 > -0.07 &&
-    (secondAdds[1].gain ?? 0) <= -0.07,
-  "after the post-reduce add, another 7% drop from the new blended cost marks the next add",
+  secondAdds.length === 1 && secondAdds[0].time === secondAdd.points[47].time,
+  "the 8% drop from the last reduce still adds while MACD stays bullish",
+);
+assert(
+  secondClears.length === 1 && secondClears[0].time === secondAdd.points[49].time,
+  "a later MACD death cross clears instead of adding again",
 );
 const slowCloses: number[] = [];
 let slow = 30;
