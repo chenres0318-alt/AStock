@@ -69,8 +69,6 @@ export function macdSeries(closes: number[]): Array<MacdPoint | null> {
 }
 
 const FIRST_STAND_LOOK = 5;
-/** 买入之后，相对上一次买、加仓或减仓的价格，每上涨或下跌这一档再标一次。 */
-const LADDER_STEP = 0.05;
 /** 20 日线下方的空头减弱，只保留大阳 / 大振幅反包，避免下跌中继假买点。 */
 const STRONG_RECLAIM_DAY_PCT = 5;
 const STRONG_RECLAIM_AMP_PCT = 8;
@@ -364,9 +362,8 @@ export type RibbonPoint = {
 
 export type RibbonSignal = {
   time: string;
-  side: "buy" | "add" | "reduce" | "clear";
+  side: "buy" | "sell";
   close: number;
-  /** 加减仓相对上一次买、加仓或减仓的收盘价。加仓为负，减仓为正。买点和清仓为空。 */
   gain: number | null;
 };
 
@@ -375,10 +372,9 @@ export type RibbonSignal = {
  * VAR1=(2*C+H+L+O)/5
  * A1=(EMA(VAR1,3)+EMA(VAR1,6)+EMA(VAR1,12)+EMA(VAR1,24))/4
  * A2..A7 逐层 EMA(2)
- * 买：七层都向下的青丝带，并且收盘站上五日线。
- * 之后以上一次买入、加仓或减仓的收盘价为基准，每再涨 5% 减仓，每再跌 5% 加仓。
- * 青丝带阶段跌破五日线则清仓。丝带先走成全红，再变成全绿（七层向下），也清仓。
- * 清仓当天若仍是青丝带且收盘还在五日线上，重新标买。
+ * 买：下跌中的青丝带（七层都向下）逐步收拢，不再向下发散，并且五日线拐头或继续向上。
+ * 卖：青丝带又向下发散，同时五日线拐头向下；或者上涨中的红丝带开始收拢、往下收缩，同时五日线拐头向下。
+ * 卖出之后重新等待下一次买点。
  */
 export function buildRedRibbon(bars: KBar[]): { points: RibbonPoint[]; signals: RibbonSignal[] } {
   const points: RibbonPoint[] = [];
@@ -406,44 +402,37 @@ export function buildRedRibbon(bars: KBar[]): { points: RibbonPoint[]; signals: 
   }
 
   const closes = bars.map((bar) => bar.close);
-  let holding = false;
-  let seenRed = false;
-  let anchor: number | null = null;
-  const openBuy = (index: number) => {
-    signals.push({ time: bars[index].time, side: "buy", close: bars[index].close, gain: null });
-    holding = true;
-    seenRed = false;
-    anchor = bars[index].close;
+  const spreadAt = (index: number) => {
+    const values = points[index].values;
+    return Math.max(...values) - Math.min(...values);
   };
-  for (let i = 1; i < bars.length; i += 1) {
+  let holding = false;
+  for (let i = 6; i < bars.length; i += 1) {
     const direction = points[i].direction;
     const allUp = direction.every((item) => item === "up");
     const allDown = direction.every((item) => item === "down");
+    const spread = spreadAt(i);
+    const spreadPrev = spreadAt(i - 1);
+    const spreadPrev2 = spreadAt(i - 2);
+    const narrowingStep = spread < spreadPrev && spreadPrev < spreadPrev2;
+    const narrowing = spread < spreadPrev;
+    const widening = spread > spreadPrev && spread > spreadPrev2;
+    const lowerFalling = Math.min(...points[i].values) < Math.min(...points[i - 1].values);
     const ma5 = maAt(closes, 5, i);
-    const aboveMa5 = ma5 != null && closes[i] > ma5;
-    const belowMa5 = ma5 != null && closes[i] < ma5;
-    if (holding && allUp) seenRed = true;
-    if (holding) {
-      const clearForMa5 = !seenRed && belowMa5;
-      const clearForGreen = seenRed && allDown;
-      if (clearForMa5 || clearForGreen) {
-        signals.push({ time: bars[i].time, side: "clear", close: bars[i].close, gain: null });
-        holding = false;
-        seenRed = false;
-        anchor = null;
-        if (allDown && aboveMa5) openBuy(i);
-      } else if (anchor != null && anchor > 0) {
-        const gain = closes[i] / anchor - 1;
-        if (gain <= -LADDER_STEP) {
-          signals.push({ time: bars[i].time, side: "add", close: bars[i].close, gain });
-          anchor = closes[i];
-        } else if (gain >= LADDER_STEP) {
-          signals.push({ time: bars[i].time, side: "reduce", close: bars[i].close, gain });
-          anchor = closes[i];
-        }
-      }
-    } else if (allDown && aboveMa5) {
-      openBuy(i);
+    const ma5Prev = maAt(closes, 5, i - 1);
+    const ma5Prev2 = maAt(closes, 5, i - 2);
+    if (ma5 == null || ma5Prev == null || ma5Prev2 == null) continue;
+    const maRising = ma5 > ma5Prev;
+    const maTurningDown = ma5 < ma5Prev && ma5Prev >= ma5Prev2;
+    const buy = allDown && narrowingStep && maRising;
+    const sellOnCyanDiverge = allDown && widening && lowerFalling && maTurningDown;
+    const sellOnRedContract = allUp && narrowing && maTurningDown;
+    if (holding && (sellOnCyanDiverge || sellOnRedContract)) {
+      signals.push({ time: bars[i].time, side: "sell", close: bars[i].close, gain: null });
+      holding = false;
+    } else if (!holding && buy) {
+      signals.push({ time: bars[i].time, side: "buy", close: bars[i].close, gain: null });
+      holding = true;
     }
   }
   return { points, signals };
