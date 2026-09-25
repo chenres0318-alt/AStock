@@ -362,7 +362,7 @@ export type RibbonPoint = {
 
 export type RibbonSignal = {
   time: string;
-  side: "sell";
+  side: "buy" | "sell";
   close: number;
   gain: number | null;
 };
@@ -372,7 +372,7 @@ export type RibbonSignal = {
  * VAR1=(2*C+H+L+O)/5
  * A1=(EMA(VAR1,3)+EMA(VAR1,6)+EMA(VAR1,12)+EMA(VAR1,24))/4
  * A2..A7 逐层 EMA(2)
- * 收盘在全红丝带上沿之上就开始持有，图上不标买点。
+ * 收盘在全红丝带上沿之上就开始持有，并标一次买。
  * 持有到收盘跌破丝带下沿，标一次卖。
  */
 export function buildRedRibbon(bars: KBar[]): { points: RibbonPoint[]; signals: RibbonSignal[] } {
@@ -409,8 +409,10 @@ export function buildRedRibbon(bars: KBar[]): { points: RibbonPoint[]; signals: 
     const bottom = Math.min(...values);
     const aboveRed = allRising[i] && bars[i].close > top;
     const belowRibbon = bars[i].close < bottom;
-    if (!holding && aboveRed) holding = true;
-    else if (holding && belowRibbon) {
+    if (!holding && aboveRed) {
+      signals.push({ time: bars[i].time, side: "buy", close: bars[i].close, gain: null });
+      holding = true;
+    } else if (holding && belowRibbon) {
       signals.push({ time: bars[i].time, side: "sell", close: bars[i].close, gain: null });
       holding = false;
     }

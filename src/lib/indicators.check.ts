@@ -219,7 +219,16 @@ function ribbonBand(point: { values: number[]; direction: Array<"up" | "down" | 
 const heldClimb = buildRedRibbon(Array.from({ length: 90 }, (_, i) => barAt(i, 10 + i * 0.2)));
 const climbTop = ribbonBand(heldClimb.points.at(-1)!);
 assert(heldClimb.points.at(-1)!.values.length > 0 && climbTop.red && 10 + 89 * 0.2 > climbTop.top, "a steady climb finishes above a red ribbon");
-assert(heldClimb.signals.length === 0, "holding above a red ribbon does not mark a buy or a sell");
+const climbBuys = heldClimb.signals.filter((item) => item.side === "buy");
+const climbBuyAt = heldClimb.points.findIndex((point) => point.time === climbBuys[0]?.time);
+const climbBuyBand = ribbonBand(heldClimb.points[climbBuyAt]);
+assert(
+  climbBuys.length === 1 &&
+    heldClimb.signals.every((item) => item.side !== "sell") &&
+    climbBuyBand.red &&
+    10 + climbBuyAt * 0.2 > climbBuyBand.top,
+  "the first close above a red ribbon marks one buy and no sell",
+);
 
 const roundTripCloses = [
   ...Array.from({ length: 80 }, (_, i) => 10 + i * 0.15),
@@ -247,7 +256,15 @@ const secondTripCloses = [
   ...Array.from({ length: 25 }, (_, i) => roundTripCloses.at(-1)! + 40 * 0.35 - (i + 1) * 0.5),
 ];
 const secondTrip = buildRedRibbon(secondTripCloses.map((close, i) => barAt(i, close)));
+const roundBuys = roundTrip.signals.filter((item) => item.side === "buy");
+const buyIndex = roundTrip.points.findIndex((point) => point.time === roundBuys[0]?.time);
+const buyBand = ribbonBand(roundTrip.points[buyIndex]);
+assert(
+  roundBuys.length === 1 && buyIndex < sellIndex && buyBand.red && roundTripCloses[buyIndex] > buyBand.top,
+  "the buy is the first close above the red ribbon",
+);
 assert(secondTrip.signals.filter((item) => item.side === "sell").length === 2, "a later drop back under the ribbon marks a second sell");
+assert(secondTrip.signals.filter((item) => item.side === "buy").length === 2, "each new stand above the red ribbon marks another buy");
 
 const laggedCloses: number[] = [];
 let lagged = 30;

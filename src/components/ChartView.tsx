@@ -310,9 +310,12 @@ export default function ChartView({
   }, []);
 
   const ribbonCounts = useMemo(() => {
-    if (mode === "trend") return { sell: 0 };
+    if (mode === "trend") return { buy: 0, sell: 0 };
     const { signals } = buildRedRibbon(bars);
-    return { sell: signals.filter((item) => item.side === "sell").length };
+    return {
+      buy: signals.filter((item) => item.side === "buy").length,
+      sell: signals.filter((item) => item.side === "sell").length,
+    };
   }, [mode, bars]);
 
   useEffect(() => {
@@ -407,14 +410,25 @@ export default function ChartView({
       })),
     );
     candle.setMarkers(
-      ribbon.signals.map((point) => ({
-        time: point.time,
-        position: "aboveBar" as const,
-        color: DOWN,
-        shape: "arrowDown" as const,
-        text: "卖",
-        size: 1.2,
-      })),
+      ribbon.signals.map((point) =>
+        point.side === "buy"
+          ? {
+              time: point.time,
+              position: "belowBar" as const,
+              color: UP,
+              shape: "arrowUp" as const,
+              text: "买",
+              size: 1.2,
+            }
+          : {
+              time: point.time,
+              position: "aboveBar" as const,
+              color: DOWN,
+              shape: "arrowDown" as const,
+              text: "卖",
+              size: 1.2,
+            },
+      ),
     );
     const rangeKey = `${mode}:${bars.length}:${bars[0]?.time ?? ""}:${bars.at(-1)?.time ?? ""}`;
     const resetRange = rangeKeyRef.current !== rangeKey;
@@ -518,7 +532,7 @@ export default function ChartView({
             ? "加载中…"
             : mode === "trend"
               ? "黄线现价 蓝线均价"
-              : `黄线MA5 · 红青丝带 · 卖 ${ribbonCounts.sell}`}
+              : `黄线MA5 · 红青丝带 · 买 ${ribbonCounts.buy} 卖 ${ribbonCounts.sell}`}
         </div>
       </div>
       <div className="relative min-h-0 flex-1">
