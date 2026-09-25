@@ -310,10 +310,11 @@ export default function ChartView({
   }, []);
 
   const ribbonCounts = useMemo(() => {
-    if (mode === "trend") return { buy: 0, sell: 0 };
+    if (mode === "trend") return { buy: 0, add: 0, reduce: 0 };
     const { signals } = buildRedRibbon(bars);
     return {
       buy: signals.filter((item) => item.side === "buy").length,
+      add: signals.filter((item) => item.side === "add").length,
       reduce: signals.filter((item) => item.side === "reduce").length,
     };
   }, [mode, bars]);
@@ -410,25 +411,36 @@ export default function ChartView({
       })),
     );
     candle.setMarkers(
-      ribbon.signals.map((point) =>
-        point.side === "buy"
-          ? {
-              time: point.time,
-              position: "belowBar" as const,
-              color: UP,
-              shape: "arrowUp" as const,
-              text: "买",
-              size: 1.2,
-            }
-          : {
-              time: point.time,
-              position: "aboveBar" as const,
-              color: "#e4b454",
-              shape: "arrowDown" as const,
-              text: "减仓",
-              size: 1.2,
-            },
-      ),
+      ribbon.signals.map((point) => {
+        if (point.side === "buy") {
+          return {
+            time: point.time,
+            position: "belowBar" as const,
+            color: UP,
+            shape: "arrowUp" as const,
+            text: "买",
+            size: 1.2,
+          };
+        }
+        if (point.side === "add") {
+          return {
+            time: point.time,
+            position: "belowBar" as const,
+            color: "#e4b454",
+            shape: "arrowUp" as const,
+            text: "加仓",
+            size: 1.2,
+          };
+        }
+        return {
+          time: point.time,
+          position: "aboveBar" as const,
+          color: "#e4b454",
+          shape: "arrowDown" as const,
+          text: "减仓",
+          size: 1.2,
+        };
+      }),
     );
     const rangeKey = `${mode}:${bars.length}:${bars[0]?.time ?? ""}:${bars.at(-1)?.time ?? ""}`;
     const resetRange = rangeKeyRef.current !== rangeKey;
@@ -532,7 +544,7 @@ export default function ChartView({
             ? "加载中…"
             : mode === "trend"
               ? "黄线现价 蓝线均价"
-              : `黄线MA5 · 红青丝带 · 买 ${ribbonCounts.buy} 减仓 ${ribbonCounts.reduce}`}
+              : `黄线MA5 · 红青丝带 · 买 ${ribbonCounts.buy} 加仓 ${ribbonCounts.add} 减仓 ${ribbonCounts.reduce}`}
         </div>
       </div>
       <div className="relative min-h-0 flex-1">

@@ -69,8 +69,8 @@ export function macdSeries(closes: number[]): Array<MacdPoint | null> {
 }
 
 const FIRST_STAND_LOOK = 5;
-/** 红丝带上，收盘高出五日线达到这个比例就标减仓。 */
-const MA5_STRETCH = 0.1;
+/** 买入之后，收盘相对买点每上涨这一档就标一次减仓。 */
+const REDUCE_STEP = 0.07;
 /** 20 日线下方的空头减弱，只保留大阳 / 大振幅反包，避免下跌中继假买点。 */
 const STRONG_RECLAIM_DAY_PCT = 5;
 const STRONG_RECLAIM_AMP_PCT = 8;
@@ -373,10 +373,10 @@ export type RibbonPoint = {
 
 export type RibbonSignal = {
   time: string;
-  side: "buy" | "reduce";
+  side: "buy" | "add" | "reduce";
   close: number;
-  /** 收盘相对五日线的偏离。减仓日约为 0.1 以上。 */
-  stretch: number | null;
+  /** 相对这笔买点收盘的涨跌幅。加仓为负，减仓为正。 */
+  gain: number | null;
 };
 
 /**
@@ -386,7 +386,8 @@ export type RibbonSignal = {
  * A2..A7 逐层 EMA(2)
  * 买：七层刚变成全红，并且这根或前 4 根里出现过近 5 日首次站上五日线。
  * 丝带慢于价格，首次站上往往早于七层全部翻红，所以买点落在翻红这根。
- * 减仓：红丝带仍全向上，收盘高出五日线达到约 10%。同一段偏离只标第一次。
+ * 加仓 / 减仓：买入之后，收盘相对买点每下跌 7% 标一次加仓，每上涨 7% 标一次减仓。
+ * 同一档只标第一次。下一笔买点重新起算。
  */
 export function buildRedRibbon(bars: KBar[]): { points: RibbonPoint[]; signals: RibbonSignal[] } {
   const points: RibbonPoint[] = [];
@@ -416,20 +417,34 @@ export function buildRedRibbon(bars: KBar[]): { points: RibbonPoint[]; signals: 
   }
 
   const closes = bars.map((bar) => bar.close);
-  let stretched = false;
+  let buyClose: number | null = null;
+  let reduceSteps = 0;
+  let addSteps = 0;
   for (let i = 1; i < bars.length; i += 1) {
     const turnedUp = allRising[i] && !allRising[i - 1];
-    const ma5 = maAt(closes, 5, i);
-    const stretch = ma5 != null && ma5 > 0 ? closes[i] / ma5 - 1 : null;
     const bought = turnedUp && recentFirstStand(closes, i);
     if (bought) {
-      signals.push({ time: bars[i].time, side: "buy", close: bars[i].close, stretch });
+      signals.push({ time: bars[i].time, side: "buy", close: bars[i].close, gain: null });
+      buyClose = bars[i].close;
+      reduceSteps = 0;
+      addSteps = 0;
     }
-    const extended = allRising[i] && stretch != null && stretch >= MA5_STRETCH;
-    if (extended && !stretched && !bought) {
-      signals.push({ time: bars[i].time, side: "reduce", close: bars[i].close, stretch });
+    if (buyClose != null && buyClose > 0 && !bought) {
+      const gain = closes[i] / buyClose - 1;
+      if (gain > 0) {
+        const steps = Math.floor((gain + 1e-9) / REDUCE_STEP);
+        if (steps > reduceSteps) {
+          signals.push({ time: bars[i].time, side: "reduce", close: bars[i].close, gain });
+          reduceSteps = steps;
+        }
+      } else if (gain < 0) {
+        const steps = Math.floor((-gain + 1e-9) / REDUCE_STEP);
+        if (steps > addSteps) {
+          signals.push({ time: bars[i].time, side: "add", close: bars[i].close, gain });
+          addSteps = steps;
+        }
+      }
     }
-    stretched = extended;
   }
   return { points, signals };
 }
