@@ -224,6 +224,21 @@ assert(
   ribbonReduces.every((item) => item.time !== ribbonBuys[0].time),
   "the buy bar itself is not a reduce",
 );
+const clearPath = [...ribbonBase, 10.6];
+let clearPrice = 10.6;
+for (let i = 0; i < 8; i += 1) {
+  clearPrice *= 0.97;
+  clearPath.push(clearPrice);
+}
+const cleared = buildRedRibbon(clearPath.map((close, i) => barAt(i, close)));
+const clears = cleared.signals.filter((item) => item.side === "clear");
+assert(clears.length === 1 && clears[0].time === cleared.points[44].time, "a red ribbon that turns fully cyan marks one clear");
+assert(cleared.points[44].direction.every((item) => item === "down"), "the clear day has every layer falling");
+assert(!cleared.points[43].direction.every((item) => item === "down"), "clear is the turn into a full cyan ribbon");
+assert(
+  cleared.signals.filter((item) => item.side === "reduce").length === 0,
+  "a clear ends the campaign before another reduce",
+);
 const slowCloses: number[] = [];
 let slow = 30;
 for (let i = 0; i < 50; i += 1) {

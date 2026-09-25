@@ -373,7 +373,7 @@ export type RibbonPoint = {
 
 export type RibbonSignal = {
   time: string;
-  side: "buy" | "reduce";
+  side: "buy" | "reduce" | "clear";
   close: number;
   /** 减仓日相对这笔买点收盘的涨幅。 */
   gain: number | null;
@@ -387,6 +387,7 @@ export type RibbonSignal = {
  * 买：七层刚变成全红，并且这根或前 4 根里出现过近 5 日首次站上五日线。
  * 丝带慢于价格，首次站上往往早于七层全部翻红，所以买点落在翻红这根。
  * 减仓：买入之后，收盘相对买点每上涨 7% 标一次。同一档只标第一次，回落后再站回不重复标。
+ * 清仓：买入之后，七层刚从不全青变成全青。这笔仓位只标一次，之后不再减仓。
  */
 export function buildRedRibbon(bars: KBar[]): { points: RibbonPoint[]; signals: RibbonSignal[] } {
   const points: RibbonPoint[] = [];
@@ -401,6 +402,7 @@ export function buildRedRibbon(bars: KBar[]): { points: RibbonPoint[]; signals: 
   const layers: number[][] = [a1];
   for (let layer = 1; layer < RIBBON_LAYERS; layer += 1) layers.push(tdxEma(layers[layer - 1], 2));
   const allRising: boolean[] = [];
+  const allFalling: boolean[] = [];
   for (let i = 0; i < bars.length; i += 1) {
     const direction: Array<"up" | "down" | null> = [];
     for (let layer = 0; layer < RIBBON_LAYERS; layer += 1) {
@@ -408,6 +410,7 @@ export function buildRedRibbon(bars: KBar[]): { points: RibbonPoint[]; signals: 
       else direction.push(layers[layer][i] > layers[layer][i - 1] ? "up" : "down");
     }
     allRising.push(direction.every((item) => item === "up"));
+    allFalling.push(direction.every((item) => item === "down"));
     points.push({
       time: bars[i].time,
       values: layers.map((layer) => layer[i]),
@@ -420,11 +423,18 @@ export function buildRedRibbon(bars: KBar[]): { points: RibbonPoint[]; signals: 
   let reduceSteps = 0;
   for (let i = 1; i < bars.length; i += 1) {
     const turnedUp = allRising[i] && !allRising[i - 1];
+    const turnedCyan = allFalling[i] && !allFalling[i - 1];
     const bought = turnedUp && recentFirstStand(closes, i);
     if (bought) {
       signals.push({ time: bars[i].time, side: "buy", close: bars[i].close, gain: null });
       buyClose = bars[i].close;
       reduceSteps = 0;
+    }
+    if (buyClose != null && turnedCyan) {
+      signals.push({ time: bars[i].time, side: "clear", close: bars[i].close, gain: null });
+      buyClose = null;
+      reduceSteps = 0;
+      continue;
     }
     if (buyClose != null && buyClose > 0 && !bought) {
       const gain = closes[i] / buyClose - 1;
