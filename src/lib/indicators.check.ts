@@ -224,20 +224,16 @@ assert(
   ribbonReduces.every((item) => item.time !== ribbonBuys[0].time),
   "the buy bar itself is not a reduce",
 );
-const clearPath = [...ribbonBase, 10.6];
-let clearPrice = 10.6;
-for (let i = 0; i < 8; i += 1) {
-  clearPrice *= 0.97;
-  clearPath.push(clearPrice);
-}
-const cleared = buildRedRibbon(clearPath.map((close, i) => barAt(i, close)));
-const clears = cleared.signals.filter((item) => item.side === "clear");
-assert(clears.length === 1 && clears[0].time === cleared.points[44].time, "a red ribbon that turns fully cyan marks one clear");
-assert(cleared.points[44].direction.every((item) => item === "down"), "the clear day has every layer falling");
-assert(!cleared.points[43].direction.every((item) => item === "down"), "clear is the turn into a full cyan ribbon");
+const dipPath = [...ribbonBase, 10.6, 10.2, 9.85, 9.7, 9.11];
+const dipped = buildRedRibbon(dipPath.map((close, i) => barAt(i, close)));
+const adds = dipped.signals.filter((item) => item.side === "add");
+assert(dipped.signals.filter((item) => item.side === "buy").length === 1, "the dip path still has the one buy");
+assert(adds.length === 2, "after a buy, each new 7% drop from the buy close marks an add");
+assert(adds[0].time === dipped.points[42].time && (adds[0].gain ?? 0) <= -0.07, "the first add is the 7% drop");
+assert(adds[1].time === dipped.points[44].time && (adds[1].gain ?? 0) <= -0.14, "the second add is the 14% drop");
 assert(
-  cleared.signals.filter((item) => item.side === "reduce").length === 0,
-  "a clear ends the campaign before another reduce",
+  dipped.signals.every((item) => item.side !== "reduce"),
+  "a decline from the buy does not mark a reduce",
 );
 const slowCloses: number[] = [];
 let slow = 30;

@@ -310,12 +310,12 @@ export default function ChartView({
   }, []);
 
   const ribbonCounts = useMemo(() => {
-    if (mode === "trend") return { buy: 0, reduce: 0, clear: 0 };
+    if (mode === "trend") return { buy: 0, add: 0, reduce: 0 };
     const { signals } = buildRedRibbon(bars);
     return {
       buy: signals.filter((item) => item.side === "buy").length,
+      add: signals.filter((item) => item.side === "add").length,
       reduce: signals.filter((item) => item.side === "reduce").length,
-      clear: signals.filter((item) => item.side === "clear").length,
     };
   }, [mode, bars]);
 
@@ -422,13 +422,13 @@ export default function ChartView({
             size: 1.2,
           };
         }
-        if (point.side === "clear") {
+        if (point.side === "add") {
           return {
             time: point.time,
-            position: "aboveBar" as const,
-            color: RIBBON_CYAN,
-            shape: "arrowDown" as const,
-            text: "清仓",
+            position: "belowBar" as const,
+            color: "#e4b454",
+            shape: "arrowUp" as const,
+            text: "加仓",
             size: 1.2,
           };
         }
@@ -544,7 +544,7 @@ export default function ChartView({
             ? "加载中…"
             : mode === "trend"
               ? "黄线现价 蓝线均价"
-              : `黄线MA5 · 红青丝带 · 买 ${ribbonCounts.buy} 减仓 ${ribbonCounts.reduce} 清仓 ${ribbonCounts.clear}`}
+              : `黄线MA5 · 红青丝带 · 买 ${ribbonCounts.buy} 加仓 ${ribbonCounts.add} 减仓 ${ribbonCounts.reduce}`}
         </div>
       </div>
       <div className="relative min-h-0 flex-1">
