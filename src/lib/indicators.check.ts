@@ -271,6 +271,40 @@ assert(
   "a cyan ribbon fanning downward again as MA5 turns down marks a sell",
 );
 
+const hookTightenCloses = [...Array.from({ length: 70 }, (_, i) => 40 - i * 0.28)];
+let hookTightenPrice = hookTightenCloses.at(-1)!;
+for (let i = 0; i < 8; i += 1) {
+  hookTightenPrice += 0.05;
+  hookTightenCloses.push(hookTightenPrice);
+}
+hookTightenPrice -= 0.4;
+hookTightenCloses.push(hookTightenPrice);
+hookTightenPrice += 0.3;
+hookTightenCloses.push(hookTightenPrice);
+const hookTighten = buildRedRibbon(hookTightenCloses.map((close, index) => barAt(index, close)));
+const hookBuy = hookTighten.signals.at(-1);
+const hookBuyAt = hookTighten.points.findIndex((point) => point.time === hookBuy?.time);
+const hookSpread = ribbonSpread(hookTighten.points[hookBuyAt].values);
+const hookSpreadPrev = ribbonSpread(hookTighten.points[hookBuyAt - 1].values);
+const hookSpreadPrev2 = ribbonSpread(hookTighten.points[hookBuyAt - 2].values);
+const hookMa = maAt(hookTightenCloses, 5, hookBuyAt);
+const hookMaPrev = maAt(hookTightenCloses, 5, hookBuyAt - 1);
+const hookMaPrev2 = maAt(hookTightenCloses, 5, hookBuyAt - 2);
+assert(
+  hookBuy?.side === "buy" &&
+    hookBuyAt === hookTighten.points.length - 1 &&
+    hookTighten.signals.some((item) => item.side === "sell" && hookTighten.points.findIndex((point) => point.time === item.time) < hookBuyAt) &&
+    hookTighten.points[hookBuyAt].direction.every((item) => item === "down") &&
+    hookSpread < hookSpreadPrev &&
+    !(hookSpreadPrev < hookSpreadPrev2) &&
+    hookMa != null &&
+    hookMaPrev != null &&
+    hookMaPrev2 != null &&
+    hookMa > hookMaPrev &&
+    hookMaPrev <= hookMaPrev2,
+  "a fully cyan ribbon that tightens for one day as MA5 hooks up marks a buy",
+);
+
 const redCloses = [...Array.from({ length: 50 }, (_, i) => 30 - i * 0.2)];
 let redPrice = redCloses.at(-1)!;
 for (let i = 0; i < 6; i += 1) {
