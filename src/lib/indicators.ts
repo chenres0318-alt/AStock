@@ -399,7 +399,8 @@ export type RibbonSignal = {
  * 加仓 / 减仓：成本是买入价和其后各次加仓价的等权平均，减仓不改变成本。
  * 收盘相对这个成本每下跌 7% 标一次加仓，每上涨 7% 标一次减仓。加仓后按新成本重新分档。
  * 减仓之后，要先相对上一次减仓收盘再跌超过 8%，才标下一次加仓；这次加仓仍计入成本。
- * 买入之后，DIF 下穿 DEA 为 MACD 死叉，标一次清仓并结束这笔持仓，直到下一次买入。
+ * 买入之后，DIF 下穿 DEA 为 MACD 死叉，标一次清仓并结束这笔持仓。
+ * 清仓之后，收盘再次站上五日线且七层红丝带全红，再标一次买入。
  */
 export function buildRedRibbon(bars: KBar[]): { points: RibbonPoint[]; signals: RibbonSignal[] } {
   const points: RibbonPoint[] = [];
@@ -435,6 +436,7 @@ export function buildRedRibbon(bars: KBar[]): { points: RibbonPoint[]; signals: 
   let reduceSteps = 0;
   let addSteps = 0;
   let lastReduceClose: number | null = null;
+  let awaitingReentry = false;
   const takeAdd = (index: number, gain: number) => {
     signals.push({ time: bars[index].time, side: "add", close: bars[index].close, gain });
     cost = ((cost as number) * units + closes[index]) / (units + 1);
@@ -445,7 +447,11 @@ export function buildRedRibbon(bars: KBar[]): { points: RibbonPoint[]; signals: 
   };
   for (let i = 1; i < bars.length; i += 1) {
     const turnedUp = allRising[i] && !allRising[i - 1];
-    const bought = turnedUp && recentFirstStand(closes, i);
+    const ma5 = maAt(closes, 5, i);
+    const aboveMa5 = ma5 != null && closes[i] > ma5;
+    const opened = turnedUp && recentFirstStand(closes, i);
+    const reentry = awaitingReentry && aboveMa5 && allRising[i];
+    const bought = opened || reentry;
     if (bought) {
       signals.push({ time: bars[i].time, side: "buy", close: bars[i].close, gain: null });
       cost = bars[i].close;
@@ -453,6 +459,7 @@ export function buildRedRibbon(bars: KBar[]): { points: RibbonPoint[]; signals: 
       reduceSteps = 0;
       addSteps = 0;
       lastReduceClose = null;
+      awaitingReentry = false;
     }
     if (cost != null && cost > 0 && units > 0 && !bought && macdDeathCross(macd, i)) {
       signals.push({ time: bars[i].time, side: "clear", close: bars[i].close, gain: closes[i] / cost - 1 });
@@ -461,6 +468,7 @@ export function buildRedRibbon(bars: KBar[]): { points: RibbonPoint[]; signals: 
       reduceSteps = 0;
       addSteps = 0;
       lastReduceClose = null;
+      awaitingReentry = true;
     } else if (cost != null && cost > 0 && units > 0 && !bought) {
       const gain = closes[i] / cost - 1;
       const fromReduce = lastReduceClose != null && lastReduceClose > 0 ? closes[i] / lastReduceClose - 1 : null;
