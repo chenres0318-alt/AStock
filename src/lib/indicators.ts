@@ -69,7 +69,7 @@ export function macdSeries(closes: number[]): Array<MacdPoint | null> {
 }
 
 const FIRST_STAND_LOOK = 5;
-/** 买入之后，收盘相对买点每上涨这一档就标一次减仓。 */
+/** 相对持仓成本每上涨或下跌这一档，标一次减仓或加仓。 */
 const REDUCE_STEP = 0.07;
 /** 20 日线下方的空头减弱，只保留大阳 / 大振幅反包，避免下跌中继假买点。 */
 const STRONG_RECLAIM_DAY_PCT = 5;
@@ -386,8 +386,8 @@ export type RibbonSignal = {
  * A2..A7 逐层 EMA(2)
  * 买：七层刚变成全红，并且这根或前 4 根里出现过近 5 日首次站上五日线。
  * 丝带慢于价格，首次站上往往早于七层全部翻红，所以买点落在翻红这根。
- * 加仓 / 减仓：买入之后，收盘相对买点每下跌 7% 标一次加仓，每上涨 7% 标一次减仓。
- * 同一档只标第一次。下一笔买点重新起算。
+ * 加仓 / 减仓：成本是买入价和其后各次加仓价的等权平均，减仓不改变成本。
+ * 收盘相对这个成本每下跌 7% 标一次加仓，每上涨 7% 标一次减仓。加仓后按新成本重新分档。
  */
 export function buildRedRibbon(bars: KBar[]): { points: RibbonPoint[]; signals: RibbonSignal[] } {
   const points: RibbonPoint[] = [];
@@ -417,7 +417,8 @@ export function buildRedRibbon(bars: KBar[]): { points: RibbonPoint[]; signals: 
   }
 
   const closes = bars.map((bar) => bar.close);
-  let buyClose: number | null = null;
+  let cost: number | null = null;
+  let units = 0;
   let reduceSteps = 0;
   let addSteps = 0;
   for (let i = 1; i < bars.length; i += 1) {
@@ -425,23 +426,27 @@ export function buildRedRibbon(bars: KBar[]): { points: RibbonPoint[]; signals: 
     const bought = turnedUp && recentFirstStand(closes, i);
     if (bought) {
       signals.push({ time: bars[i].time, side: "buy", close: bars[i].close, gain: null });
-      buyClose = bars[i].close;
+      cost = bars[i].close;
+      units = 1;
       reduceSteps = 0;
       addSteps = 0;
     }
-    if (buyClose != null && buyClose > 0 && !bought) {
-      const gain = closes[i] / buyClose - 1;
-      if (gain > 0) {
+    if (cost != null && cost > 0 && units > 0 && !bought) {
+      const gain = closes[i] / cost - 1;
+      if (gain < 0) {
+        const steps = Math.floor((-gain + 1e-9) / REDUCE_STEP);
+        if (steps > addSteps) {
+          signals.push({ time: bars[i].time, side: "add", close: bars[i].close, gain });
+          cost = (cost * units + closes[i]) / (units + 1);
+          units += 1;
+          addSteps = 0;
+          reduceSteps = 0;
+        }
+      } else if (gain > 0) {
         const steps = Math.floor((gain + 1e-9) / REDUCE_STEP);
         if (steps > reduceSteps) {
           signals.push({ time: bars[i].time, side: "reduce", close: bars[i].close, gain });
           reduceSteps = steps;
-        }
-      } else if (gain < 0) {
-        const steps = Math.floor((-gain + 1e-9) / REDUCE_STEP);
-        if (steps > addSteps) {
-          signals.push({ time: bars[i].time, side: "add", close: bars[i].close, gain });
-          addSteps = steps;
         }
       }
     }
