@@ -71,6 +71,8 @@ export function macdSeries(closes: number[]): Array<MacdPoint | null> {
 const FIRST_STAND_LOOK = 5;
 /** 相对持仓成本每上涨或下跌这一档，标一次减仓或加仓。 */
 const REDUCE_STEP = 0.07;
+/** 减仓之后，收盘相对上一次减仓价再跌超过这一档，才标下一次加仓。 */
+const ADD_AFTER_REDUCE = 0.08;
 /** 20 日线下方的空头减弱，只保留大阳 / 大振幅反包，避免下跌中继假买点。 */
 const STRONG_RECLAIM_DAY_PCT = 5;
 const STRONG_RECLAIM_AMP_PCT = 8;
@@ -375,7 +377,7 @@ export type RibbonSignal = {
   time: string;
   side: "buy" | "add" | "reduce";
   close: number;
-  /** 相对这笔买点收盘的涨跌幅。加仓为负，减仓为正。 */
+  /** 触发这笔信号的涨跌幅。成本档加减仓相对持仓成本；减仓后的加仓相对上一次减仓收盘。加仓为负，减仓为正。 */
   gain: number | null;
 };
 
@@ -388,6 +390,7 @@ export type RibbonSignal = {
  * 丝带慢于价格，首次站上往往早于七层全部翻红，所以买点落在翻红这根。
  * 加仓 / 减仓：成本是买入价和其后各次加仓价的等权平均，减仓不改变成本。
  * 收盘相对这个成本每下跌 7% 标一次加仓，每上涨 7% 标一次减仓。加仓后按新成本重新分档。
+ * 减仓之后，要先相对上一次减仓收盘再跌超过 8%，才标下一次加仓；这次加仓仍计入成本。
  */
 export function buildRedRibbon(bars: KBar[]): { points: RibbonPoint[]; signals: RibbonSignal[] } {
   const points: RibbonPoint[] = [];
@@ -421,6 +424,15 @@ export function buildRedRibbon(bars: KBar[]): { points: RibbonPoint[]; signals: 
   let units = 0;
   let reduceSteps = 0;
   let addSteps = 0;
+  let lastReduceClose: number | null = null;
+  const takeAdd = (index: number, gain: number) => {
+    signals.push({ time: bars[index].time, side: "add", close: bars[index].close, gain });
+    cost = ((cost as number) * units + closes[index]) / (units + 1);
+    units += 1;
+    addSteps = 0;
+    reduceSteps = 0;
+    lastReduceClose = null;
+  };
   for (let i = 1; i < bars.length; i += 1) {
     const turnedUp = allRising[i] && !allRising[i - 1];
     const bought = turnedUp && recentFirstStand(closes, i);
@@ -430,23 +442,24 @@ export function buildRedRibbon(bars: KBar[]): { points: RibbonPoint[]; signals: 
       units = 1;
       reduceSteps = 0;
       addSteps = 0;
+      lastReduceClose = null;
     }
     if (cost != null && cost > 0 && units > 0 && !bought) {
       const gain = closes[i] / cost - 1;
-      if (gain < 0) {
+      const fromReduce = lastReduceClose != null && lastReduceClose > 0 ? closes[i] / lastReduceClose - 1 : null;
+      if (fromReduce != null && fromReduce < -ADD_AFTER_REDUCE) {
+        takeAdd(i, fromReduce);
+      } else if (fromReduce != null && fromReduce < 0) {
+        // 减仓后的回撤还没超过 8%，先不加仓。
+      } else if (gain < 0) {
         const steps = Math.floor((-gain + 1e-9) / REDUCE_STEP);
-        if (steps > addSteps) {
-          signals.push({ time: bars[i].time, side: "add", close: bars[i].close, gain });
-          cost = (cost * units + closes[i]) / (units + 1);
-          units += 1;
-          addSteps = 0;
-          reduceSteps = 0;
-        }
+        if (steps > addSteps) takeAdd(i, gain);
       } else if (gain > 0) {
         const steps = Math.floor((gain + 1e-9) / REDUCE_STEP);
         if (steps > reduceSteps) {
           signals.push({ time: bars[i].time, side: "reduce", close: bars[i].close, gain });
           reduceSteps = steps;
+          lastReduceClose = closes[i];
         }
       }
     }
