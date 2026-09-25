@@ -69,6 +69,8 @@ export function macdSeries(closes: number[]): Array<MacdPoint | null> {
 }
 
 const FIRST_STAND_LOOK = 5;
+/** 买入之后，相对上一次买、加仓或减仓的价格，每上涨或下跌这一档再标一次。 */
+const LADDER_STEP = 0.05;
 /** 20 日线下方的空头减弱，只保留大阳 / 大振幅反包，避免下跌中继假买点。 */
 const STRONG_RECLAIM_DAY_PCT = 5;
 const STRONG_RECLAIM_AMP_PCT = 8;
@@ -362,8 +364,9 @@ export type RibbonPoint = {
 
 export type RibbonSignal = {
   time: string;
-  side: "buy" | "sell";
+  side: "buy" | "add" | "reduce" | "clear";
   close: number;
+  /** 加减仓相对上一次买、加仓或减仓的收盘价。加仓为负，减仓为正。买点和清仓为空。 */
   gain: number | null;
 };
 
@@ -372,8 +375,10 @@ export type RibbonSignal = {
  * VAR1=(2*C+H+L+O)/5
  * A1=(EMA(VAR1,3)+EMA(VAR1,6)+EMA(VAR1,12)+EMA(VAR1,24))/4
  * A2..A7 逐层 EMA(2)
- * 收盘在全红丝带上沿之上就开始持有，并标一次买。
- * 持有到收盘跌破丝带下沿，标一次卖。
+ * 买：七层都向下的青丝带，并且收盘站上五日线。
+ * 之后以上一次买入、加仓或减仓的收盘价为基准，每再涨 5% 减仓，每再跌 5% 加仓。
+ * 青丝带阶段跌破五日线则清仓。丝带先走成全红，再变成全绿（七层向下），也清仓。
+ * 清仓当天若仍是青丝带且收盘还在五日线上，重新标买。
  */
 export function buildRedRibbon(bars: KBar[]): { points: RibbonPoint[]; signals: RibbonSignal[] } {
   const points: RibbonPoint[] = [];
@@ -387,14 +392,12 @@ export function buildRedRibbon(bars: KBar[]): { points: RibbonPoint[]; signals: 
   const a1 = var1.map((_, i) => (ema3[i] + ema6[i] + ema12[i] + ema24[i]) / 4);
   const layers: number[][] = [a1];
   for (let layer = 1; layer < RIBBON_LAYERS; layer += 1) layers.push(tdxEma(layers[layer - 1], 2));
-  const allRising: boolean[] = [];
   for (let i = 0; i < bars.length; i += 1) {
     const direction: Array<"up" | "down" | null> = [];
     for (let layer = 0; layer < RIBBON_LAYERS; layer += 1) {
       if (i === 0 || layers[layer][i] === layers[layer][i - 1]) direction.push(null);
       else direction.push(layers[layer][i] > layers[layer][i - 1] ? "up" : "down");
     }
-    allRising.push(direction.every((item) => item === "up"));
     points.push({
       time: bars[i].time,
       values: layers.map((layer) => layer[i]),
@@ -402,19 +405,45 @@ export function buildRedRibbon(bars: KBar[]): { points: RibbonPoint[]; signals: 
     });
   }
 
+  const closes = bars.map((bar) => bar.close);
   let holding = false;
+  let seenRed = false;
+  let anchor: number | null = null;
+  const openBuy = (index: number) => {
+    signals.push({ time: bars[index].time, side: "buy", close: bars[index].close, gain: null });
+    holding = true;
+    seenRed = false;
+    anchor = bars[index].close;
+  };
   for (let i = 1; i < bars.length; i += 1) {
-    const values = points[i].values;
-    const top = Math.max(...values);
-    const bottom = Math.min(...values);
-    const aboveRed = allRising[i] && bars[i].close > top;
-    const belowRibbon = bars[i].close < bottom;
-    if (!holding && aboveRed) {
-      signals.push({ time: bars[i].time, side: "buy", close: bars[i].close, gain: null });
-      holding = true;
-    } else if (holding && belowRibbon) {
-      signals.push({ time: bars[i].time, side: "sell", close: bars[i].close, gain: null });
-      holding = false;
+    const direction = points[i].direction;
+    const allUp = direction.every((item) => item === "up");
+    const allDown = direction.every((item) => item === "down");
+    const ma5 = maAt(closes, 5, i);
+    const aboveMa5 = ma5 != null && closes[i] > ma5;
+    const belowMa5 = ma5 != null && closes[i] < ma5;
+    if (holding && allUp) seenRed = true;
+    if (holding) {
+      const clearForMa5 = !seenRed && belowMa5;
+      const clearForGreen = seenRed && allDown;
+      if (clearForMa5 || clearForGreen) {
+        signals.push({ time: bars[i].time, side: "clear", close: bars[i].close, gain: null });
+        holding = false;
+        seenRed = false;
+        anchor = null;
+        if (allDown && aboveMa5) openBuy(i);
+      } else if (anchor != null && anchor > 0) {
+        const gain = closes[i] / anchor - 1;
+        if (gain <= -LADDER_STEP) {
+          signals.push({ time: bars[i].time, side: "add", close: bars[i].close, gain });
+          anchor = closes[i];
+        } else if (gain >= LADDER_STEP) {
+          signals.push({ time: bars[i].time, side: "reduce", close: bars[i].close, gain });
+          anchor = closes[i];
+        }
+      }
+    } else if (allDown && aboveMa5) {
+      openBuy(i);
     }
   }
   return { points, signals };

@@ -208,63 +208,86 @@ assert(climbRibbon.points.at(-1)?.direction.every((item) => item === "up"), "a s
 const drop = Array.from({ length: 90 }, (_, i) => barAt(i, 40 - i * 0.2));
 assert(buildRedRibbon(drop).points.at(-1)?.direction.every((item) => item === "down"), "a steady drop turns every ribbon layer down");
 
-function ribbonBand(point: { values: number[]; direction: Array<"up" | "down" | null> }) {
-  return {
-    top: Math.max(...point.values),
-    bottom: Math.min(...point.values),
-    red: point.direction.every((item) => item === "up"),
-  };
+assert(buildRedRibbon(drop).signals.length === 0, "a cyan ribbon below MA5 does not buy");
+
+function signalAt(ribbon: ReturnType<typeof buildRedRibbon>, side: "buy" | "add" | "reduce" | "clear") {
+  const signal = ribbon.signals.find((item) => item.side === side);
+  assert(signal != null, `missing ${side}`);
+  const index = ribbon.points.findIndex((point) => point.time === signal!.time);
+  return { signal: signal!, index };
 }
 
-const heldClimb = buildRedRibbon(Array.from({ length: 90 }, (_, i) => barAt(i, 10 + i * 0.2)));
-const climbTop = ribbonBand(heldClimb.points.at(-1)!);
-assert(heldClimb.points.at(-1)!.values.length > 0 && climbTop.red && 10 + 89 * 0.2 > climbTop.top, "a steady climb finishes above a red ribbon");
-const climbBuys = heldClimb.signals.filter((item) => item.side === "buy");
-const climbBuyAt = heldClimb.points.findIndex((point) => point.time === climbBuys[0]?.time);
-const climbBuyBand = ribbonBand(heldClimb.points[climbBuyAt]);
+const failedBounce = 50 - 79 * 0.3;
+const ma5Fail = buildRedRibbon(
+  [
+    ...Array.from({ length: 80 }, (_, i) => 50 - i * 0.3),
+    failedBounce + 2.2,
+    failedBounce + 1.2,
+    failedBounce + 0.2,
+  ].map((close, index) => barAt(index, close)),
+);
+const ma5Buy = signalAt(ma5Fail, "buy");
+const ma5Clear = signalAt(ma5Fail, "clear");
 assert(
-  climbBuys.length === 1 &&
-    heldClimb.signals.every((item) => item.side !== "sell") &&
-    climbBuyBand.red &&
-    10 + climbBuyAt * 0.2 > climbBuyBand.top,
-  "the first close above a red ribbon marks one buy and no sell",
+  ma5Buy.index === 81 &&
+    ma5Fail.points[ma5Buy.index].direction.every((item) => item === "down") &&
+    failedBounce + 1.2 > (maAt([
+      ...Array.from({ length: 80 }, (_, i) => 50 - i * 0.3),
+      failedBounce + 2.2,
+      failedBounce + 1.2,
+    ], 5, 81) ?? 0),
+  "a cyan ribbon standing above MA5 marks a buy",
+);
+assert(
+  ma5Clear.index === ma5Buy.index + 1 &&
+    ma5Fail.points[ma5Clear.index].direction.every((item) => item === "down") &&
+    ma5Fail.signals.filter((item) => item.side === "buy").length === 1 &&
+    ma5Fail.signals.every((item) => item.side !== "add" && item.side !== "reduce"),
+  "breaking MA5 before the ribbon turns red clears and does not add",
 );
 
-const roundTripCloses = [
-  ...Array.from({ length: 80 }, (_, i) => 10 + i * 0.15),
-  ...Array.from({ length: 30 }, (_, i) => 10 + 79 * 0.15 - (i + 1) * 0.45),
-];
-const roundTrip = buildRedRibbon(roundTripCloses.map((close, i) => barAt(i, close)));
-const sells = roundTrip.signals.filter((item) => item.side === "sell");
-const sellIndex = roundTrip.points.findIndex((point) => point.time === sells[0]?.time);
-assert(sells.length === 1 && sellIndex > 80, "falling through the ribbon marks one sell");
-const sellBand = ribbonBand(roundTrip.points[sellIndex]);
-assert(roundTripCloses[sellIndex] < sellBand.bottom, "the sell is the close under the ribbon");
+const campaignFloor = 50 - 79 * 0.3;
+const campaignCloses = [...Array.from({ length: 80 }, (_, i) => 50 - i * 0.3), campaignFloor + 2.2, campaignFloor + 1.2];
+let campaignPrice = campaignCloses.at(-1)!;
+for (let i = 0; i < 8; i += 1) {
+  campaignPrice += 0.2;
+  campaignCloses.push(campaignPrice);
+}
+for (let i = 0; i < 8; i += 1) {
+  campaignPrice *= 0.97;
+  campaignCloses.push(campaignPrice);
+}
+const campaignLow = campaignPrice;
+campaignCloses.push(campaignLow + 0.4, campaignLow + 1.1);
+const campaign = buildRedRibbon(campaignCloses.map((close, index) => barAt(index, close)));
+const campaignBuy = signalAt(campaign, "buy");
+const campaignReduce = signalAt(campaign, "reduce");
+const campaignAdd = signalAt(campaign, "add");
+const campaignClear = signalAt(campaign, "clear");
+const campaignRebuy = campaign.signals.filter((item) => item.side === "buy")[1];
+assert(campaignBuy.index < campaignReduce.index && (campaignReduce.signal.gain ?? 0) >= 0.05, "a 5% rise from the buy marks a reduce");
 assert(
-  roundTrip.points.slice(sellIndex + 1).every((point) => point.time !== sells[0].time),
-  "staying under the ribbon does not mark another sell",
+  campaign.points[campaignReduce.index].direction.every((item) => item === "up"),
+  "the reduce can happen after the ribbon has turned red",
 );
-const heldBefore = roundTrip.points.slice(0, sellIndex).some((point, index) => {
-  const band = ribbonBand(point);
-  return band.red && roundTripCloses[index] > band.top;
-});
-assert(heldBefore, "the sell comes after a close above the red ribbon");
-
-const secondTripCloses = [
-  ...roundTripCloses,
-  ...Array.from({ length: 40 }, (_, i) => roundTripCloses.at(-1)! + (i + 1) * 0.35),
-  ...Array.from({ length: 25 }, (_, i) => roundTripCloses.at(-1)! + 40 * 0.35 - (i + 1) * 0.5),
-];
-const secondTrip = buildRedRibbon(secondTripCloses.map((close, i) => barAt(i, close)));
-const roundBuys = roundTrip.signals.filter((item) => item.side === "buy");
-const buyIndex = roundTrip.points.findIndex((point) => point.time === roundBuys[0]?.time);
-const buyBand = ribbonBand(roundTrip.points[buyIndex]);
 assert(
-  roundBuys.length === 1 && buyIndex < sellIndex && buyBand.red && roundTripCloses[buyIndex] > buyBand.top,
-  "the buy is the first close above the red ribbon",
+  campaignReduce.index < campaignAdd.index && (campaignAdd.signal.gain ?? 0) <= -0.05,
+  "a 5% drop from the last reduce marks an add",
 );
-assert(secondTrip.signals.filter((item) => item.side === "sell").length === 2, "a later drop back under the ribbon marks a second sell");
-assert(secondTrip.signals.filter((item) => item.side === "buy").length === 2, "each new stand above the red ribbon marks another buy");
+assert(
+  campaignAdd.index < campaignClear.index &&
+    campaign.points[campaignClear.index].direction.every((item) => item === "down") &&
+    campaign.points.slice(campaignBuy.index, campaignClear.index).some((point) => point.direction.every((item) => item === "up")),
+  "a red ribbon turning fully down marks a clear",
+);
+const rebuyIndex = campaign.points.findIndex((point) => point.time === campaignRebuy?.time);
+assert(
+  campaignRebuy != null &&
+    rebuyIndex > campaignClear.index &&
+    campaign.points[rebuyIndex].direction.every((item) => item === "down") &&
+    campaignCloses[rebuyIndex] > (maAt(campaignCloses, 5, rebuyIndex) ?? Infinity),
+  "after the clear, the next cyan stand above MA5 marks a new buy",
+);
 
 const laggedCloses: number[] = [];
 let lagged = 30;
