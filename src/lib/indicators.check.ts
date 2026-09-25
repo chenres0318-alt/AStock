@@ -208,85 +208,103 @@ assert(climbRibbon.points.at(-1)?.direction.every((item) => item === "up"), "a s
 const drop = Array.from({ length: 90 }, (_, i) => barAt(i, 40 - i * 0.2));
 assert(buildRedRibbon(drop).points.at(-1)?.direction.every((item) => item === "down"), "a steady drop turns every ribbon layer down");
 
-assert(buildRedRibbon(drop).signals.length === 0, "a cyan ribbon below MA5 does not buy");
+assert(buildRedRibbon(drop).signals.length === 0, "a steady cyan decline does not buy while MA5 is still falling");
+assert(climbRibbon.signals.length === 0, "a red climb does not sell before a buy");
 
-function signalAt(ribbon: ReturnType<typeof buildRedRibbon>, side: "buy" | "add" | "reduce" | "clear") {
-  const signal = ribbon.signals.find((item) => item.side === side);
-  assert(signal != null, `missing ${side}`);
-  const index = ribbon.points.findIndex((point) => point.time === signal!.time);
-  return { signal: signal!, index };
+function ribbonSpread(values: number[]) {
+  return Math.max(...values) - Math.min(...values);
 }
 
-const failedBounce = 50 - 79 * 0.3;
-const ma5Fail = buildRedRibbon(
-  [
-    ...Array.from({ length: 80 }, (_, i) => 50 - i * 0.3),
-    failedBounce + 2.2,
-    failedBounce + 1.2,
-    failedBounce + 0.2,
-  ].map((close, index) => barAt(index, close)),
-);
-const ma5Buy = signalAt(ma5Fail, "buy");
-const ma5Clear = signalAt(ma5Fail, "clear");
-assert(
-  ma5Buy.index === 81 &&
-    ma5Fail.points[ma5Buy.index].direction.every((item) => item === "down") &&
-    failedBounce + 1.2 > (maAt([
-      ...Array.from({ length: 80 }, (_, i) => 50 - i * 0.3),
-      failedBounce + 2.2,
-      failedBounce + 1.2,
-    ], 5, 81) ?? 0),
-  "a cyan ribbon standing above MA5 marks a buy",
-);
-assert(
-  ma5Clear.index === ma5Buy.index + 1 &&
-    ma5Fail.points[ma5Clear.index].direction.every((item) => item === "down") &&
-    ma5Fail.signals.filter((item) => item.side === "buy").length === 1 &&
-    ma5Fail.signals.every((item) => item.side !== "add" && item.side !== "reduce"),
-  "breaking MA5 before the ribbon turns red clears and does not add",
-);
-
-const campaignFloor = 50 - 79 * 0.3;
-const campaignCloses = [...Array.from({ length: 80 }, (_, i) => 50 - i * 0.3), campaignFloor + 2.2, campaignFloor + 1.2];
-let campaignPrice = campaignCloses.at(-1)!;
+const convergeCloses = [...Array.from({ length: 70 }, (_, i) => 40 - i * 0.28)];
+let convergePrice = convergeCloses.at(-1)!;
 for (let i = 0; i < 8; i += 1) {
-  campaignPrice += 0.2;
-  campaignCloses.push(campaignPrice);
+  convergePrice += 0.05;
+  convergeCloses.push(convergePrice);
+}
+const converge = buildRedRibbon(convergeCloses.map((close, index) => barAt(index, close)));
+const convergeBuy = converge.signals[0];
+const convergeBuyAt = converge.points.findIndex((point) => point.time === convergeBuy?.time);
+const convergeSpread = ribbonSpread(converge.points[convergeBuyAt].values);
+const convergeSpreadPrev = ribbonSpread(converge.points[convergeBuyAt - 1].values);
+const convergeSpreadPrev2 = ribbonSpread(converge.points[convergeBuyAt - 2].values);
+const convergeMa = maAt(convergeCloses, 5, convergeBuyAt);
+const convergeMaPrev = maAt(convergeCloses, 5, convergeBuyAt - 1);
+assert(
+  converge.signals.length === 1 &&
+    convergeBuy?.side === "buy" &&
+    converge.points[convergeBuyAt].direction.every((item) => item === "down") &&
+    convergeSpread < convergeSpreadPrev &&
+    convergeSpreadPrev < convergeSpreadPrev2 &&
+    convergeMa != null &&
+    convergeMaPrev != null &&
+    convergeMa > convergeMaPrev,
+  "a cyan ribbon that keeps narrowing while MA5 turns up marks one buy",
+);
+
+const divergeCloses = convergeCloses.slice();
+let divergePrice = divergeCloses.at(-1)!;
+for (let i = 0; i < 12; i += 1) {
+  divergePrice -= 0.18;
+  divergeCloses.push(divergePrice);
+}
+const diverge = buildRedRibbon(divergeCloses.map((close, index) => barAt(index, close)));
+const divergeSell = diverge.signals.find((item) => item.side === "sell");
+const divergeSellAt = diverge.points.findIndex((point) => point.time === divergeSell?.time);
+const divergeSpread = ribbonSpread(diverge.points[divergeSellAt].values);
+const divergeSpreadPrev = ribbonSpread(diverge.points[divergeSellAt - 1].values);
+const divergeSpreadPrev2 = ribbonSpread(diverge.points[divergeSellAt - 2].values);
+const divergeMa = maAt(divergeCloses, 5, divergeSellAt);
+const divergeMaPrev = maAt(divergeCloses, 5, divergeSellAt - 1);
+const divergeMaPrev2 = maAt(divergeCloses, 5, divergeSellAt - 2);
+assert(
+  diverge.signals[0]?.side === "buy" &&
+    divergeSellAt > convergeBuyAt &&
+    diverge.points[divergeSellAt].direction.every((item) => item === "down") &&
+    divergeSpread > divergeSpreadPrev &&
+    divergeSpread > divergeSpreadPrev2 &&
+    Math.min(...diverge.points[divergeSellAt].values) < Math.min(...diverge.points[divergeSellAt - 1].values) &&
+    divergeMa != null &&
+    divergeMaPrev != null &&
+    divergeMaPrev2 != null &&
+    divergeMa < divergeMaPrev &&
+    divergeMaPrev >= divergeMaPrev2,
+  "a cyan ribbon fanning downward again as MA5 turns down marks a sell",
+);
+
+const redCloses = [...Array.from({ length: 50 }, (_, i) => 30 - i * 0.2)];
+let redPrice = redCloses.at(-1)!;
+for (let i = 0; i < 6; i += 1) {
+  redPrice += 0.08;
+  redCloses.push(redPrice);
+}
+for (let i = 0; i < 28; i += 1) {
+  redPrice += 0.18;
+  redCloses.push(redPrice);
 }
 for (let i = 0; i < 8; i += 1) {
-  campaignPrice *= 0.97;
-  campaignCloses.push(campaignPrice);
+  redPrice -= 0.04;
+  redCloses.push(redPrice);
 }
-const campaignLow = campaignPrice;
-campaignCloses.push(campaignLow + 0.4, campaignLow + 1.1);
-const campaign = buildRedRibbon(campaignCloses.map((close, index) => barAt(index, close)));
-const campaignBuy = signalAt(campaign, "buy");
-const campaignReduce = signalAt(campaign, "reduce");
-const campaignAdd = signalAt(campaign, "add");
-const campaignClear = signalAt(campaign, "clear");
-const campaignRebuy = campaign.signals.filter((item) => item.side === "buy")[1];
-assert(campaignBuy.index < campaignReduce.index && (campaignReduce.signal.gain ?? 0) >= 0.05, "a 5% rise from the buy marks a reduce");
+const redContract = buildRedRibbon(redCloses.map((close, index) => barAt(index, close)));
+const redSell = redContract.signals.find((item) => item.side === "sell");
+const redSellAt = redContract.points.findIndex((point) => point.time === redSell?.time);
+const redBuyAt = redContract.points.findIndex((point) => point.time === redContract.signals[0]?.time);
+const redSpread = ribbonSpread(redContract.points[redSellAt].values);
+const redSpreadPrev = ribbonSpread(redContract.points[redSellAt - 1].values);
+const redMa = maAt(redCloses, 5, redSellAt);
+const redMaPrev = maAt(redCloses, 5, redSellAt - 1);
+const redMaPrev2 = maAt(redCloses, 5, redSellAt - 2);
 assert(
-  campaign.points[campaignReduce.index].direction.every((item) => item === "up"),
-  "the reduce can happen after the ribbon has turned red",
-);
-assert(
-  campaignReduce.index < campaignAdd.index && (campaignAdd.signal.gain ?? 0) <= -0.05,
-  "a 5% drop from the last reduce marks an add",
-);
-assert(
-  campaignAdd.index < campaignClear.index &&
-    campaign.points[campaignClear.index].direction.every((item) => item === "down") &&
-    campaign.points.slice(campaignBuy.index, campaignClear.index).some((point) => point.direction.every((item) => item === "up")),
-  "a red ribbon turning fully down marks a clear",
-);
-const rebuyIndex = campaign.points.findIndex((point) => point.time === campaignRebuy?.time);
-assert(
-  campaignRebuy != null &&
-    rebuyIndex > campaignClear.index &&
-    campaign.points[rebuyIndex].direction.every((item) => item === "down") &&
-    campaignCloses[rebuyIndex] > (maAt(campaignCloses, 5, rebuyIndex) ?? Infinity),
-  "after the clear, the next cyan stand above MA5 marks a new buy",
+  redContract.signals[0]?.side === "buy" &&
+    redSellAt > redBuyAt &&
+    redContract.points[redSellAt].direction.every((item) => item === "up") &&
+    redSpread < redSpreadPrev &&
+    redMa != null &&
+    redMaPrev != null &&
+    redMaPrev2 != null &&
+    redMa < redMaPrev &&
+    redMaPrev >= redMaPrev2,
+  "a red ribbon that starts narrowing as MA5 turns down marks a sell",
 );
 
 const laggedCloses: number[] = [];
