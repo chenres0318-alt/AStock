@@ -77,6 +77,14 @@ const ADD_AFTER_REDUCE = 0.08;
 const STRONG_RECLAIM_DAY_PCT = 5;
 const STRONG_RECLAIM_AMP_PCT = 8;
 
+/** DIF 上一根还在 DEA 上（含相等），这一根落到 DEA 下。 */
+function macdDeathCross(series: Array<MacdPoint | null>, index: number): boolean {
+  const prev = series[index - 1];
+  const cur = series[index];
+  if (!prev || !cur) return false;
+  return prev.dif + 1e-8 >= prev.dea && cur.dif < cur.dea;
+}
+
 /** 这根或向前 window-1 根里，有过一次近 5 日首次站上五日线。 */
 function recentFirstStand(closes: number[], i: number, window = FIRST_STAND_LOOK): boolean {
   const from = Math.max(0, i - (window - 1));
@@ -375,9 +383,9 @@ export type RibbonPoint = {
 
 export type RibbonSignal = {
   time: string;
-  side: "buy" | "add" | "reduce";
+  side: "buy" | "add" | "reduce" | "clear";
   close: number;
-  /** 触发这笔信号的涨跌幅。成本档加减仓相对持仓成本；减仓后的加仓相对上一次减仓收盘。加仓为负，减仓为正。 */
+  /** 触发这笔信号的涨跌幅。成本档加减仓和清仓相对当时持仓成本；减仓后的加仓相对上一次减仓收盘。加仓为负，减仓为正。 */
   gain: number | null;
 };
 
@@ -391,6 +399,7 @@ export type RibbonSignal = {
  * 加仓 / 减仓：成本是买入价和其后各次加仓价的等权平均，减仓不改变成本。
  * 收盘相对这个成本每下跌 7% 标一次加仓，每上涨 7% 标一次减仓。加仓后按新成本重新分档。
  * 减仓之后，要先相对上一次减仓收盘再跌超过 8%，才标下一次加仓；这次加仓仍计入成本。
+ * 买入之后，DIF 下穿 DEA 为 MACD 死叉，标一次清仓并结束这笔持仓，直到下一次买入。
  */
 export function buildRedRibbon(bars: KBar[]): { points: RibbonPoint[]; signals: RibbonSignal[] } {
   const points: RibbonPoint[] = [];
@@ -420,6 +429,7 @@ export function buildRedRibbon(bars: KBar[]): { points: RibbonPoint[]; signals: 
   }
 
   const closes = bars.map((bar) => bar.close);
+  const macd = macdSeries(closes);
   let cost: number | null = null;
   let units = 0;
   let reduceSteps = 0;
@@ -444,7 +454,14 @@ export function buildRedRibbon(bars: KBar[]): { points: RibbonPoint[]; signals: 
       addSteps = 0;
       lastReduceClose = null;
     }
-    if (cost != null && cost > 0 && units > 0 && !bought) {
+    if (cost != null && cost > 0 && units > 0 && !bought && macdDeathCross(macd, i)) {
+      signals.push({ time: bars[i].time, side: "clear", close: bars[i].close, gain: closes[i] / cost - 1 });
+      cost = null;
+      units = 0;
+      reduceSteps = 0;
+      addSteps = 0;
+      lastReduceClose = null;
+    } else if (cost != null && cost > 0 && units > 0 && !bought) {
       const gain = closes[i] / cost - 1;
       const fromReduce = lastReduceClose != null && lastReduceClose > 0 ? closes[i] / lastReduceClose - 1 : null;
       if (fromReduce != null && fromReduce < -ADD_AFTER_REDUCE) {
