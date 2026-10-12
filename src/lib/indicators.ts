@@ -356,7 +356,8 @@ export type MaSignalRule = "ma20" | "day";
 
 /**
  * K 线叠加 4 / 7 / 20 日收盘均线。
- * day：日线买卖。买是 4 日上穿 7 日且 MACD 绿柱缩短；卖是 4 日下穿 7 日。
+ * day：日线买卖。买是 4 日上穿 7 日且 MACD 绿柱缩短，或空仓后 MACD 绿柱转成红柱。
+ * 4 日下穿 7 日时，若 4 日均线仍在 20 日均线上方则不卖。
  * ma20：周、月线仍用收盘站上 20 日才买，跌破 20 日或 4 日下穿 7 日卖。
  */
 export function buildMaLines(
@@ -383,8 +384,10 @@ export function buildMaLines(
     const hist = macd?.[i];
     const histPrev = macd?.[i - 1];
     const bearWeak = Boolean(hist && histPrev && hist.hist < 0 && hist.hist > histPrev.hist);
-    const buy = rule === "day" ? crossUp && bearWeak : crossUp && closes[i] > (cur.ma20 as number);
-    const sell = rule === "day" ? crossDown : crossDown || closes[i] < (cur.ma20 as number);
+    const turnedRed = Boolean(hist && histPrev && histPrev.hist <= 0 && hist.hist > 0);
+    const ma4AboveMa20 = cur.ma20 != null && cur.ma4 > cur.ma20;
+    const buy = rule === "day" ? (crossUp && bearWeak) || turnedRed : crossUp && closes[i] > (cur.ma20 as number);
+    const sell = rule === "day" ? crossDown && !ma4AboveMa20 : crossDown || closes[i] < (cur.ma20 as number);
     if (holding && sell) {
       signals.push({ time: bars[i].time, side: "sell", close: closes[i], gain: null });
       holding = false;
