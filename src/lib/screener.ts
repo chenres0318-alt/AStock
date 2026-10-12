@@ -57,6 +57,8 @@ function toHit(
     pct: meta.pct ?? tech.dayPct,
     turnover: meta.turnover,
     amplitudePct: tech.amplitudePct,
+    ma4: tech.ma4,
+    ma7: tech.ma7,
     ma5: tech.ma5,
     dif: tech.dif,
     dea: tech.dea,

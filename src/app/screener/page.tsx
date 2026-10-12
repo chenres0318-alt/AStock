@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "选股 · AStock 看盘",
-  description: "近5日首次站上五日线、MACD多头或空头减弱；20日线下只留大阳反包",
+  description: "当天4日均线上穿7日均线，且MACD空头势力减弱",
 };
 
 export default function ScreenerPage() {
