@@ -352,12 +352,17 @@ export type RibbonSignal = {
   gain: number | null;
 };
 
+export type MaSignalRule = "ma20" | "day";
+
 /**
  * K 线叠加 4 / 7 / 20 日收盘均线。
- * 买：空仓，4 日均线上穿 7 日均线，且收盘在 20 日均线上方。
- * 卖：持仓，4 日均线下穿 7 日均线，或收盘跌破 20 日均线。
+ * day：日线买卖。买是 4 日上穿 7 日且 MACD 绿柱缩短；卖是 4 日下穿 7 日。
+ * ma20：周、月线仍用收盘站上 20 日才买，跌破 20 日或 4 日下穿 7 日卖。
  */
-export function buildMaLines(bars: KBar[]): { points: MaLinePoint[]; signals: RibbonSignal[] } {
+export function buildMaLines(
+  bars: KBar[],
+  rule: MaSignalRule = "ma20",
+): { points: MaLinePoint[]; signals: RibbonSignal[] } {
   const closes = bars.map((bar) => bar.close);
   const points: MaLinePoint[] = bars.map((bar, i) => ({
     time: bar.time,
@@ -365,18 +370,25 @@ export function buildMaLines(bars: KBar[]): { points: MaLinePoint[]; signals: Ri
     ma7: maAt(closes, 7, i),
     ma20: maAt(closes, 20, i),
   }));
+  const macd = rule === "day" ? macdSeries(closes) : null;
   const signals: RibbonSignal[] = [];
   let holding = false;
   for (let i = 1; i < bars.length; i += 1) {
     const cur = points[i];
     const prev = points[i - 1];
-    if (cur.ma4 == null || cur.ma7 == null || cur.ma20 == null || prev.ma4 == null || prev.ma7 == null) continue;
+    if (cur.ma4 == null || cur.ma7 == null || prev.ma4 == null || prev.ma7 == null) continue;
+    if (rule === "ma20" && cur.ma20 == null) continue;
     const crossUp = prev.ma4 <= prev.ma7 && cur.ma4 > cur.ma7;
     const crossDown = prev.ma4 >= prev.ma7 && cur.ma4 < cur.ma7;
-    if (holding && (crossDown || closes[i] < cur.ma20)) {
+    const hist = macd?.[i];
+    const histPrev = macd?.[i - 1];
+    const bearWeak = Boolean(hist && histPrev && hist.hist < 0 && hist.hist > histPrev.hist);
+    const buy = rule === "day" ? crossUp && bearWeak : crossUp && closes[i] > (cur.ma20 as number);
+    const sell = rule === "day" ? crossDown : crossDown || closes[i] < (cur.ma20 as number);
+    if (holding && sell) {
       signals.push({ time: bars[i].time, side: "sell", close: closes[i], gain: null });
       holding = false;
-    } else if (!holding && crossUp && closes[i] > cur.ma20) {
+    } else if (!holding && buy) {
       signals.push({ time: bars[i].time, side: "buy", close: closes[i], gain: null });
       holding = true;
     }

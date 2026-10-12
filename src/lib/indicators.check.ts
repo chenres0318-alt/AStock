@@ -277,6 +277,40 @@ assert(bounceBar.ma4 > bounceBar.ma7, "the bounce lifts MA4 through MA7");
 assert(buried[buried.length - 1].close < bounceBar.ma20, "the bounce close is still under MA20");
 assert(buriedLines.signals.length === 0, "a 4/7 cross under MA20 is not a buy, and a decline never sells from flat");
 
+const dayCross = buildMaLines(crossBars, "day");
+const dayBuy = dayCross.signals.at(-1);
+assert(dayBuy?.side === "buy" && dayBuy.time === crossBars.at(-1)?.time, "day rule buys the 4/7 cross while the green MACD bar is still shortening");
+assert(dayCross.points.at(-1)?.ma20 != null && crossBars.at(-1)!.close < (dayCross.points.at(-1)?.ma20 ?? 0), "that day buy can sit under MA20");
+assert(!buildMaLines(crossBars).signals.some((item) => item.time === dayBuy?.time), "the weekly rule still skips a 4/7 cross under MA20");
+
+const poppedBars = barsFromCloses(popped);
+const poppedDay = buildMaLines(poppedBars, "day");
+assert(!poppedDay.signals.some((item) => item.side === "buy" && item.time === poppedBars.at(-1)?.time), "day rule does not buy once the MACD bar has turned positive");
+
+const dayHeldCloses = crossCloses.slice();
+let dayHeldPrice = dayHeldCloses[dayHeldCloses.length - 1];
+for (let i = 0; i < 10; i += 1) {
+  dayHeldPrice *= 1.004;
+  dayHeldCloses.push(Number(dayHeldPrice.toFixed(4)));
+}
+dayHeldCloses.push(Number((dayHeldPrice * 0.96).toFixed(4)));
+const dayHeldBars = barsFromCloses(dayHeldCloses);
+const dayHeld = buildMaLines(dayHeldBars, "day");
+const dayHeldPoint = dayHeld.points.at(-1)!;
+assert(dayHeldBars.at(-1)!.close < dayHeldPoint.ma20!, "the dip closes under MA20");
+assert(dayHeldPoint.ma4! > dayHeldPoint.ma7!, "MA4 is still above MA7 on that dip");
+assert(dayHeld.signals.length === 1 && dayHeld.signals[0].side === "buy", "a close under MA20 does not sell the day trade while MA4 stays above MA7");
+assert(buildMaLines(dayHeldBars).signals.length === 0, "the weekly rule never opens that trade, because the 4/7 cross was under MA20");
+
+const dayDeathCloses = dayHeldCloses.slice(0, -1);
+dayDeathCloses.push(Number((dayHeldPrice * 0.94).toFixed(4)));
+const dayDeathBars = barsFromCloses(dayDeathCloses);
+const dayDeath = buildMaLines(dayDeathBars, "day");
+const dayDeathPoint = dayDeath.points.at(-1)!;
+assert(dayDeathPoint.ma4! < dayDeathPoint.ma7!, "the next drop puts MA4 back under MA7");
+assert(dayDeath.signals.map((item) => item.side).join(",") === "buy,sell", "day rule sells only when MA4 crosses under MA7");
+assert(dayDeath.signals[1].time === dayDeathBars.at(-1)?.time, "that sell is the death-cross bar");
+
 const chop = Array.from({ length: 160 }, (_, i) => barAt(i, 20 + Math.sin(i / 2) * 0.08));
 assert(adxSeries(chop).every((value) => value == null || value <= 22), "a tight box stays at or below the ADX gate");
 
