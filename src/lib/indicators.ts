@@ -9,6 +9,8 @@ export type MacdPoint = {
 export type ScreenFlags = {
   close: number;
   open: number;
+  ma4: number;
+  ma7: number;
   ma5: number;
   ma5Prev: number;
   ma20: number | null;
@@ -19,7 +21,9 @@ export type ScreenFlags = {
   amplitudePct: number | null;
   aboveMa5: boolean;
   firstStandMa5: boolean;
+  ma4CrossUpMa7: boolean;
   macdBull: boolean;
+  /** MACD 柱仍为负，且比前一日更接近 0，绿柱缩短。 */
   macdBearWeak: boolean;
   belowMa20: boolean;
   strongReclaim: boolean;
@@ -91,23 +95,22 @@ export function analyzeBarsAt(
   macd = macdSeries(closes),
 ): ScreenFlags | null {
   if (i < FIRST_STAND_LOOK + 3 || i >= bars.length) return null;
+  const ma4 = maAt(closes, 4, i);
+  const ma4Prev = maAt(closes, 4, i - 1);
+  const ma7 = maAt(closes, 7, i);
+  const ma7Prev = maAt(closes, 7, i - 1);
   const ma5 = maAt(closes, 5, i);
   const ma5Prev = maAt(closes, 5, i - 1);
-  if (ma5 == null || ma5Prev == null) return null;
+  if (ma4 == null || ma4Prev == null || ma7 == null || ma7Prev == null || ma5 == null || ma5Prev == null) return null;
 
   const aboveMa5 = closes[i] > ma5;
   const firstStandMa5 = firstStandAboveMa5(closes, i);
+  const ma4CrossUpMa7 = ma4Prev <= ma7Prev && ma4 > ma7;
 
   const cur = macd[i];
   const prev = macd[i - 1];
   const macdBull = Boolean(cur && cur.dea > 0 && cur.dif + 1e-8 >= cur.dea);
-  const macdBearWeak = Boolean(
-    cur &&
-      prev &&
-      !(cur.dea > 0 && cur.dif + 1e-8 >= cur.dea) &&
-      cur.hist > prev.hist &&
-      (cur.hist < 0 || cur.dea <= 0 || cur.dif <= 0),
-  );
+  const macdBearWeak = Boolean(cur && prev && cur.hist < 0 && cur.hist > prev.hist);
 
   const prevClose = bars[i - 1].close;
   const dayPct = prevClose > 0 ? ((bars[i].close / prevClose - 1) * 100) : null;
@@ -123,6 +126,8 @@ export function analyzeBarsAt(
   return {
     close: bars[i].close,
     open: bars[i].open,
+    ma4,
+    ma7,
     ma5,
     ma5Prev,
     ma20,
@@ -133,6 +138,7 @@ export function analyzeBarsAt(
     amplitudePct,
     aboveMa5,
     firstStandMa5,
+    ma4CrossUpMa7,
     macdBull,
     macdBearWeak,
     belowMa20,
@@ -264,20 +270,14 @@ export function findBuyPoints(bars: KBar[]): BuyPoint[] {
 
 export function screenReasons(tech: ScreenFlags): string[] {
   const rows: string[] = [];
-  if (tech.firstStandMa5) rows.push("近5日首次站上五日线");
-  if (tech.macdBull) rows.push("MACD多头排列");
-  else if (tech.macdBearWeak) rows.push("MACD空头减弱");
-  if (tech.macdBearWeak && tech.belowMa20 && tech.strongReclaim) rows.push("大阳反包");
+  if (tech.ma4CrossUpMa7) rows.push("4日均线上穿7日均线");
+  if (tech.macdBearWeak) rows.push("MACD空头势力减弱");
   return rows;
 }
 
+/** 当天收盘：4 日均线上穿 7 日均线，且 MACD 绿柱缩短但仍为负。 */
 export function passesScreen(tech: ScreenFlags): boolean {
-  if (!tech.firstStandMa5) return false;
-  if (tech.macdBull) return true;
-  if (!tech.macdBearWeak) return false;
-  // 20 日线下方的空头减弱，多数是下跌中继；只留下大阳 / 大振幅反包。
-  if (tech.belowMa20 && !tech.strongReclaim) return false;
-  return true;
+  return tech.ma4CrossUpMa7 && tech.macdBearWeak;
 }
 
 /** 通达信 EMA：首值取当天，之后 Y = 2/(N+1)*X + (N-1)/(N+1)*Y'。 */

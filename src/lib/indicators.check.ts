@@ -84,16 +84,7 @@ const bullBars = barsFromCloses(bullFirstStand());
 const bull = analyzeBars(bullBars)!;
 assert(bull.firstStandMa5, "pullback then reclaim should be first MA5 stand in 5 days");
 assert(bull.macdBull || bull.macdBearWeak, "reclaim after uptrend should keep MACD usable");
-assert(passesScreen(bull), "first stand with MACD bull or weakening bear should pass");
-assert(screenReasons(bull).includes("近5日首次站上五日线"), "reasons should mention first MA5 stand");
-assert(
-  screenReasons(bull).includes("MACD多头排列") || screenReasons(bull).includes("MACD空头减弱"),
-  "reasons should mention MACD state",
-);
-
-const bullHits = findBuyPoints(bullBars);
-assert(bullHits.length >= 1, "historical scan should mark the first-stand bar");
-assert(bullHits.at(-1)?.time === bullBars[bullBars.length - 1].time, "latest marker should be the reclaim bar");
+assert(!passesScreen(bull), "an MA5 reclaim is not a 4-day over 7-day cross");
 
 const follow = barsFromCloses([...bullFirstStand(), Number((bull.close * 1.02).toFixed(4))]);
 const late = analyzeBars(follow)!;
@@ -104,11 +95,8 @@ assert(!passesScreen(late), "follow-through above MA5 should fail");
 const bounceBars = barsFromCloses(bearBounceStand());
 const bounce = analyzeBars(bounceBars)!;
 assert(bounce.firstStandMa5, "bounce from a decline should first stand on MA5");
-assert(bounce.macdBearWeak || bounce.macdBull, "decline bounce should show weakening bear or flipped MACD");
 assert(bounce.strongReclaim, "8% bounce should count as a strong reclaim");
-assert(passesScreen(bounce), "first stand plus strong MACD reclaim should pass");
-assert(findBuyPoints(bounceBars).some((point) => point.time === bounceBars[bounceBars.length - 1].time));
-assert(screenReasons(bounce).includes("大阳反包") || !bounce.belowMa20, "below-MA20 bounce should be labeled 大阳反包");
+assert(!passesScreen(bounce), "a one-day MA5 reclaim is not the 4/7 cross with a still-negative MACD bar");
 
 const weaveBars = barsFromCloses(weakWeaveStand());
 const weave = analyzeBars(weaveBars)!;
@@ -117,6 +105,51 @@ assert(weave.belowMa20, "slow decline weave should remain below MA20");
 assert(weave.strongReclaim === false, "1.8% poke is not a strong reclaim");
 assert(!passesScreen(weave), "downtrend weave below MA20 should not be a buy");
 assert(!findBuyPoints(weaveBars).some((point) => point.time === weaveBars[weaveBars.length - 1].time));
+
+/** Drift, then a decline, then two modest up days: MA4 crosses above MA7 while the MACD bar is still negative but shorter. */
+function ma4CrossWhileBearWeakens(): number[] {
+  const closes: number[] = [];
+  let price = 20;
+  for (let i = 0; i < 30; i += 1) {
+    closes.push(Number(price.toFixed(4)));
+    price *= 1.0005;
+  }
+  for (let i = 0; i < 20; i += 1) {
+    price *= 0.996;
+    closes.push(Number(price.toFixed(4)));
+  }
+  for (let i = 0; i < 2; i += 1) {
+    price *= 1.015;
+    closes.push(Number(price.toFixed(4)));
+  }
+  return closes;
+}
+
+const crossCloses = ma4CrossWhileBearWeakens();
+const crossBars = barsFromCloses(crossCloses);
+const cross = analyzeBars(crossBars)!;
+assert(cross.ma4CrossUpMa7, "last bar should cross MA4 up through MA7");
+assert(cross.ma4 > cross.ma7, "MA4 should finish above MA7");
+assert(cross.macdBearWeak, "MACD histogram should still be negative and shorter than yesterday");
+assert(cross.hist < 0, "bearish force stays below zero");
+assert(passesScreen(cross), "MA4 cross plus weakening bearish MACD should pass");
+assert(screenReasons(cross).includes("4日均线上穿7日均线"), "reasons should name the 4/7 cross");
+assert(screenReasons(cross).includes("MACD空头势力减弱"), "reasons should name weakening bearish MACD");
+const crossHits = findBuyPoints(crossBars);
+assert(crossHits.at(-1)?.time === crossBars[crossBars.length - 1].time, "the cross day is the latest screen hit");
+
+const beforeCross = analyzeBars(barsFromCloses(crossCloses.slice(0, -1)))!;
+assert(beforeCross.macdBearWeak, "the day before can already show a shorter green bar");
+assert(beforeCross.ma4CrossUpMa7 === false, "the day before has not crossed MA4 over MA7");
+assert(!passesScreen(beforeCross), "bearish MACD alone should not pass");
+
+const popped = crossCloses.slice(0, -2);
+const poppedPrice = popped[popped.length - 1] * 1.06;
+popped.push(Number(poppedPrice.toFixed(4)));
+const poppedTech = analyzeBars(barsFromCloses(popped))!;
+assert(poppedTech.ma4CrossUpMa7, "a sharp bounce can still cross MA4 over MA7");
+assert(poppedTech.macdBearWeak === false, "a bar that has already turned positive is not weakening bearish force");
+assert(!passesScreen(poppedTech), "a positive MACD bar should not pass the bearish-weakening rule");
 
 const risingTd = tdSequential(risingCloses(20, 10, 1).map((close, i) => ({ time: `u${i}`, close })));
 assert(risingTd[0]?.side === "up" && risingTd[0].count === 1, "first bar above close[i-4] starts up count at 1");
@@ -500,11 +533,5 @@ assert(reversed?.from === forward?.from && reversed?.to === forward?.to && rever
 assert(klineRangeChange([], "a", "b") === null, "an empty range has no change");
 
 console.log("indicators.check ok", {
-  bull: { firstStandMa5: bull.firstStandMa5, macdBull: bull.macdBull, macdBearWeak: bull.macdBearWeak, dea: bull.dea.toFixed(3) },
-  bounce: {
-    firstStandMa5: bounce.firstStandMa5,
-    macdBull: bounce.macdBull,
-    macdBearWeak: bounce.macdBearWeak,
-    hist: bounce.hist.toFixed(4),
-  },
+  cross: { ma4: cross.ma4.toFixed(3), ma7: cross.ma7.toFixed(3), hist: cross.hist.toFixed(4) },
 });

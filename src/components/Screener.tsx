@@ -39,7 +39,7 @@ function HitTable({
         <thead className="text-[11px] text-mute">
           <tr className="border-b border-line">
             <th className="px-3 py-2 font-normal">股票</th>
-            <th className="px-3 py-2 font-normal text-right">现价 / MA5</th>
+            <th className="px-3 py-2 font-normal text-right">现价 / MA4·MA7</th>
             <th className="px-3 py-2 font-normal text-right">涨跌幅</th>
             <th className="px-3 py-2 font-normal text-right">DIF</th>
             <th className="px-3 py-2 font-normal text-right">DEA</th>
@@ -58,7 +58,9 @@ function HitTable({
               </td>
               <td className="px-3 py-2 text-right">
                 <div className={`num ${toneClass(item.pct)}`}>{formatPrice(item.price)}</div>
-                <div className="num text-[11px] text-mute">{formatPrice(item.ma5)}</div>
+                <div className="num text-[11px] text-mute">
+                  {formatPrice(item.ma4)} / {formatPrice(item.ma7)}
+                </div>
               </td>
               <td className={`num px-3 py-2 text-right ${toneClass(item.pct)}`}>{formatPct(item.pct)}</td>
               <td className={`num px-3 py-2 text-right ${toneClass(item.dif)}`}>{item.dif.toFixed(3)}</td>
@@ -136,10 +138,9 @@ export default function Screener() {
       <AppHeader />
 
       <section className="panel px-4 py-3">
-        <div className="text-sm">选股：近 5 日首次站上五日线，MACD 多头排列或空头减弱（20 日线下只留大阳反包）</div>
+        <div className="text-sm">选股：当天 4 日均线上穿 7 日均线，MACD 空头势力减弱</div>
         <div className="mt-2 max-w-4xl text-xs leading-5 text-mute">
-          当日收盘站上 5 日均线，且近 5 个交易日里这是第一次。MACD 为多头排列（DIF 大于 DEA 且 DEA 大于 0）或空头减弱（绿柱缩短）。股价在 20
-          日均线下方时，空头减弱只保留当天涨幅至少 5% 或振幅至少 8% 的阳线反包，用来去掉下跌中继里反复轻站五日线的假买点。扫描成交额靠前的沪深
+          用当日收盘计算均线。4 日均线前一日还不高于 7 日均线，当天收到 7 日均线上方。MACD 柱仍为负，但比前一日更接近 0，也就是绿柱缩短。两条同时成立才入选。扫描成交额靠前的沪深
           A 股，不含 ST / 北交所。看盘 K 线上的红青丝带和买卖箭头是另一套起涨红丝带，不标这里的条件。
         </div>
       </section>
@@ -173,7 +174,7 @@ export default function Screener() {
         />
         {loading ? (
           <div className="px-4 py-8 text-center text-sm text-mute">
-            正在拉取沪深 A 股日线，匹配近 5 日首次站上五日线与 MACD 条件（下跌趋势会过滤弱反抽），大约需要一分钟。
+            正在拉取沪深 A 股日线，匹配 4 日均线上穿 7 日均线、且 MACD 绿柱缩短的股票，大约需要一分钟。
           </div>
         ) : (
           <HitTable items={hits} onOpen={openStock} />
