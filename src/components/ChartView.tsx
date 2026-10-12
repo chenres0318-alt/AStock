@@ -302,7 +302,7 @@ export default function ChartView({
 
   const ribbonCounts = useMemo(() => {
     if (mode === "trend") return { buy: 0, sell: 0 };
-    const { signals } = buildMaLines(bars);
+    const { signals } = buildMaLines(bars, mode === "day" ? "day" : "ma20");
     return {
       buy: signals.filter((item) => item.side === "buy").length,
       sell: signals.filter((item) => item.side === "sell").length,
@@ -386,7 +386,7 @@ export default function ChartView({
     avg.setData([]);
     ma4.setData(maLine(bars, 4));
     ma7.setData(maLine(bars, 7));
-    const ribbon = buildMaLines(bars);
+    const ribbon = buildMaLines(bars, mode === "day" ? "day" : "ma20");
     candle.setData(
       bars.map((bar) => ({
         time: bar.time,
@@ -526,7 +526,9 @@ export default function ChartView({
             ? "加载中…"
             : mode === "trend"
               ? "黄线现价 蓝线均价"
-              : `红MA4 · 青MA7 · 黄MA20 · 4上穿7且站上20买 · 4下穿7或跌破20卖 · 买 ${ribbonCounts.buy} 卖 ${ribbonCounts.sell}`}
+              : mode === "day"
+                ? `红MA4 · 青MA7 · 黄MA20 · 4上穿7且绿柱缩短买 · 4下穿7卖 · 买 ${ribbonCounts.buy} 卖 ${ribbonCounts.sell}`
+                : `红MA4 · 青MA7 · 黄MA20 · 4上穿7且站上20买 · 4下穿7或跌破20卖 · 买 ${ribbonCounts.buy} 卖 ${ribbonCounts.sell}`}
         </div>
       </div>
       <div className="relative min-h-0 flex-1">
