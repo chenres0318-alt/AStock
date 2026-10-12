@@ -280,21 +280,6 @@ export function passesScreen(tech: ScreenFlags): boolean {
   return tech.ma4CrossUpMa7 && tech.macdBearWeak;
 }
 
-/** 通达信 EMA：首值取当天，之后 Y = 2/(N+1)*X + (N-1)/(N+1)*Y'。 */
-function tdxEma(values: number[], period: number): number[] {
-  const out: number[] = [];
-  if (values.length === 0) return out;
-  const alpha = 2 / (period + 1);
-  let prev = values[0];
-  out.push(prev);
-  for (let i = 1; i < values.length; i += 1) {
-    prev = values[i] * alpha + prev * (1 - alpha);
-    out.push(prev);
-  }
-  return out;
-}
-
-const RIBBON_LAYERS = 7;
 const ADX_PERIOD = 14;
 
 function wilderSmooth(values: number[], period: number): Array<number | null> {
@@ -353,11 +338,11 @@ export function adxSeries(bars: KBar[], period = ADX_PERIOD): Array<number | nul
   return out;
 }
 
-export type RibbonPoint = {
+export type MaLinePoint = {
   time: string;
-  values: number[];
-  /** 相对前一根。首根或与前一根相等时为 null。 */
-  direction: Array<"up" | "down" | null>;
+  ma4: number | null;
+  ma7: number | null;
+  ma20: number | null;
 };
 
 export type RibbonSignal = {
@@ -368,115 +353,32 @@ export type RibbonSignal = {
 };
 
 /**
- * 通达信起涨红丝带。
- * VAR1=(2*C+H+L+O)/5
- * A1=(EMA(VAR1,3)+EMA(VAR1,6)+EMA(VAR1,12)+EMA(VAR1,24))/4
- * A2..A7 逐层 EMA(2)
- * 买：下跌中的青丝带收拢且五日线向上。连续收两天、五日线仍向上时标买；只收紧一天时，要五日线当天拐向上才标买。青丝带里已有层转红、五日线拐向上时也标买。
- * 红丝带收拢卖出，或红丝带里有层转青并且五日线拐向下卖出之后，若五日线重新拐向上且红丝带又向上发散，再标买。
- * 卖：青丝带又向下发散且五日线拐头向下；五日线先拐头、之后又拐向下，青丝带再向下发散时也标卖。红丝带收拢且五日线拐头向下；或者红丝带里已有层转青，同时五日线拐向下。
+ * K 线叠加 4 / 7 / 20 日收盘均线。
+ * 买：空仓，4 日均线上穿 7 日均线，且收盘在 20 日均线上方。
+ * 卖：持仓，4 日均线下穿 7 日均线，或收盘跌破 20 日均线。
  */
-export function buildRedRibbon(bars: KBar[]): { points: RibbonPoint[]; signals: RibbonSignal[] } {
-  const points: RibbonPoint[] = [];
-  const signals: RibbonSignal[] = [];
-  if (bars.length === 0) return { points, signals };
-  const var1 = bars.map((bar) => (2 * bar.close + bar.high + bar.low + bar.open) / 5);
-  const ema3 = tdxEma(var1, 3);
-  const ema6 = tdxEma(var1, 6);
-  const ema12 = tdxEma(var1, 12);
-  const ema24 = tdxEma(var1, 24);
-  const a1 = var1.map((_, i) => (ema3[i] + ema6[i] + ema12[i] + ema24[i]) / 4);
-  const layers: number[][] = [a1];
-  for (let layer = 1; layer < RIBBON_LAYERS; layer += 1) layers.push(tdxEma(layers[layer - 1], 2));
-  for (let i = 0; i < bars.length; i += 1) {
-    const direction: Array<"up" | "down" | null> = [];
-    for (let layer = 0; layer < RIBBON_LAYERS; layer += 1) {
-      if (i === 0 || layers[layer][i] === layers[layer][i - 1]) direction.push(null);
-      else direction.push(layers[layer][i] > layers[layer][i - 1] ? "up" : "down");
-    }
-    points.push({
-      time: bars[i].time,
-      values: layers.map((layer) => layer[i]),
-      direction,
-    });
-  }
-
+export function buildMaLines(bars: KBar[]): { points: MaLinePoint[]; signals: RibbonSignal[] } {
   const closes = bars.map((bar) => bar.close);
-  const spreadAt = (index: number) => {
-    const values = points[index].values;
-    return Math.max(...values) - Math.min(...values);
-  };
+  const points: MaLinePoint[] = bars.map((bar, i) => ({
+    time: bar.time,
+    ma4: maAt(closes, 4, i),
+    ma7: maAt(closes, 7, i),
+    ma20: maAt(closes, 20, i),
+  }));
+  const signals: RibbonSignal[] = [];
   let holding = false;
-  let reboundBuy = false;
-  let sawHookUp = false;
-  let maHookedUp = false;
-  let maHookedDownAgain = false;
-  for (let i = 6; i < bars.length; i += 1) {
-    const direction = points[i].direction;
-    const allUp = direction.every((item) => item === "up");
-    const allDown = direction.every((item) => item === "down");
-    const spread = spreadAt(i);
-    const spreadPrev = spreadAt(i - 1);
-    const spreadPrev2 = spreadAt(i - 2);
-    const narrowingStep = spread < spreadPrev && spreadPrev < spreadPrev2;
-    const narrowing = spread < spreadPrev;
-    const widening = spread > spreadPrev && spread > spreadPrev2;
-    const lowerFalling = Math.min(...points[i].values) < Math.min(...points[i - 1].values);
-    const ma5 = maAt(closes, 5, i);
-    const ma5Prev = maAt(closes, 5, i - 1);
-    const ma5Prev2 = maAt(closes, 5, i - 2);
-    if (ma5 == null || ma5Prev == null || ma5Prev2 == null) continue;
-    const maRising = ma5 > ma5Prev;
-    const maTurningUp = maRising && ma5Prev <= ma5Prev2;
-    const maTurningDown = ma5 < ma5Prev && ma5Prev >= ma5Prev2;
-    const allOf = (index: number, side: "up" | "down") => points[index].direction.every((item) => item === side);
-    const cameFrom = (side: "up" | "down") => {
-      const other = side === "up" ? "down" : "up";
-      for (let j = i - 1; j >= Math.max(1, i - 8); j -= 1) {
-        if (allOf(j, other)) return false;
-        if (allOf(j, side)) return true;
-      }
-      return false;
-    };
-    const someUp = direction.some((item) => item === "up");
-    const someDown = direction.some((item) => item === "down");
-    if (maTurningUp) {
-      maHookedUp = true;
-      maHookedDownAgain = false;
-    } else if (maHookedUp && maTurningDown) {
-      maHookedDownAgain = true;
-    }
-    const buyOnConverge = allDown && ((narrowingStep && maRising) || (narrowing && maTurningUp));
-    const buyOnTurningRed = !allDown && someUp && cameFrom("down") && maTurningUp;
-    const sellOnCyanDiverge = allDown && widening && lowerFalling && maTurningDown;
-    const sellOnCyanDivergeAfterRehook = allDown && widening && lowerFalling && maHookedDownAgain && ma5 < ma5Prev;
-    const sellOnRedContract = allUp && narrowing && maTurningDown;
-    const sellOnTurningCyan = !allUp && someDown && cameFrom("up") && maTurningDown;
-    const upperRising = Math.max(...points[i].values) > Math.max(...points[i - 1].values);
-    const divergingUp = allUp && spread > spreadPrev && upperRising;
-    if (holding && (sellOnCyanDiverge || sellOnCyanDivergeAfterRehook || sellOnRedContract || sellOnTurningCyan)) {
-      signals.push({ time: bars[i].time, side: "sell", close: bars[i].close, gain: null });
+  for (let i = 1; i < bars.length; i += 1) {
+    const cur = points[i];
+    const prev = points[i - 1];
+    if (cur.ma4 == null || cur.ma7 == null || cur.ma20 == null || prev.ma4 == null || prev.ma7 == null) continue;
+    const crossUp = prev.ma4 <= prev.ma7 && cur.ma4 > cur.ma7;
+    const crossDown = prev.ma4 >= prev.ma7 && cur.ma4 < cur.ma7;
+    if (holding && (crossDown || closes[i] < cur.ma20)) {
+      signals.push({ time: bars[i].time, side: "sell", close: closes[i], gain: null });
       holding = false;
-      reboundBuy = sellOnRedContract || sellOnTurningCyan;
-      sawHookUp = false;
-    } else if (!holding) {
-      if (reboundBuy && maTurningUp) sawHookUp = true;
-      const reboundReady = reboundBuy && sawHookUp && divergingUp && maRising;
-      if (reboundBuy && (allDown || (sawHookUp && maTurningDown && !reboundReady))) {
-        reboundBuy = false;
-        sawHookUp = false;
-      }
-      if (reboundReady && reboundBuy) {
-        signals.push({ time: bars[i].time, side: "buy", close: bars[i].close, gain: null });
-        holding = true;
-        reboundBuy = false;
-        sawHookUp = false;
-      } else if (buyOnConverge || buyOnTurningRed) {
-        signals.push({ time: bars[i].time, side: "buy", close: bars[i].close, gain: null });
-        holding = true;
-        reboundBuy = false;
-        sawHookUp = false;
-      }
+    } else if (!holding && crossUp && closes[i] > cur.ma20) {
+      signals.push({ time: bars[i].time, side: "buy", close: closes[i], gain: null });
+      holding = true;
     }
   }
   return { points, signals };

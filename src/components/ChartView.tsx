@@ -14,15 +14,15 @@ import {
   type UTCTimestamp,
 } from "lightweight-charts";
 import { formatPrice } from "@/lib/format";
-import { buildRedRibbon, klineRangeChange, maAt, type RibbonPoint } from "@/lib/indicators";
+import { buildMaLines, klineRangeChange, maAt } from "@/lib/indicators";
 import type { KBar, Quote, TrendPoint } from "@/lib/types";
 
 export type ChartMode = "trend" | "day" | "week" | "month";
 
 const UP = "#ff5c5c";
 const DOWN = "#1ecb93";
-const RIBBON_CYAN = "#2ad4c8";
-const RIBBON_LAYERS = 7;
+const MA7_COLOR = "#2ad4c8";
+const MA20_COLOR = "#e4b454";
 
 function formatChartTime(time: unknown, withDate: boolean): string {
   if (typeof time === "string") return withDate ? time : time.slice(5);
@@ -43,25 +43,11 @@ function formatChartTime(time: unknown, withDate: boolean): string {
   }).format(new Date(ts * 1000));
 }
 
-function ribbonSeriesData(points: RibbonPoint[], layer: number) {
-  const data: Array<{ time: string; value: number; color: string }> = [];
-  for (const point of points) {
-    const direction = point.direction[layer];
-    if (direction == null) continue;
-    data.push({
-      time: point.time,
-      value: point.values[layer],
-      color: direction === "up" ? UP : RIBBON_CYAN,
-    });
-  }
-  return data;
-}
-
-function ma5Line(bars: KBar[]): Array<{ time: string; value: number }> {
+function maLine(bars: KBar[], period: number): Array<{ time: string; value: number }> {
   const closes = bars.map((bar) => bar.close);
   const points: Array<{ time: string; value: number }> = [];
   for (let i = 0; i < bars.length; i += 1) {
-    const ma = maAt(closes, 5, i);
+    const ma = maAt(closes, period, i);
     if (ma == null) continue;
     points.push({ time: bars[i].time, value: ma });
   }
@@ -88,7 +74,7 @@ function applyTimeScale(chart: IChartApi, mode: ChartMode, barCount: number, res
   });
 }
 
-/** 可见 K 线越少，价格轴收得越紧，红青丝带才不会挤成一条。 */
+/** 可见 K 线越少，价格轴收得越紧，4 / 7 / 20 日均线才不会挤成一条。 */
 function magnifiedPriceRange(chart: IChartApi, bars: KBar[]): AutoscaleInfo | null {
   const range = chart.timeScale().getVisibleLogicalRange();
   if (!range || bars.length === 0) return null;
@@ -103,7 +89,7 @@ function magnifiedPriceRange(chart: IChartApi, bars: KBar[]): AutoscaleInfo | nu
     high = Math.max(high, bars[i].high);
   }
   if (!(high > low)) return null;
-  // 42 根仍用完整高低点。收到大约 20 根时，纵轴只留高低点的 45%，丝带层才会分开。
+  // 42 根仍用完整高低点。收到大约 20 根时，纵轴只留高低点的 45%，均线才会分开。
   const tighten = Math.min(1, (42 - count) / 22);
   const zoom = 1 - tighten * 0.55;
   const mid = (low + high) / 2;
@@ -156,7 +142,8 @@ export default function ChartView({
   const candleRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const volRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const lineRef = useRef<ISeriesApi<"Line"> | null>(null);
-  const ribbonRef = useRef<Array<ISeriesApi<"Line">>>([]);
+  const ma4Ref = useRef<ISeriesApi<"Line"> | null>(null);
+  const ma7Ref = useRef<ISeriesApi<"Line"> | null>(null);
   const avgRef = useRef<ISeriesApi<"Line"> | null>(null);
   const preCloseLineRef = useRef<IPriceLine | null>(null);
   const viewRef = useRef({ mode, barCount: bars.length });
@@ -265,20 +252,24 @@ export default function ChartView({
       priceLineVisible: false,
       lastValueVisible: false,
     });
-    const ribbons: Array<ISeriesApi<"Line">> = [];
-    for (let layer = 0; layer < RIBBON_LAYERS; layer += 1) {
-      ribbons.push(
-        chart.addLineSeries({
-          color: UP,
-          lineWidth: 1,
-          priceLineVisible: false,
-          lastValueVisible: false,
-          crosshairMarkerVisible: false,
-          autoscaleInfoProvider,
-        }),
-      );
-    }
-    ribbonRef.current = ribbons;
+    const ma4 = chart.addLineSeries({
+      color: UP,
+      lineWidth: 2,
+      priceLineVisible: false,
+      lastValueVisible: true,
+      crosshairMarkerVisible: false,
+      autoscaleInfoProvider,
+    });
+    const ma7 = chart.addLineSeries({
+      color: MA7_COLOR,
+      lineWidth: 1,
+      priceLineVisible: false,
+      lastValueVisible: true,
+      crosshairMarkerVisible: false,
+      autoscaleInfoProvider,
+    });
+    ma4Ref.current = ma4;
+    ma7Ref.current = ma7;
     const vol = chart.addHistogramSeries({
       priceFormat: { type: "volume" },
       priceScaleId: "",
@@ -311,7 +302,7 @@ export default function ChartView({
 
   const ribbonCounts = useMemo(() => {
     if (mode === "trend") return { buy: 0, sell: 0 };
-    const { signals } = buildRedRibbon(bars);
+    const { signals } = buildMaLines(bars);
     return {
       buy: signals.filter((item) => item.side === "buy").length,
       sell: signals.filter((item) => item.side === "sell").length,
@@ -322,9 +313,11 @@ export default function ChartView({
     const candle = candleRef.current;
     const vol = volRef.current;
     const line = lineRef.current;
+    const ma4 = ma4Ref.current;
+    const ma7 = ma7Ref.current;
     const avg = avgRef.current;
     const chart = chartRef.current;
-    if (!candle || !vol || !line || !avg || !chart) return;
+    if (!candle || !vol || !line || !ma4 || !ma7 || !avg || !chart) return;
 
     if (preCloseLineRef.current) {
       line.removePriceLine(preCloseLineRef.current);
@@ -335,7 +328,8 @@ export default function ChartView({
       scaleMargins: { top: 0.06, bottom: mode === "day" ? 0.28 : 0.22 },
     });
     line.applyOptions({
-      lineWidth: mode === "trend" ? 2 : 1,
+      color: MA20_COLOR,
+      lineWidth: 2,
       lastValueVisible: true,
     });
 
@@ -343,7 +337,8 @@ export default function ChartView({
       const points = trend.points.filter((item) => item.timestamp > 0 && item.time <= "15:00");
       candle.setData([]);
       candle.setMarkers([]);
-      ribbonRef.current.forEach((series) => series.setData([]));
+      ma4.setData([]);
+      ma7.setData([]);
       line.setData(
         points.map((item) => ({
           time: item.timestamp as UTCTimestamp,
@@ -386,13 +381,12 @@ export default function ChartView({
       return;
     }
 
-    line.setData(ma5Line(bars));
+    line.setData(maLine(bars, 20));
     line.setMarkers([]);
     avg.setData([]);
-    const ribbon = buildRedRibbon(bars);
-    ribbonRef.current.forEach((series, layer) => {
-      series.setData(ribbonSeriesData(ribbon.points, layer));
-    });
+    ma4.setData(maLine(bars, 4));
+    ma7.setData(maLine(bars, 7));
+    const ribbon = buildMaLines(bars);
     candle.setData(
       bars.map((bar) => ({
         time: bar.time,
@@ -532,7 +526,7 @@ export default function ChartView({
             ? "加载中…"
             : mode === "trend"
               ? "黄线现价 蓝线均价"
-              : `黄线MA5 · 红青丝带 · 买 ${ribbonCounts.buy} 卖 ${ribbonCounts.sell}`}
+              : `红MA4 · 青MA7 · 黄MA20 · 4上穿7且站上20买 · 4下穿7或跌破20卖 · 买 ${ribbonCounts.buy} 卖 ${ribbonCounts.sell}`}
         </div>
       </div>
       <div className="relative min-h-0 flex-1">

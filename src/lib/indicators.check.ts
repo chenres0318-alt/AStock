@@ -1,4 +1,4 @@
-import { adxSeries, analyzeBars, buildRedRibbon, findBuyPoints, findTrendSwingBuys, klineRangeChange, maAt, macdSeries, passesScreen, screenReasons, tdSequential } from "./indicators.ts";
+import { adxSeries, analyzeBars, buildMaLines, findBuyPoints, findTrendSwingBuys, klineRangeChange, maAt, macdSeries, passesScreen, screenReasons, tdSequential } from "./indicators.ts";
 import type { KBar } from "./types.ts";
 
 function assert(cond: unknown, message: string) {
@@ -230,296 +230,52 @@ function barAt(index: number, close: number, volume = 1000): KBar {
 }
 
 const flat = Array.from({ length: 80 }, (_, i) => barAt(i, 20));
-const flatRibbon = buildRedRibbon(flat);
-assert(flatRibbon.signals.length === 0, "a flat tape has no ribbon trade");
-assert(flatRibbon.points.at(-1)?.direction.every((item) => item == null), "a flat ribbon does not paint up or down");
+const flatLines = buildMaLines(flat);
+assert(flatLines.signals.length === 0, "a flat tape has no moving-average trade");
+assert(flatLines.points.at(-1)?.ma4 === 20 && flatLines.points.at(-1)?.ma7 === 20 && flatLines.points.at(-1)?.ma20 === 20, "flat closes sit on MA4, MA7 and MA20");
 
-const climb = Array.from({ length: 90 }, (_, i) => barAt(i, 10 + i * 0.2));
-const climbRibbon = buildRedRibbon(climb);
-assert(climbRibbon.points.at(-1)?.direction.every((item) => item === "up"), "a steady climb turns every ribbon layer up");
+const maPop = [...Array.from({ length: 30 }, (_, i) => barAt(i, 10)), barAt(30, 12)];
+const maPopLines = buildMaLines(maPop);
+assert(maPopLines.signals.length === 1 && maPopLines.signals[0].side === "buy", "MA4 crossing above MA7 with the close above MA20 is a buy");
+assert(maPopLines.points[30].ma4 != null && maPopLines.points[30].ma7 != null && maPopLines.points[30].ma4! > maPopLines.points[30].ma7!, "the buy bar has MA4 above MA7");
 
-const drop = Array.from({ length: 90 }, (_, i) => barAt(i, 40 - i * 0.2));
-assert(buildRedRibbon(drop).points.at(-1)?.direction.every((item) => item === "down"), "a steady drop turns every ribbon layer down");
+const roundTrip = [
+  ...maPop,
+  barAt(31, 10),
+];
+const roundTripLines = buildMaLines(roundTrip);
+assert(roundTripLines.signals.map((item) => item.side).join(",") === "buy,sell", "falling back through MA20 sells the open trade");
+assert(roundTripLines.signals[1].time === roundTrip[31].time, "the sell is the bar that breaks MA20");
 
-assert(buildRedRibbon(drop).signals.length === 0, "a steady cyan decline does not buy while MA5 is still falling");
-assert(climbRibbon.signals.length === 0, "a red climb does not sell before a buy");
+const stillAbove = [
+  ...maPop,
+  ...Array.from({ length: 6 }, (_, i) => barAt(31 + i, 13)),
+];
+const held = buildMaLines(stillAbove);
+assert(held.signals.length === 1 && held.signals[0].side === "buy", "holding above MA20 does not sell before a cross down");
 
-function ribbonSpread(values: number[]) {
-  return Math.max(...values) - Math.min(...values);
-}
+const deathCross = [...stillAbove, barAt(37, 11.2)];
+const death = buildMaLines(deathCross);
+assert(death.signals.map((item) => item.side).join(",") === "buy,sell", "MA4 crossing back under MA7 sells while the close is still above MA20");
+assert((death.points.at(-1)?.ma20 ?? 0) < 11.2, "that sell stays above MA20");
+assert((death.points.at(-1)?.ma4 ?? 0) < (death.points.at(-1)?.ma7 ?? 0), "MA4 is back under MA7 on the sell");
 
-const convergeCloses = [...Array.from({ length: 70 }, (_, i) => 40 - i * 0.28)];
-let convergePrice = convergeCloses.at(-1)!;
-for (let i = 0; i < 8; i += 1) {
-  convergePrice += 0.05;
-  convergeCloses.push(convergePrice);
-}
-const converge = buildRedRibbon(convergeCloses.map((close, index) => barAt(index, close)));
-const convergeBuy = converge.signals[0];
-const convergeBuyAt = converge.points.findIndex((point) => point.time === convergeBuy?.time);
-const convergeSpread = ribbonSpread(converge.points[convergeBuyAt].values);
-const convergeSpreadPrev = ribbonSpread(converge.points[convergeBuyAt - 1].values);
-const convergeSpreadPrev2 = ribbonSpread(converge.points[convergeBuyAt - 2].values);
-const convergeMa = maAt(convergeCloses, 5, convergeBuyAt);
-const convergeMaPrev = maAt(convergeCloses, 5, convergeBuyAt - 1);
-assert(
-  converge.signals.length === 1 &&
-    convergeBuy?.side === "buy" &&
-    converge.points[convergeBuyAt].direction.every((item) => item === "down") &&
-    convergeSpread < convergeSpreadPrev &&
-    convergeSpreadPrev < convergeSpreadPrev2 &&
-    convergeMa != null &&
-    convergeMaPrev != null &&
-    convergeMa > convergeMaPrev,
-  "a cyan ribbon that keeps narrowing while MA5 turns up marks one buy",
-);
-
-const divergeCloses = convergeCloses.slice();
-let divergePrice = divergeCloses.at(-1)!;
-for (let i = 0; i < 12; i += 1) {
-  divergePrice -= 0.18;
-  divergeCloses.push(divergePrice);
-}
-const diverge = buildRedRibbon(divergeCloses.map((close, index) => barAt(index, close)));
-const divergeSell = diverge.signals.find((item) => item.side === "sell");
-const divergeSellAt = diverge.points.findIndex((point) => point.time === divergeSell?.time);
-const divergeSpread = ribbonSpread(diverge.points[divergeSellAt].values);
-const divergeSpreadPrev = ribbonSpread(diverge.points[divergeSellAt - 1].values);
-const divergeSpreadPrev2 = ribbonSpread(diverge.points[divergeSellAt - 2].values);
-const divergeMa = maAt(divergeCloses, 5, divergeSellAt);
-const divergeMaPrev = maAt(divergeCloses, 5, divergeSellAt - 1);
-const divergeMaPrev2 = maAt(divergeCloses, 5, divergeSellAt - 2);
-assert(
-  diverge.signals[0]?.side === "buy" &&
-    divergeSellAt > convergeBuyAt &&
-    diverge.points[divergeSellAt].direction.every((item) => item === "down") &&
-    divergeSpread > divergeSpreadPrev &&
-    divergeSpread > divergeSpreadPrev2 &&
-    Math.min(...diverge.points[divergeSellAt].values) < Math.min(...diverge.points[divergeSellAt - 1].values) &&
-    divergeMa != null &&
-    divergeMaPrev != null &&
-    divergeMaPrev2 != null &&
-    divergeMa < divergeMaPrev &&
-    divergeMaPrev >= divergeMaPrev2,
-  "a cyan ribbon fanning downward again as MA5 turns down marks a sell",
-);
-
-const hookTightenCloses = [...Array.from({ length: 70 }, (_, i) => 40 - i * 0.28)];
-let hookTightenPrice = hookTightenCloses.at(-1)!;
-for (let i = 0; i < 8; i += 1) {
-  hookTightenPrice += 0.05;
-  hookTightenCloses.push(hookTightenPrice);
-}
-hookTightenPrice -= 0.4;
-hookTightenCloses.push(hookTightenPrice);
-hookTightenPrice += 0.3;
-hookTightenCloses.push(hookTightenPrice);
-const hookTighten = buildRedRibbon(hookTightenCloses.map((close, index) => barAt(index, close)));
-const hookBuy = hookTighten.signals.at(-1);
-const hookBuyAt = hookTighten.points.findIndex((point) => point.time === hookBuy?.time);
-const hookSpread = ribbonSpread(hookTighten.points[hookBuyAt].values);
-const hookSpreadPrev = ribbonSpread(hookTighten.points[hookBuyAt - 1].values);
-const hookSpreadPrev2 = ribbonSpread(hookTighten.points[hookBuyAt - 2].values);
-const hookMa = maAt(hookTightenCloses, 5, hookBuyAt);
-const hookMaPrev = maAt(hookTightenCloses, 5, hookBuyAt - 1);
-const hookMaPrev2 = maAt(hookTightenCloses, 5, hookBuyAt - 2);
-assert(
-  hookBuy?.side === "buy" &&
-    hookBuyAt === hookTighten.points.length - 1 &&
-    hookTighten.signals.some((item) => item.side === "sell" && hookTighten.points.findIndex((point) => point.time === item.time) < hookBuyAt) &&
-    hookTighten.points[hookBuyAt].direction.every((item) => item === "down") &&
-    hookSpread < hookSpreadPrev &&
-    !(hookSpreadPrev < hookSpreadPrev2) &&
-    hookMa != null &&
-    hookMaPrev != null &&
-    hookMaPrev2 != null &&
-    hookMa > hookMaPrev &&
-    hookMaPrev <= hookMaPrev2,
-  "a fully cyan ribbon that tightens for one day as MA5 hooks up marks a buy",
-);
-
-const rehookCloses = [...Array.from({ length: 70 }, (_, i) => 40 - i * 0.2)];
-let rehookPrice = rehookCloses.at(-1)!;
-for (let i = 0; i < 7; i += 1) {
-  rehookPrice += 0.06;
-  rehookCloses.push(rehookPrice);
-}
-rehookPrice -= 0.25;
-rehookCloses.push(rehookPrice);
-rehookPrice -= 0.2;
-rehookCloses.push(rehookPrice);
-const rehook = buildRedRibbon(rehookCloses.map((close, index) => barAt(index, close)));
-const rehookSell = rehook.signals.at(-1);
-const rehookSellAt = rehook.points.findIndex((point) => point.time === rehookSell?.time);
-const rehookPrevAt = rehookSellAt - 1;
-const rehookSpread = ribbonSpread(rehook.points[rehookSellAt].values);
-const rehookSpreadPrev = ribbonSpread(rehook.points[rehookPrevAt].values);
-const rehookSpreadPrev2 = ribbonSpread(rehook.points[rehookSellAt - 2].values);
-const rehookMa = maAt(rehookCloses, 5, rehookSellAt);
-const rehookMaPrev = maAt(rehookCloses, 5, rehookPrevAt);
-const rehookMaPrev2 = maAt(rehookCloses, 5, rehookSellAt - 2);
-const rehookHookMa = maAt(rehookCloses, 5, rehookPrevAt);
-const rehookHookMaPrev = maAt(rehookCloses, 5, rehookPrevAt - 1);
-const rehookHookMaPrev2 = maAt(rehookCloses, 5, rehookPrevAt - 2);
-assert(
-  rehook.signals.some((item) => item.side === "buy") &&
-    rehookSell?.side === "sell" &&
-    rehookSellAt === rehook.points.length - 1 &&
-    rehook.signals.every((item) => item.time !== rehook.points[rehookPrevAt].time) &&
-    rehook.points[rehookSellAt].direction.every((item) => item === "down") &&
-    rehookSpread > rehookSpreadPrev &&
-    rehookSpread > rehookSpreadPrev2 &&
-    Math.min(...rehook.points[rehookSellAt].values) < Math.min(...rehook.points[rehookPrevAt].values) &&
-    rehookMa != null &&
-    rehookMaPrev != null &&
-    rehookMaPrev2 != null &&
-    rehookMa < rehookMaPrev &&
-    rehookMaPrev < rehookMaPrev2 &&
-    rehookHookMa != null &&
-    rehookHookMaPrev != null &&
-    rehookHookMaPrev2 != null &&
-    rehookHookMa < rehookHookMaPrev &&
-    rehookHookMaPrev >= rehookHookMaPrev2,
-  "a cyan ribbon that fans out after MA5 has already hooked down marks a sell",
-);
-
-const redCloses = [...Array.from({ length: 50 }, (_, i) => 30 - i * 0.2)];
-let redPrice = redCloses.at(-1)!;
-for (let i = 0; i < 6; i += 1) {
-  redPrice += 0.08;
-  redCloses.push(redPrice);
-}
-for (let i = 0; i < 28; i += 1) {
-  redPrice += 0.18;
-  redCloses.push(redPrice);
-}
-for (let i = 0; i < 8; i += 1) {
-  redPrice -= 0.04;
-  redCloses.push(redPrice);
-}
-const redContract = buildRedRibbon(redCloses.map((close, index) => barAt(index, close)));
-const redSell = redContract.signals.find((item) => item.side === "sell");
-const redSellAt = redContract.points.findIndex((point) => point.time === redSell?.time);
-const redBuyAt = redContract.points.findIndex((point) => point.time === redContract.signals[0]?.time);
-const redSpread = ribbonSpread(redContract.points[redSellAt].values);
-const redSpreadPrev = ribbonSpread(redContract.points[redSellAt - 1].values);
-const redMa = maAt(redCloses, 5, redSellAt);
-const redMaPrev = maAt(redCloses, 5, redSellAt - 1);
-const redMaPrev2 = maAt(redCloses, 5, redSellAt - 2);
-assert(
-  redContract.signals[0]?.side === "buy" &&
-    redSellAt > redBuyAt &&
-    redContract.points[redSellAt].direction.every((item) => item === "up") &&
-    redSpread < redSpreadPrev &&
-    redMa != null &&
-    redMaPrev != null &&
-    redMaPrev2 != null &&
-    redMa < redMaPrev &&
-    redMaPrev >= redMaPrev2,
-  "a red ribbon that starts narrowing as MA5 turns down marks a sell",
-);
-
-const turnCloses = [...Array.from({ length: 70 }, (_, i) => 40 - i * 0.25)];
-let turnPrice = turnCloses.at(-1)!;
-for (let i = 0; i < 3; i += 1) {
-  turnPrice += 0.35;
-  turnCloses.push(turnPrice);
-}
-for (let i = 0; i < 20; i += 1) {
-  turnPrice += 0.2;
-  turnCloses.push(turnPrice);
+const buried: KBar[] = [];
+let buriedPrice = 20;
+for (let i = 0; i < 40; i += 1) {
+  buried.push(barAt(i, Number(buriedPrice.toFixed(4))));
+  buriedPrice *= 0.99;
 }
 for (let i = 0; i < 3; i += 1) {
-  turnPrice -= 0.35;
-  turnCloses.push(turnPrice);
+  buriedPrice *= 1.02;
+  buried.push(barAt(buried.length, Number(buriedPrice.toFixed(4))));
 }
-const turnRibbon = buildRedRibbon(turnCloses.map((close, index) => barAt(index, close)));
-const turnBuyAt = turnRibbon.points.findIndex((point) => point.time === turnRibbon.signals[0]?.time);
-const turnSell = turnRibbon.signals.find((item) => item.side === "sell");
-const turnSellAt = turnRibbon.points.findIndex((point) => point.time === turnSell?.time);
-const turnBuyMa = maAt(turnCloses, 5, turnBuyAt);
-const turnBuyMaPrev = maAt(turnCloses, 5, turnBuyAt - 1);
-const turnBuyMaPrev2 = maAt(turnCloses, 5, turnBuyAt - 2);
-const turnSellMa = maAt(turnCloses, 5, turnSellAt);
-const turnSellMaPrev = maAt(turnCloses, 5, turnSellAt - 1);
-const turnSellMaPrev2 = maAt(turnCloses, 5, turnSellAt - 2);
-const cameFromDown = turnRibbon.points.slice(Math.max(1, turnBuyAt - 8), turnBuyAt).some((point) => point.direction.every((item) => item === "down"));
-assert(
-  turnRibbon.signals[0]?.side === "buy" &&
-    turnRibbon.points[turnBuyAt].direction.some((item) => item === "up") &&
-    !turnRibbon.points[turnBuyAt].direction.every((item) => item === "down") &&
-    cameFromDown &&
-    turnBuyMa != null &&
-    turnBuyMaPrev != null &&
-    turnBuyMaPrev2 != null &&
-    turnBuyMa > turnBuyMaPrev &&
-    turnBuyMaPrev <= turnBuyMaPrev2,
-  "a cyan ribbon turning red as MA5 hooks up marks a buy",
-);
-assert(
-  turnSellAt > turnBuyAt &&
-    turnRibbon.points[turnSellAt - 1].direction.every((item) => item === "up") &&
-    turnRibbon.points[turnSellAt].direction.some((item) => item === "down") &&
-    turnSellMa != null &&
-    turnSellMaPrev != null &&
-    turnSellMaPrev2 != null &&
-    turnSellMa < turnSellMaPrev &&
-    turnSellMaPrev >= turnSellMaPrev2,
-  "a red ribbon turning cyan as MA5 hooks down marks a sell",
-);
-
-const reboundCloses = [...Array.from({ length: 50 }, (_, i) => 30 - i * 0.2)];
-let reboundPrice = reboundCloses.at(-1)!;
-for (let i = 0; i < 6; i += 1) {
-  reboundPrice += 0.08;
-  reboundCloses.push(reboundPrice);
-}
-for (let i = 0; i < 28; i += 1) {
-  reboundPrice += 0.18;
-  reboundCloses.push(reboundPrice);
-}
-for (let i = 0; i < 8; i += 1) {
-  reboundPrice -= 0.04;
-  reboundCloses.push(reboundPrice);
-}
-for (let i = 0; i < 6; i += 1) {
-  reboundPrice += 0.35;
-  reboundCloses.push(reboundPrice);
-}
-const rebound = buildRedRibbon(reboundCloses.map((close, index) => barAt(index, close)));
-const reboundSellAt = rebound.points.findIndex((point) => point.time === rebound.signals.find((item) => item.side === "sell")?.time);
-const reboundBuy = rebound.signals.filter((item) => item.side === "buy").at(-1);
-const reboundBuyAt = rebound.points.findIndex((point) => point.time === reboundBuy?.time);
-const reboundSpread = ribbonSpread(rebound.points[reboundBuyAt].values);
-const reboundSpreadPrev = ribbonSpread(rebound.points[reboundBuyAt - 1].values);
-const reboundMa = maAt(reboundCloses, 5, reboundBuyAt);
-const reboundMaPrev = maAt(reboundCloses, 5, reboundBuyAt - 1);
-const reboundMaPrev2 = maAt(reboundCloses, 5, reboundBuyAt - 2);
-assert(
-  reboundSellAt < reboundBuyAt &&
-    rebound.points[reboundSellAt].direction.every((item) => item === "up") &&
-    rebound.points[reboundBuyAt].direction.every((item) => item === "up") &&
-    reboundSpread > reboundSpreadPrev &&
-    reboundMa != null &&
-    reboundMaPrev != null &&
-    reboundMaPrev2 != null &&
-    reboundMa > reboundMaPrev &&
-    reboundMaPrev <= reboundMaPrev2,
-  "after a red-ribbon sell, a fresh MA5 hook and an upward fan marks another buy",
-);
-
-const laggedCloses: number[] = [];
-let lagged = 30;
-for (let i = 0; i < 50; i += 1) {
-  lagged *= 0.985;
-  laggedCloses.push(lagged);
-}
-for (let i = 0; i < 12; i += 1) {
-  lagged *= 1.02;
-  laggedCloses.push(lagged);
-}
-const laggedRibbon = buildRedRibbon(laggedCloses.map((close, i) => barAt(i, close)));
-assert(laggedRibbon.points[51].direction.some((item) => item !== "up"), "the first MA5 stand can arrive before every layer is red");
+const buriedLines = buildMaLines(buried);
+const bounceBar = buriedLines.points[buried.length - 1];
+assert(bounceBar.ma4 != null && bounceBar.ma7 != null && bounceBar.ma20 != null, "the bounce has all three averages");
+assert(bounceBar.ma4 > bounceBar.ma7, "the bounce lifts MA4 through MA7");
+assert(buried[buried.length - 1].close < bounceBar.ma20, "the bounce close is still under MA20");
+assert(buriedLines.signals.length === 0, "a 4/7 cross under MA20 is not a buy, and a decline never sells from flat");
 
 const chop = Array.from({ length: 160 }, (_, i) => barAt(i, 20 + Math.sin(i / 2) * 0.08));
 assert(adxSeries(chop).every((value) => value == null || value <= 22), "a tight box stays at or below the ADX gate");

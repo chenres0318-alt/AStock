@@ -141,7 +141,7 @@ export default function Screener() {
         <div className="text-sm">选股：当天 4 日均线上穿 7 日均线，MACD 空头势力减弱</div>
         <div className="mt-2 max-w-4xl text-xs leading-5 text-mute">
           用当日收盘计算均线。4 日均线前一日还不高于 7 日均线，当天收到 7 日均线上方。MACD 柱仍为负，但比前一日更接近 0，也就是绿柱缩短。两条同时成立才入选。扫描成交额靠前的沪深
-          A 股，不含 ST / 北交所。看盘 K 线上的红青丝带和买卖箭头是另一套起涨红丝带，不标这里的条件。
+          A 股，不含 ST / 北交所。看盘 K 线画 4 日、7 日、20 日均线：4 日上穿 7 日且收盘站上 20 日标买，4 日下穿 7 日或收盘跌破 20 日标卖，箭头不再看 MACD。
         </div>
       </section>
 
