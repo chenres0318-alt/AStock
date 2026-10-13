@@ -25,8 +25,8 @@ type Report = {
   memberCount: number;
 };
 
-async function readJson<T>(url: string): Promise<T> {
-  const res = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(120_000) });
+async function readJson<T>(url: string, timeoutMs = 120_000): Promise<T> {
+  const res = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(timeoutMs) });
   const data = (await res.json()) as T & { error?: string };
   if (!res.ok) throw new Error(data.error || "请求失败");
   return data;
@@ -45,6 +45,7 @@ export default function SectorTrendView() {
   const [picked, setPicked] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [liveCodes, setLiveCodes] = useState<string[]>([]);
 
   useEffect(() => {
     readJson<{ items: SectorItem[] }>("/api/market/sectors?scope=all")
@@ -56,6 +57,18 @@ export default function SectorTrendView() {
       })
       .catch((err) => setError(err instanceof Error ? err.message : "板块列表失败"));
   }, [code, router]);
+
+  useEffect(() => {
+    let cancelled = false;
+    readJson<{ codes: string[] }>("/api/market/sector-trend?list=active", 300_000)
+      .then((data) => {
+        if (!cancelled) setLiveCodes(data.codes ?? []);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!code) return;
@@ -81,6 +94,17 @@ export default function SectorTrendView() {
     };
   }, [code]);
 
+  const liveSet = useMemo(() => {
+    const set = new Set(liveCodes);
+    const last = report?.bars.at(-1)?.time;
+    const selfLive = report?.trends.some((item) => item.status === "open" && item.end === last) ?? false;
+    if (code && report) {
+      if (selfLive) set.add(code);
+      else set.delete(code);
+    }
+    return set;
+  }, [liveCodes, report, code]);
+
   const selected = report?.trends.find((item) => item.start === picked) ?? report?.trends.at(-1) ?? null;
   const upTotal =
     report?.board.upCount != null
@@ -98,25 +122,17 @@ export default function SectorTrendView() {
               从局部低点出发，涨幅够、回调不破起点、时间超过一两天，并且板块里多数个股同步上涨、有领涨龙头。四条第一次同时满足，当天就画出红框，并延伸到最新一根。之后跌破起点或涨幅回吐，这段改成灰框，终点留在高点。还没满足条件的脉冲不画。
             </div>
           </div>
-          <label className="text-xs text-mute">
-            板块
-            <select
-              className="ml-2 rounded bg-panel-2 px-2 py-1 text-sm text-ink ring-1 ring-line"
-              value={code}
-              onChange={(event) => router.push(`/sector?code=${event.target.value}`)}
-            >
-              {boards.map((item) => (
-                <option key={item.code} value={item.code}>
-                  {item.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          <BoardPicker
+            boards={boards}
+            code={code}
+            liveCodes={liveSet}
+            onPick={(next) => router.push(`/sector?code=${next}`)}
+          />
         </div>
         {report ? (
           <div className="mt-3 flex flex-wrap items-baseline gap-x-6 gap-y-2">
             <div>
-              <div className="text-lg">{report.board.name}</div>
+              <div className={liveSet.has(report.board.code) ? "text-lg text-up" : "text-lg"}>{report.board.name}</div>
               <div className="text-[11px] text-mute">{report.board.code}</div>
             </div>
             <Stat label="5日涨幅" value={formatPct(report.pct5)} tone={report.pct5} />
@@ -172,6 +188,87 @@ export default function SectorTrendView() {
           <MemberTable rows={selected?.roster ?? []} />
         </section>
       </div>
+    </div>
+  );
+}
+
+function BoardPicker({
+  boards,
+  code,
+  liveCodes,
+  onPick,
+}: {
+  boards: SectorItem[];
+  code: string;
+  liveCodes: Set<string>;
+  onPick: (code: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const ordered = useMemo(() => {
+    return [...boards].sort((a, b) => {
+      const rank = (item: SectorItem) => (liveCodes.has(item.code) ? 0 : 1);
+      const byLive = rank(a) - rank(b);
+      if (byLive !== 0) return byLive;
+      return a.name.localeCompare(b.name, "zh-CN");
+    });
+  }, [boards, liveCodes]);
+  const current = boards.find((item) => item.code === code);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    const currentRow = rootRef.current?.querySelector("[data-current='true']");
+    currentRow?.scrollIntoView({ block: "nearest" });
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={rootRef} className="relative text-xs text-mute">
+      <div className="mb-1">板块</div>
+      <button
+        type="button"
+        className="flex min-w-36 items-center justify-between gap-3 rounded bg-panel-2 px-2 py-1 text-left text-sm ring-1 ring-line"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+      >
+        <span className={liveCodes.has(code) ? "text-up" : "text-ink"}>{current?.name ?? "选择板块"}</span>
+        <span aria-hidden="true">▾</span>
+      </button>
+      {open ? (
+        <div className="absolute right-0 z-30 mt-1 max-h-80 w-52 overflow-auto rounded bg-panel py-1 shadow-lg ring-1 ring-line scroll-thin">
+          {ordered.map((item) => {
+            const live = liveCodes.has(item.code);
+            const selected = item.code === code;
+            return (
+              <button
+                key={item.code}
+                type="button"
+                data-current={selected ? "true" : undefined}
+                className={`block w-full truncate px-3 py-1.5 text-left text-sm ${
+                  selected ? "bg-white/10" : "hover:bg-panel-2"
+                } ${live ? "text-up" : "text-ink"}`}
+                onClick={() => {
+                  setOpen(false);
+                  if (item.code !== code) onPick(item.code);
+                }}
+              >
+                {item.name}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { captureSectorTrends, type SectorMemberPath } from "./sectorTrend.ts";
+import { captureSectorTrends, indexCouldBeOpen, trendCoversLastBar, type SectorMemberPath } from "./sectorTrend.ts";
 import type { KBar } from "./types.ts";
 
 function assert(cond: unknown, message: string) {
@@ -95,6 +95,25 @@ const noLeader = membersFollowing(weakIndex).map((member) => {
 assert(
   captureSectorTrends(weakIndex, noLeader).length === 0,
   "a rise without a leader ahead of the index is not a sector trend",
+);
+
+assert(indexCouldBeOpen(held), "an in-progress rise still looks open on price alone");
+assert(indexCouldBeOpen(early), "the first qualifying day already looks open on price alone");
+assert(!indexCouldBeOpen(broken), "a break of the start low is no longer an open trend");
+assert(!indexCouldBeOpen(finished), "a pullback that closed the box does not cover the latest bar");
+assert(!indexCouldBeOpen(pulse), "a spike that never qualified is not an open trend");
+assert(!indexCouldBeOpen(quiet), "sideways chop is not an open trend");
+assert(
+  trendCoversLastBar(heldTrends, held.at(-1)?.time),
+  "an open box covers the latest bar",
+);
+assert(
+  !trendCoversLastBar(finishedTrends, finished.at(-1)?.time),
+  "a closed box ends at the high and does not cover a later bar",
+);
+assert(
+  !trendCoversLastBar(brokenTrends, broken.at(-1)?.time),
+  "a box closed by a break does not cover the latest bar",
 );
 
 console.log("sectorTrend.check ok", {

@@ -189,6 +189,65 @@ function walkSegments(bars: KBar[], members: SectorMemberPath[]): RawSegment[] {
   return found;
 }
 
+/**
+ * 指数自己还有没有可能把红框留到最后一根。
+ * 只看价格：局部低点、没跌破起点、跨度够、曾经涨够且路径顺、回吐还没把这段收口。
+ * 成分股同步和龙头要另外确认；这里放过的，完整计算里可能仍被否掉。
+ */
+export function indexCouldBeOpen(bars: KBar[]): boolean {
+  if (bars.length < MIN_BARS + PIVOT_WING * 2) return false;
+  for (let start = PIVOT_WING; start < bars.length - PIVOT_WING; start += 1) {
+    if (!isPivotLow(bars, start)) continue;
+    if (priceWindowCouldStayOpen(bars, start)) return true;
+  }
+  return false;
+}
+
+function priceWindowCouldStayOpen(bars: KBar[], start: number): boolean {
+  const floor = bars[start].low;
+  const startClose = bars[start].close;
+  if (!(startClose > 0)) return false;
+  let peak = start;
+  let path = 0;
+  let maxHigh = bars[start].high;
+  let minLow = bars[start].low;
+  let born = false;
+  for (let j = start + 1; j < bars.length; j += 1) {
+    if (bars[j].close < floor) return false;
+    path += Math.abs(bars[j].close - bars[j - 1].close);
+    if (bars[j].high > maxHigh) maxHigh = bars[j].high;
+    if (bars[j].low < minLow) minLow = bars[j].low;
+    if (bars[j].close >= bars[peak].close) peak = j;
+    const gain = bars[j].close / startClose - 1;
+    const efficiency = path > 0 ? (bars[j].close - startClose) / path : 0;
+    const amplitude = (maxHigh - minLow) / startClose;
+    if (
+      !born &&
+      j - start + 1 >= MIN_BARS &&
+      gain >= MIN_GAIN &&
+      efficiency >= MIN_EFFICIENCY &&
+      amplitude >= MIN_GAIN
+    ) {
+      born = true;
+    }
+    const advance = bars[peak].close - startClose;
+    const giveback = advance > 0 ? (bars[peak].close - bars[j].close) / advance : 0;
+    if (giveback >= FAIL_GIVEBACK) return false;
+    if (born && j >= peak + COMPLETE_LAG && giveback >= COMPLETE_GIVEBACK) return false;
+  }
+  if (!born) return false;
+  const advance = bars[peak].close - startClose;
+  const last = bars[bars.length - 1].close;
+  const giveback = advance > 0 ? (bars[peak].close - last) / advance : 0;
+  return giveback < COMPLETE_GIVEBACK;
+}
+
+/** 最后一根是否还落在某段趋势区间里。收口的灰框终点在高点，不含后来的交易日。 */
+export function trendCoversLastBar(segments: SectorTrendSegment[], lastTime: string | undefined): boolean {
+  if (!lastTime) return false;
+  return segments.some((segment) => segment.status === "open" && segment.end === lastTime);
+}
+
 /** 板块指数上的一段上涨。价格、时间、个股同步、波动率四条一起过才留下。 */
 export function captureSectorTrends(bars: KBar[], members: SectorMemberPath[]): SectorTrendSegment[] {
   if (bars.length < MIN_BARS + PIVOT_WING * 2 || members.length < MIN_MEMBERS) return [];
