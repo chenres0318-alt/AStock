@@ -22,8 +22,11 @@ type OverviewResponse = {
   error?: string;
 };
 
-async function readJson<T>(url: string): Promise<T> {
-  const res = await fetch(url, { cache: "no-store" });
+async function readJson<T>(url: string, timeoutMs?: number): Promise<T> {
+  const res = await fetch(url, {
+    cache: "no-store",
+    signal: timeoutMs ? AbortSignal.timeout(timeoutMs) : undefined,
+  });
   const data = (await res.json()) as T & { error?: string };
   if (!res.ok) throw new Error(data.error || "请求失败");
   return data;
@@ -47,6 +50,7 @@ export default function Dashboard() {
   });
   const [chartLoading, setChartLoading] = useState(false);
   const [sectors, setSectors] = useState<SectorItem[]>([]);
+  const [liveCodes, setLiveCodes] = useState<string[]>([]);
   const [rankTab, setRankTab] = useState<RankTab>("up");
   const [rankMap, setRankMap] = useState<Record<RankTab, RankItem[]>>({
     up: [],
@@ -165,6 +169,19 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!ready) return;
+    let cancelled = false;
+    readJson<{ codes: string[] }>("/api/market/sector-trend?list=active", 300_000)
+      .then((data) => {
+        if (!cancelled) setLiveCodes(data.codes ?? []);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [ready]);
+
+  useEffect(() => {
+    if (!ready) return;
     loadAux().catch(() => undefined);
     const timer = setInterval(() => {
       loadAux().catch(() => undefined);
@@ -245,7 +262,7 @@ export default function Dashboard() {
           />
         </div>
         <div className="flex min-h-0 flex-col gap-2 xl:h-full">
-          <SectorList items={sectors} onPick={pickStock} />
+          <SectorList items={sectors} liveCodes={liveCodes} onPick={pickStock} />
           <RankBoard tab={rankTab} onTab={setRankTab} items={rankMap[rankTab]} onPick={pickStock} />
         </div>
       </div>

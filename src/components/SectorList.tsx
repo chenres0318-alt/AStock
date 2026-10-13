@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import Link from "next/link";
 import { displaySymbol, isListedStockCode } from "@/lib/codes";
 import { formatPct, formatPrice, toneClass } from "@/lib/format";
@@ -9,10 +10,18 @@ import { EmptyHint, PanelTitle } from "./ui";
 export default function SectorList({
   items,
   onPick,
+  liveCodes = [],
 }: {
   items: SectorItem[];
   onPick: (code: string, name: string) => void;
+  liveCodes?: string[];
 }) {
+  const ordered = useMemo(() => {
+    if (!liveCodes.length) return items;
+    const live = new Set(liveCodes);
+    return [...items.filter((item) => live.has(item.code)), ...items.filter((item) => !live.has(item.code))];
+  }, [items, liveCodes]);
+  const live = useMemo(() => new Set(liveCodes), [liveCodes]);
   return (
     <section className="panel flex min-h-[220px] flex-1 flex-col overflow-hidden xl:min-h-0">
       <PanelTitle
@@ -25,7 +34,7 @@ export default function SectorList({
       />
       <div className="flex-1 overflow-auto scroll-thin">
         {items.length === 0 ? <EmptyHint text="板块暂不可用" /> : null}
-        {items.map((item) => (
+        {ordered.map((item) => (
           <div
             key={`${item.code}-${item.name}`}
             className="flex w-full items-center gap-2 border-b border-line/70 px-3 py-2 hover:bg-panel-2"
@@ -37,7 +46,7 @@ export default function SectorList({
                 if (item.leaderCode) onPick(item.leaderCode, item.leader || item.name);
               }}
             >
-              <div className="truncate text-sm">{item.name}</div>
+              <div className={`truncate text-sm ${live.has(item.code) ? "text-up" : ""}`}>{item.name}</div>
               <div className="truncate text-[11px] text-mute">
                 {item.leader
                   ? `领涨 ${item.leader}`

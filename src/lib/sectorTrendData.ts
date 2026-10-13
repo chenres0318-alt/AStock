@@ -1,7 +1,14 @@
 import { listAllIndustryBoards, listBoardMembers } from "./boards";
 import { cached } from "./cache";
 import { mapPool } from "./pool";
-import { captureSectorTrends, memberGainsInWindow, type SectorMemberPath, type SectorTrendSegment } from "./sectorTrend";
+import {
+  captureSectorTrends,
+  indexCouldBeOpen,
+  memberGainsInWindow,
+  trendCoversLastBar,
+  type SectorMemberPath,
+  type SectorTrendSegment,
+} from "./sectorTrend";
 import { fetchEastMoneyKline } from "./sources/eastmoney";
 import { fetchTencentKline } from "./sources/tencent";
 import type { BoardMember, KBar, SectorItem } from "./types";
@@ -79,4 +86,33 @@ export async function getSectorTrend(code: string): Promise<SectorTrendReport> {
     pct5,
     memberCount: members.length,
   };
+}
+
+/** 最新一根还落在趋势区间里的行业代码。先用指数价格筛，再对候选做成分股确认。 */
+export async function listBoardsInTrend(): Promise<string[]> {
+  return cached("boards-in-open-trend", 10 * 60_000, async () => {
+    const boards = await listAllIndustryBoards();
+    const klines = await mapPool(boards, 6, async (board) => {
+      try {
+        const bars = await cached(`board-kline:${board.code}:160`, 10 * 60_000, () =>
+          fetchEastMoneyKline(`90.${board.code}`, 160),
+        );
+        return { code: board.code, bars };
+      } catch {
+        return { code: board.code, bars: [] as KBar[] };
+      }
+    });
+    const candidates = klines.filter((item) => indexCouldBeOpen(item.bars));
+    const confirmed = await mapPool(candidates, 3, async (item) => {
+      try {
+        const members = await listBoardMembers(item.code, 40, "amount");
+        const paths = await memberPaths(members);
+        const trends = captureSectorTrends(item.bars, paths);
+        return trendCoversLastBar(trends, item.bars.at(-1)?.time) ? item.code : null;
+      } catch {
+        return null;
+      }
+    });
+    return confirmed.filter((code): code is string => code != null);
+  });
 }
