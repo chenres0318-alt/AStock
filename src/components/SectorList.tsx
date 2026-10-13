@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { displaySymbol, isListedStockCode } from "@/lib/codes";
 import { formatPct, formatPrice, toneClass } from "@/lib/format";
 import type { SectorItem } from "@/lib/types";
@@ -25,15 +26,17 @@ export default function SectorList({
       <div className="flex-1 overflow-auto scroll-thin">
         {items.length === 0 ? <EmptyHint text="板块暂不可用" /> : null}
         {items.map((item) => (
-          <button
+          <div
             key={`${item.code}-${item.name}`}
-            type="button"
-            className="flex w-full items-center gap-2 border-b border-line/70 px-3 py-2 text-left hover:bg-panel-2"
-            onClick={() => {
-              if (item.leaderCode) onPick(item.leaderCode, item.leader || item.name);
-            }}
+            className="flex w-full items-center gap-2 border-b border-line/70 px-3 py-2 hover:bg-panel-2"
           >
-            <div className="min-w-0 flex-1">
+            <button
+              type="button"
+              className="min-w-0 flex-1 text-left"
+              onClick={() => {
+                if (item.leaderCode) onPick(item.leaderCode, item.leader || item.name);
+              }}
+            >
               <div className="truncate text-sm">{item.name}</div>
               <div className="truncate text-[11px] text-mute">
                 {item.leader
@@ -42,7 +45,12 @@ export default function SectorList({
                     ? displaySymbol(item.code)
                     : item.code}
               </div>
-            </div>
+            </button>
+            {item.code.startsWith("BK") ? (
+              <Link href={`/sector?code=${item.code}`} className="shrink-0 text-[10px] text-gold">
+                趋势
+              </Link>
+            ) : null}
             <div className="text-right">
               <div className={`num text-sm ${toneClass(item.pct)}`}>{formatPct(item.pct)}</div>
               {item.upCount != null ? (
@@ -53,7 +61,7 @@ export default function SectorList({
                 <div className={`num text-[11px] ${toneClass(item.pct)}`}>{formatPrice(item.price)}</div>
               )}
             </div>
-          </button>
+          </div>
         ))}
       </div>
     </section>

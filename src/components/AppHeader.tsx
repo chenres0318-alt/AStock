@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 const LINKS = [
   { href: "/", label: "看盘" },
+  { href: "/sector", label: "板块" },
   { href: "/screener", label: "选股" },
 ];
 
