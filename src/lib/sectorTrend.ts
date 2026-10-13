@@ -1,12 +1,12 @@
 import type { KBar } from "./types";
 
-/** 少于 4 个交易日的上涨只当单日脉冲，不画框。 */
-const MIN_BARS = 4;
+/** 低点当天加上启动当天，两根就够。涨幅和成分股也过了，启动日收盘就画框。 */
+const MIN_BARS = 2;
 /** 从起点收盘到终点收盘，至少这段涨幅才算一段趋势。 */
 const MIN_GAIN = 0.02;
 /** 从高点回吐掉这段涨幅的四成，并且已经离开高点，视为这段走完。 */
 const COMPLETE_GIVEBACK = 0.4;
-/** 涨幅几乎回吐光，或者还在试的时候快速跌破，红框删掉。 */
+/** 跌破起点，或者把这段涨幅回吐掉八成，收成灰框，终点留在高点。 */
 const FAIL_GIVEBACK = 0.8;
 const COMPLETE_LAG = 2;
 /** 净涨幅 / 路径长度。横盘来回拉锯过不了。 */
@@ -15,7 +15,8 @@ const MIN_UP_RATIO = 0.5;
 /** 领涨个股至少要比板块指数多出的涨幅。 */
 const LEADER_GAP = 0.03;
 const MIN_MEMBERS = 5;
-const PIVOT_WING = 2;
+/** 起点要比前两根的低点更低。右边只看启动日当天，不再多等两天确认。 */
+const LEFT_WING = 2;
 
 export type SectorMemberPath = {
   code: string;
@@ -50,12 +51,12 @@ type RawSegment = {
 };
 
 function isPivotLow(bars: KBar[], index: number): boolean {
-  if (index < PIVOT_WING || index + PIVOT_WING >= bars.length) return false;
+  if (index < LEFT_WING || index + 1 >= bars.length) return false;
   const low = bars[index].low;
-  for (let j = index - PIVOT_WING; j <= index + PIVOT_WING; j += 1) {
-    if (j !== index && bars[j].low < low) return false;
+  for (let j = index - LEFT_WING; j < index; j += 1) {
+    if (bars[j].low < low) return false;
   }
-  // 横着的一段低点取最右边那根，避免把后面的一两天脉冲算成从很早以前就开始。
+  // 横着的一段低点取最右边那根。启动日的低点必须抬高，这样启动当天就能确认。
   if (bars[index + 1].low <= low) return false;
   return true;
 }
@@ -133,7 +134,7 @@ function qualifies(
 }
 
 /**
- * 从每个局部低点向前走。第一次四条一起满足，当天就留下框。
+ * 从每个局部低点走到启动日。涨幅、成分股、龙头第一次一起满足，当天就留下框。
  * 还守着起点、涨幅也没回吐光：红框一直画到最新一根。
  * 之后跌破起点或回吐八成：不把这段擦掉，收成灰框，终点留在仍然符合条件的高点。
  * 还没满足条件就失败的脉冲，不画框。
@@ -141,7 +142,7 @@ function qualifies(
 function walkSegments(bars: KBar[], members: SectorMemberPath[]): RawSegment[] {
   const found: RawSegment[] = [];
   let cursor = 0;
-  for (let start = PIVOT_WING; start < bars.length - PIVOT_WING; start += 1) {
+  for (let start = LEFT_WING; start < bars.length - 1; start += 1) {
     if (start < cursor || !isPivotLow(bars, start)) continue;
     const floor = bars[start].low;
     let peak = start;
@@ -195,8 +196,8 @@ function walkSegments(bars: KBar[], members: SectorMemberPath[]): RawSegment[] {
  * 成分股同步和龙头要另外确认；这里放过的，完整计算里可能仍被否掉。
  */
 export function indexCouldBeOpen(bars: KBar[]): boolean {
-  if (bars.length < MIN_BARS + PIVOT_WING * 2) return false;
-  for (let start = PIVOT_WING; start < bars.length - PIVOT_WING; start += 1) {
+  if (bars.length < LEFT_WING + MIN_BARS) return false;
+  for (let start = LEFT_WING; start < bars.length - 1; start += 1) {
     if (!isPivotLow(bars, start)) continue;
     if (priceWindowCouldStayOpen(bars, start)) return true;
   }
@@ -250,7 +251,7 @@ export function trendCoversLastBar(segments: SectorTrendSegment[], lastTime: str
 
 /** 板块指数上的一段上涨。价格、时间、个股同步、波动率四条一起过才留下。 */
 export function captureSectorTrends(bars: KBar[], members: SectorMemberPath[]): SectorTrendSegment[] {
-  if (bars.length < MIN_BARS + PIVOT_WING * 2 || members.length < MIN_MEMBERS) return [];
+  if (bars.length < LEFT_WING + MIN_BARS || members.length < MIN_MEMBERS) return [];
   const segments: SectorTrendSegment[] = [];
   for (const raw of walkSegments(bars, members)) {
     const passed = qualifies(bars, members, raw.start, raw.metricEnd);
