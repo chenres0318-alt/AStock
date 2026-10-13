@@ -44,6 +44,8 @@ export type SectorTrendSegment = {
 type RawSegment = {
   start: number;
   end: number;
+  /** 用来计算龙头和上涨家数的那一根。红框可能延伸到更新的一天。 */
+  metricEnd: number;
   status: "open" | "closed";
 };
 
@@ -53,6 +55,8 @@ function isPivotLow(bars: KBar[], index: number): boolean {
   for (let j = index - PIVOT_WING; j <= index + PIVOT_WING; j += 1) {
     if (j !== index && bars[j].low < low) return false;
   }
+  // 横着的一段低点取最右边那根，避免把后面的一两天脉冲算成从很早以前就开始。
+  if (bars[index + 1].low <= low) return false;
   return true;
 }
 
@@ -129,33 +133,35 @@ function qualifies(
 }
 
 /**
- * 从每个局部低点向前走。
- * 收盘跌破起点低点，或涨幅回吐八成，这段试探失败，不留框。
- * 离开高点两个交易日、并且回吐四成但没破位，这段收口，终点定在高点。
- * 走到最后一根仍守住涨幅，就是还在试的红框。
+ * 从每个局部低点向前走。第一次四条一起满足，当天就留下框。
+ * 还守着起点、涨幅也没回吐光：红框一直画到最新一根。
+ * 之后跌破起点或回吐八成：不把这段擦掉，收成灰框，终点留在仍然符合条件的高点。
+ * 还没满足条件就失败的脉冲，不画框。
  */
-function walkSegments(bars: KBar[]): RawSegment[] {
+function walkSegments(bars: KBar[], members: SectorMemberPath[]): RawSegment[] {
   const found: RawSegment[] = [];
   let cursor = 0;
   for (let start = PIVOT_WING; start < bars.length - PIVOT_WING; start += 1) {
     if (start < cursor || !isPivotLow(bars, start)) continue;
     const floor = bars[start].low;
     let peak = start;
+    let bornPeak = -1;
     let outcome: "open" | "closed" | "fail" | "pending" = "pending";
     let endAt = start;
     for (let j = start + 1; j < bars.length; j += 1) {
-      if (bars[j].close < floor) {
-        outcome = "fail";
-        break;
-      }
       if (bars[j].close >= bars[peak].close) peak = j;
+      if (qualifies(bars, members, start, j)) bornPeak = peak;
       const advance = bars[peak].close - bars[start].close;
       const giveback = advance > 0 ? (bars[peak].close - bars[j].close) / advance : 0;
-      if (giveback >= FAIL_GIVEBACK) {
-        outcome = "fail";
+      const failed = bars[j].close < floor || giveback >= FAIL_GIVEBACK;
+      if (failed) {
+        if (bornPeak >= 0) {
+          outcome = "closed";
+          endAt = bornPeak;
+        } else outcome = "fail";
         break;
       }
-      if (peak > start && j >= peak + COMPLETE_LAG && giveback >= COMPLETE_GIVEBACK) {
+      if (bornPeak >= 0 && j >= peak + COMPLETE_LAG && giveback >= COMPLETE_GIVEBACK) {
         outcome = "closed";
         endAt = peak;
         break;
@@ -163,16 +169,21 @@ function walkSegments(bars: KBar[]): RawSegment[] {
       endAt = j;
     }
     if (outcome === "pending") {
+      if (bornPeak < 0) continue;
       const advance = bars[peak].close - bars[start].close;
       const giveback = advance > 0 ? (bars[peak].close - bars[endAt].close) / advance : 0;
-      if (endAt === bars.length - 1 && giveback < COMPLETE_GIVEBACK) outcome = "open";
-      else if (peak > start && giveback >= COMPLETE_GIVEBACK) {
+      if (endAt === bars.length - 1 && giveback < COMPLETE_GIVEBACK) {
+        outcome = "open";
+        endAt = bars.length - 1;
+      } else {
         outcome = "closed";
-        endAt = peak;
-      } else outcome = "fail";
+        endAt = bornPeak;
+      }
     }
     if (outcome !== "open" && outcome !== "closed") continue;
-    found.push({ start, end: endAt, status: outcome });
+    const metricEnd = outcome === "open" && qualifies(bars, members, start, endAt) ? endAt : bornPeak;
+    if (metricEnd < start) continue;
+    found.push({ start, end: endAt, metricEnd, status: outcome });
     cursor = endAt + 1;
   }
   return found;
@@ -182,13 +193,13 @@ function walkSegments(bars: KBar[]): RawSegment[] {
 export function captureSectorTrends(bars: KBar[], members: SectorMemberPath[]): SectorTrendSegment[] {
   if (bars.length < MIN_BARS + PIVOT_WING * 2 || members.length < MIN_MEMBERS) return [];
   const segments: SectorTrendSegment[] = [];
-  for (const raw of walkSegments(bars)) {
-    const passed = qualifies(bars, members, raw.start, raw.end);
-    if (!passed) continue;
+  for (const raw of walkSegments(bars, members)) {
+    const passed = qualifies(bars, members, raw.start, raw.metricEnd);
+    if (!passed || !(bars[raw.end].close > 0) || !(bars[raw.start].close > 0)) continue;
     segments.push({
       start: bars[raw.start].time,
       end: bars[raw.end].time,
-      gain: passed.gain,
+      gain: bars[raw.end].close / bars[raw.start].close - 1,
       status: raw.status,
       upCount: passed.breadth.upCount,
       memberCount: passed.breadth.memberCount,
