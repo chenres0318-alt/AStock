@@ -167,6 +167,61 @@ assert(
   "a box closed by a break does not cover the latest bar",
 );
 
+function kbar(i: number, close: number, low: number, high: number, open = close): KBar {
+  return {
+    time: `2026-04-${String((i % 28) + 1).padStart(2, "0")}-${i}`,
+    open,
+    high,
+    low,
+    close,
+    volume: 1000,
+  };
+}
+
+const flats = Array.from({ length: 8 }, (_, i) => kbar(i, 100, 99.5, 100.4));
+const reversal = [...flats, kbar(8, 103, 96, 104, 100)];
+const reversalTrends = captureSectorTrends(reversal, membersAheadFrom(reversal, 8));
+assert(
+  reversalTrends.length === 1 &&
+    reversalTrends[0].status === "open" &&
+    reversalTrends[0].start === reversal.at(-1)?.time &&
+    reversalTrends[0].end === reversal.at(-1)?.time,
+  "a low day that closes back near the high is a suspected launch",
+);
+assert(reversalTrends[0].gain > 0.02, "the suspected launch uses that day's gain");
+assert(indexCouldBeOpen(reversal), "the low day still looks open on price alone");
+assert(trendCoversLastBar(reversalTrends, reversal.at(-1)?.time), "the suspected launch covers the latest bar");
+
+const wick = [...flats, kbar(8, 100.5, 97, 101, 99.6)];
+const wickTrends = captureSectorTrends(wick, membersAheadFrom(wick, 8));
+assert(
+  wickTrends.length === 1 && wickTrends[0].start === wick.at(-1)?.time && wickTrends[0].end === wick.at(-1)?.time,
+  "a dip that closes up, with the rebound already past 2%, is a suspected launch",
+);
+
+const softClose = [...flats, kbar(8, 97, 96, 104, 100)];
+assert(
+  captureSectorTrends(softClose, membersAheadFrom(softClose, 8)).length === 0,
+  "a low day that closes near the low is not a launch",
+);
+assert(!indexCouldBeOpen(softClose), "a weak close on the low day is not an open trend");
+
+const brokenLow = [...reversal, kbar(9, 94, 93, 97, 103)];
+assert(
+  captureSectorTrends(brokenLow, membersAheadFrom(brokenLow, 8)).length === 0,
+  "the suspected launch is withdrawn when the next day undercuts the low",
+);
+
+const heldLow = [...reversal, kbar(9, 104, 100, 105, 103)];
+const heldLowTrends = captureSectorTrends(heldLow, membersAheadFrom(heldLow, 8));
+assert(
+  heldLowTrends.length === 1 &&
+    heldLowTrends[0].status === "open" &&
+    heldLowTrends[0].start === reversal.at(-1)?.time &&
+    heldLowTrends[0].end === heldLow.at(-1)?.time,
+  "once the next day holds the low, the box stays and runs through the latest bar",
+);
+
 console.log("sectorTrend.check ok", {
   open: heldTrends[0].gain,
   closed: finishedTrends[0].gain,

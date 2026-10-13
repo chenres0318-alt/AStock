@@ -36,6 +36,16 @@ function gainText(gain: number): string {
   return formatPct(gain * 100);
 }
 
+function boxSpan(trend: { start: string; end: string }): string {
+  return trend.start === trend.end ? trend.start : `${trend.start} ~ ${trend.end}`;
+}
+
+function boxState(trend: { status: string; start: string; end: string }): string {
+  if (trend.status === "closed") return "灰框已收口";
+  if (trend.start === trend.end) return "疑似启动";
+  return "红框试运行";
+}
+
 export default function SectorTrendView() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -119,7 +129,7 @@ export default function SectorTrendView() {
           <div>
             <div className="text-sm">近期趋势捕捉</div>
             <div className="mt-1 max-w-3xl text-xs leading-5 text-mute">
-              从局部低点出发，启动当天涨幅够、还守在起点之上，并且板块里多数个股同步上涨、有领涨龙头，当天就画出红框，并延伸到最新一根。之后跌破起点或涨幅回吐，这段改成灰框，终点留在高点。还没满足条件的脉冲不画。
+              打出低点的当天，收盘拉到日内高位，当天涨幅或从低点拉起的幅度够，并且多数个股在涨、有领涨龙头，就按疑似启动画出红框。低点守住之后，框延伸到最新一根。跌破这个低点，疑似启动撤回。已经走出的一段如果涨幅回吐，改成灰框，终点留在高点。
             </div>
           </div>
           <BoardPicker
@@ -146,9 +156,9 @@ export default function SectorTrendView() {
 
       <section className="panel flex min-h-[460px] flex-col overflow-hidden">
         <div className="flex items-center justify-between border-b border-line px-3 py-2 text-xs text-mute">
-          <span>{selected ? `${selected.start} ~ ${selected.end}` : "最近一段"}</span>
+          <span>{selected ? boxSpan(selected) : "最近一段"}</span>
           <span className={selected ? toneClass(selected.gain) : ""}>
-            {selected ? `${selected.status === "open" ? "红框试运行" : "灰框已收口"} ${gainText(selected.gain)}` : loading ? "计算中…" : "没有画出趋势"}
+            {selected ? `${boxState(selected)} ${gainText(selected.gain)}` : loading ? "计算中…" : "没有画出趋势"}
           </span>
         </div>
         <TrendChart
@@ -444,7 +454,9 @@ function TrendChart({
           onClick={() => onSelect(item.start)}
         >
           <span className={`pointer-events-none absolute left-1 top-1 text-[10px] ${item.status === "open" ? "text-up" : "text-mute"}`}>
-            {item.trend ? `${item.trend.start.slice(5)} ~ ${item.trend.end.slice(5)} ${gainText(item.trend.gain)}` : ""}
+            {item.trend
+              ? `${item.trend.start === item.trend.end ? item.trend.start.slice(5) : `${item.trend.start.slice(5)} ~ ${item.trend.end.slice(5)}`} ${gainText(item.trend.gain)}`
+              : ""}
           </span>
         </button>
       ))}
