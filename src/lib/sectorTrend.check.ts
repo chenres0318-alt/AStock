@@ -53,7 +53,58 @@ const quiet = barsFromCloses(Array.from({ length: 24 }, (_, i) => 100 + Math.sin
 assert(captureSectorTrends(quiet, membersFollowing(quiet)).length === 0, "a tight sideways range is not a trend");
 
 const pulse = barsFromCloses(rise(100, [1.04, 1.05], [0.9]));
-assert(captureSectorTrends(pulse, membersFollowing(pulse)).length === 0, "a one-or-two-day spike is not a trend");
+assert(
+  captureSectorTrends(pulse, membersFollowing(pulse)).length === 0,
+  "a short pop without a leader ahead of the sector draws nothing",
+);
+
+/** 龙头从启动那根开始比指数高出一截，用来检验启动日当天就能画框。 */
+function membersAheadFrom(bars: KBar[], aheadIndex: number): SectorMemberPath[] {
+  return Array.from({ length: 8 }, (_, index) => {
+    const closes = new Map<string, number>();
+    bars.forEach((bar, i) => {
+      closes.set(bar.time, index === 0 && i >= aheadIndex ? bar.close * 1.06 : bar.close);
+    });
+    return { code: `sh60000${index}`, name: index === 0 ? "龙头" : `跟风${index}`, closes };
+  });
+}
+
+function withLaunchLow(closes: number[]): KBar[] {
+  const launchAt = closes.findIndex((close, index) => index > 0 && close !== closes[index - 1]);
+  return barsFromCloses(
+    closes,
+    closes.map((close, index) => (index >= launchAt ? close * 0.995 : close * 0.998)),
+  );
+}
+
+const launchCloses = rise(100, [1.03]);
+const launch = withLaunchLow(launchCloses);
+const launchAt = launch.findIndex((bar, index) => index > 0 && bar.close !== launch[index - 1].close);
+const launchTrends = captureSectorTrends(launch, membersAheadFrom(launch, launchAt));
+assert(
+  launchTrends.length === 1 && launchTrends[0].status === "open" && launchTrends[0].end === launch.at(-1)?.time,
+  "the launch day itself draws an open box through that bar",
+);
+const launchStart = launch.findIndex((bar) => bar.time === launchTrends[0].start);
+const launchEnd = launch.findIndex((bar) => bar.time === launchTrends[0].end);
+assert(launchEnd - launchStart === 1, "the box spans the low and the first up day only");
+assert(indexCouldBeOpen(launch), "the launch day still looks open on price alone");
+
+const smallLaunch = withLaunchLow(rise(100, [1.01]));
+const smallAt = smallLaunch.findIndex((bar, index) => index > 0 && bar.close !== smallLaunch[index - 1].close);
+assert(
+  captureSectorTrends(smallLaunch, membersAheadFrom(smallLaunch, smallAt)).length === 0,
+  "a first up day that has not gained 2% draws nothing",
+);
+
+const fadedCloses = rise(100, [1.03], [0.9]);
+const faded = withLaunchLow(fadedCloses);
+const fadedAt = faded.findIndex((bar, index) => index > 0 && bar.close !== faded[index - 1].close);
+const fadedTrends = captureSectorTrends(faded, membersAheadFrom(faded, fadedAt));
+assert(
+  fadedTrends.length === 1 && fadedTrends[0].status === "closed" && fadedTrends[0].end === faded[fadedAt].time,
+  "a launch that breaks the next day stays as a gray box ending on the launch day",
+);
 
 const held = barsFromCloses(rise(100, [1.02, 1.02, 1.02, 1.02, 1.015]));
 const heldTrends = captureSectorTrends(held, membersFollowing(held));

@@ -119,7 +119,7 @@ export default function SectorTrendView() {
           <div>
             <div className="text-sm">近期趋势捕捉</div>
             <div className="mt-1 max-w-3xl text-xs leading-5 text-mute">
-              从局部低点出发，涨幅够、回调不破起点、时间超过一两天，并且板块里多数个股同步上涨、有领涨龙头。四条第一次同时满足，当天就画出红框，并延伸到最新一根。之后跌破起点或涨幅回吐，这段改成灰框，终点留在高点。还没满足条件的脉冲不画。
+              从局部低点出发，启动当天涨幅够、还守在起点之上，并且板块里多数个股同步上涨、有领涨龙头，当天就画出红框，并延伸到最新一根。之后跌破起点或涨幅回吐，这段改成灰框，终点留在高点。还没满足条件的脉冲不画。
             </div>
           </div>
           <BoardPicker
