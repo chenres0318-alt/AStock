@@ -28,7 +28,7 @@ function membersFollowing(bars: KBar[], downFrom = 10): SectorMemberPath[] {
   return Array.from({ length: 10 }, (_, index) => {
     const closes = new Map<string, number>();
     bars.forEach((bar, i) => {
-      const close = index === 0 ? bar.close * (1 + 0.004 * i) : index >= downFrom ? 100 - i : bar.close;
+      const close = index === 0 ? bar.close * (1 + 0.015 * i) : index >= downFrom ? 100 - i : bar.close;
       closes.set(bar.time, close);
     });
     return { code: `sh60000${index}`, name: index === 0 ? "龙头" : `跟风${index}`, closes };
@@ -69,8 +69,18 @@ assert(finishedTrends.length === 1 && finishedTrends[0].status === "closed", "a 
 const peak = finished.reduce((best, bar, index) => (bar.close > finished[best].close ? index : best), 0);
 assert(finishedTrends[0].end === finished[peak].time, "a closed box ends on the high, not on the pullback");
 
+const early = barsFromCloses(rise(100, [1.02, 1.02, 1.02, 1.02]));
+const earlyTrends = captureSectorTrends(early, membersFollowing(early));
+assert(
+  earlyTrends.length === 1 && earlyTrends[0].status === "open" && earlyTrends[0].end === early.at(-1)?.time,
+  "the box is drawn on the first day the rules pass and runs through that bar",
+);
+
 const broken = barsFromCloses(rise(100, [1.02, 1.02, 1.02, 1.02, 1.02], [0.9]));
-assert(captureSectorTrends(broken, membersFollowing(broken)).length === 0, "breaking the start low while the box is still open deletes it");
+const brokenTrends = captureSectorTrends(broken, membersFollowing(broken));
+const brokenPeak = broken.reduce((best, bar, index) => (bar.close > broken[best].close ? index : best), 0);
+assert(brokenTrends.length === 1 && brokenTrends[0].status === "closed", "a qualified rise that later breaks the start stays on the chart");
+assert(brokenTrends[0].end === broken[brokenPeak].time, "that box ends on the high before the break");
 
 const weakIndex = barsFromCloses(rise(100, [1.02, 1.02, 1.02, 1.02, 1.02]));
 assert(
