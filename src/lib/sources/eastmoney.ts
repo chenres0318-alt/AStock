@@ -108,6 +108,30 @@ export async function fetchEastMoneySectors(limit = 24): Promise<SectorItem[]> {
   return mapSectorRows(json.data?.diff ?? []);
 }
 
+export async function fetchAllIndustryBoards(): Promise<SectorItem[]> {
+  const collected: SectorItem[] = [];
+  for (let pn = 1; pn <= 4; pn += 1) {
+    const json = await clist(
+      `/api/qt/clist/get?pn=${pn}&pz=100&po=1&np=1&fltt=2&invt=2&fid=f12` +
+        `&fs=m:90+t:2+f:!50&fields=f12,f14,f2,f3,f104,f105,f128,f140,f141`,
+    );
+    const rows = mapSectorRows(json.data?.diff ?? []);
+    if (!rows.length) break;
+    collected.push(...rows);
+    if (rows.length < 100) break;
+  }
+  const seen = new Set<string>();
+  const out: SectorItem[] = [];
+  for (const item of collected) {
+    if (!item.code || seen.has(item.code)) continue;
+    seen.add(item.code);
+    if (item.name.endsWith("Ⅲ") || item.name.endsWith("III")) continue;
+    out.push(item);
+  }
+  out.sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
+  return out;
+}
+
 export async function fetchIndustryBoards(): Promise<SectorItem[]> {
   const collected: SectorItem[] = [];
   for (let pn = 1; pn <= 3; pn += 1) {

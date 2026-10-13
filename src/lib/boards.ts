@@ -1,5 +1,5 @@
 import { cached } from "./cache";
-import { fetchBoardMembers, fetchIndustryBoards } from "./sources/eastmoney";
+import { fetchAllIndustryBoards, fetchBoardMembers, fetchIndustryBoards } from "./sources/eastmoney";
 import { fetchSinaBoardMembers, fetchSinaIndustries, type SinaNodeSort } from "./sources/sina";
 import type { BoardMember, SectorItem } from "./types";
 
@@ -16,6 +16,13 @@ export async function listIndustryBoards(): Promise<SectorItem[]> {
     }
     if (sina.length) return sina;
     return [];
+  });
+}
+
+export async function listAllIndustryBoards(): Promise<SectorItem[]> {
+  return cached("industry-boards-all", 10 * 60_000, async () => {
+    const boards = await fetchAllIndustryBoards();
+    return boards.filter((item) => item.code.startsWith("BK"));
   });
 }
 
