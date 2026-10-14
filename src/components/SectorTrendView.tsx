@@ -71,7 +71,7 @@ export default function SectorTrendView() {
         const preferred = data.items.find((item) => item.name.includes("元件")) ?? data.items[0];
         if (preferred) router.replace(`/sector?code=${preferred.code}`);
       })
-      .catch((err) => setError(err instanceof Error ? err.message : "板块列表失败"));
+      .catch(() => undefined);
   }, [code, router]);
 
   useEffect(() => {
@@ -152,6 +152,7 @@ export default function SectorTrendView() {
           <BoardPicker
             boards={boards}
             code={code}
+            currentName={report?.board.code === code ? report.board.name : null}
             liveCodes={liveSet}
             followed={followed}
             onPick={(next) => router.push(`/sector?code=${next}`)}
@@ -255,6 +256,7 @@ export default function SectorTrendView() {
 function BoardPicker({
   boards,
   code,
+  currentName,
   liveCodes,
   followed,
   onPick,
@@ -262,6 +264,7 @@ function BoardPicker({
 }: {
   boards: SectorItem[];
   code: string;
+  currentName?: string | null;
   liveCodes: Set<string>;
   followed: SectorWatchItem[];
   onPick: (code: string) => void;
@@ -289,6 +292,7 @@ function BoardPicker({
       });
   }, [boards, followedSet, liveCodes, queryText]);
   const current = boards.find((item) => item.code === code) ?? followed.find((item) => item.code === code);
+  const buttonName = current?.name || currentName || "选择板块";
 
   useEffect(() => {
     if (!open) return;
@@ -325,7 +329,7 @@ function BoardPicker({
           else setOpen(true);
         }}
       >
-        <span className={liveCodes.has(code) ? "text-up" : "text-ink"}>{current?.name ?? "选择板块"}</span>
+        <span className={liveCodes.has(code) ? "text-up" : "text-ink"}>{buttonName}</span>
         <span aria-hidden="true">▾</span>
       </button>
       {open ? (
