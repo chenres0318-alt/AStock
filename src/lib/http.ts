@@ -1,5 +1,3 @@
-import http from "node:http";
-import https from "node:https";
 import iconv from "iconv-lite";
 
 const UA =
@@ -10,53 +8,6 @@ export class UpstreamError extends Error {
     super(message);
     this.name = "UpstreamError";
   }
-}
-
-function fetchPlain(protocol: "http" | "https", url: string, timeoutMs: number, referer?: string): Promise<string> {
-  const parsed = new URL(url);
-  const request = protocol === "https" ? https.request : http.request;
-  return new Promise((resolve, reject) => {
-    const req = request(
-      {
-        host: parsed.hostname,
-        servername: parsed.hostname,
-        port: parsed.port || (protocol === "https" ? 443 : 80),
-        path: `${parsed.pathname}${parsed.search}`,
-        method: "GET",
-        timeout: timeoutMs,
-        headers: {
-          Host: parsed.hostname,
-          "User-Agent": UA,
-          Accept: "*/*",
-          Referer: referer ?? "https://quote.eastmoney.com/",
-          Connection: "close",
-        },
-      },
-      (res) => {
-        const chunks: Buffer[] = [];
-        res.on("data", (chunk: Buffer) => chunks.push(chunk));
-        res.on("end", () => {
-          if ((res.statusCode ?? 500) >= 400) reject(new UpstreamError(`上游 ${res.statusCode}`, res.statusCode ?? 502));
-          else resolve(Buffer.concat(chunks).toString("utf8"));
-        });
-      },
-    );
-    req.on("timeout", () => {
-      req.destroy();
-      reject(new UpstreamError("上游超时"));
-    });
-    req.on("error", (error) => reject(error));
-    req.end();
-  });
-}
-
-/** 东财官网在非 HTTPS 页面上就是用 HTTP/1.1 打编号历史节点。undici 的 HTTP/2 经常被直接掐断。 */
-export function fetchHttp1(url: string, timeoutMs = 4000, referer?: string): Promise<string> {
-  return fetchPlain("http", url, timeoutMs, referer);
-}
-
-export function fetchHttps1(url: string, timeoutMs = 4000, referer?: string): Promise<string> {
-  return fetchPlain("https", url, timeoutMs, referer);
 }
 
 export async function fetchBuffer(
