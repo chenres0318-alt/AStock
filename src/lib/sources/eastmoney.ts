@@ -50,7 +50,7 @@ const MAIN_FLOW = [
 
 async function clist(query: string): Promise<ClistResponse> {
   let lastError: unknown;
-  for (const host of HOSTS.slice(0, 2)) {
+  for (const host of HOSTS) {
     try {
       const json = await fetchJson<ClistResponse>(`${host}${query}`, {
         referer: "https://quote.eastmoney.com/center/hsbk.html",
@@ -110,11 +110,27 @@ export async function fetchEastMoneySectors(limit = 24): Promise<SectorItem[]> {
 
 export async function fetchAllIndustryBoards(): Promise<SectorItem[]> {
   const collected: SectorItem[] = [];
-  for (let pn = 1; pn <= 4; pn += 1) {
-    const json = await clist(
+  let total = Number.POSITIVE_INFINITY;
+  // 按代码倒序分页。只取前 4 页会把代码靠后的行业丢掉，例如游戏Ⅱ。
+  for (let pn = 1; pn <= 12 && collected.length < total; pn += 1) {
+    const query =
       `/api/qt/clist/get?pn=${pn}&pz=100&po=1&np=1&fltt=2&invt=2&fid=f12` +
-        `&fs=m:90+t:2+f:!50&fields=f12,f14,f2,f3,f104,f105,f128,f140,f141`,
-    );
+      `&fs=m:90+t:2+f:!50&fields=f12,f14,f2,f3,f104,f105,f128,f140,f141`;
+    let json: ClistResponse | null = null;
+    let lastError: unknown;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        json = await clist(query);
+        break;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    if (!json) {
+      if (collected.length) break;
+      throw lastError instanceof Error ? lastError : new Error("行业板块列表不可用");
+    }
+    if (typeof json.data?.total === "number") total = json.data.total;
     const rows = mapSectorRows(json.data?.diff ?? []);
     if (!rows.length) break;
     collected.push(...rows);
