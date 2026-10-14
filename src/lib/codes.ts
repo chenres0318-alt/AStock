@@ -147,6 +147,11 @@ export function isListedStockCode(code: string): boolean {
   return /^(sh|sz|bj)\d{6}$/i.test(code.trim());
 }
 
+/** 同花顺行业指数，代码以 881 开头。 */
+export function isTonghuashunIndustry(code: string): boolean {
+  return /^881\d{3}$/.test(code.trim());
+}
+
 export function isIndexCode(code: string): boolean {
   const tx = toTencentCode(code);
   if (INDEX_CODES.has(tx)) return true;

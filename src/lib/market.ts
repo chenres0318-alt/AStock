@@ -1,8 +1,9 @@
+import { listAllIndustryBoards } from "./boards";
 import { cached } from "./cache";
 import { DEFAULT_WATCHLIST, INDICES, SECTOR_ETFS, limitPercent, toTencentCode } from "./codes";
 import { firstOk } from "./http";
 import { getMarketStatus } from "./market-status";
-import { fetchEastMoneyMainNet, fetchEastMoneySearch, fetchEastMoneySectors } from "./sources/eastmoney";
+import { fetchEastMoneyMainNet, fetchEastMoneySearch } from "./sources/eastmoney";
 import { fetchSinaIndustries, fetchSinaRank, fetchSinaSuggest } from "./sources/sina";
 import { fetchTencentKline, fetchTencentQuotes, fetchTencentTrend } from "./sources/tencent";
 import type {
@@ -92,17 +93,15 @@ export async function getBoards(): Promise<{ limitUp: RankItem[]; limitDown: Ran
 
 export async function getSectors(): Promise<SectorItem[]> {
   return cached("sectors", 15_000, async () => {
-    const sinaPromise = fetchSinaIndustries()
+    try {
+      const boards = await listAllIndustryBoards();
+      if (boards.length) return boards.slice(0, 20);
+    } catch {
+      // 同花顺行业页读不到时，首页仍用证监会行业或行业 ETF
+    }
+    const sina = await fetchSinaIndustries()
       .then((rows) => rows.slice(0, 20))
       .catch(() => [] as SectorItem[]);
-    const em = await Promise.race([
-      fetchEastMoneySectors(20).catch(() => [] as SectorItem[]),
-      new Promise<SectorItem[]>((resolve) => {
-        setTimeout(() => resolve([]), 2500);
-      }),
-    ]);
-    if (em.length) return em;
-    const sina = await sinaPromise;
     if (sina.length) return sina;
     const quotes = await fetchTencentQuotes(SECTOR_ETFS.map((item) => item.code));
     const names = new Map(SECTOR_ETFS.map((item) => [item.code, item.name]));

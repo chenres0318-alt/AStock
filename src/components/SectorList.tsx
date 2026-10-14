@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
-import { displaySymbol, isListedStockCode } from "@/lib/codes";
+import { displaySymbol, isListedStockCode, isTonghuashunIndustry } from "@/lib/codes";
 import { formatPct, formatPrice, toneClass } from "@/lib/format";
 import type { SectorItem } from "@/lib/types";
 import { EmptyHint, PanelTitle } from "./ui";
@@ -28,7 +28,13 @@ export default function SectorList({
         title="行业板块"
         extra={
           <span className="text-[10px] text-mute">
-            {items[0]?.source === "etf" ? "行业ETF" : items[0]?.source === "sina" ? "证监会行业" : "涨幅排序"}
+            {items[0]?.source === "ths"
+              ? "同花顺行业"
+              : items[0]?.source === "etf"
+                ? "行业ETF"
+                : items[0]?.source === "sina"
+                  ? "证监会行业"
+                  : "涨幅排序"}
           </span>
         }
       />
@@ -55,7 +61,7 @@ export default function SectorList({
                     : item.code}
               </div>
             </button>
-            {item.code.startsWith("BK") ? (
+            {isTonghuashunIndustry(item.code) || item.code.startsWith("BK") ? (
               <Link href={`/sector?code=${item.code}`} className="shrink-0 text-[10px] text-gold">
                 趋势
               </Link>

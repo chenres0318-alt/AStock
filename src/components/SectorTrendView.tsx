@@ -10,7 +10,7 @@ import {
   type ISeriesApi,
   type Time,
 } from "lightweight-charts";
-import { displaySymbol } from "@/lib/codes";
+import { displaySymbol, isTonghuashunIndustry } from "@/lib/codes";
 import { formatPct, formatPrice, toneClass } from "@/lib/format";
 import type { KBar, SectorItem } from "@/lib/types";
 import type { SectorTrendView as TrendBox } from "@/lib/sectorTrendData";
@@ -61,9 +61,10 @@ export default function SectorTrendView() {
     readJson<{ items: SectorItem[] }>("/api/market/sectors?scope=all")
       .then((data) => {
         setBoards(data.items);
-        if (code) return;
-        const preferred = data.items.find((item) => item.name.includes("元件")) ?? data.items[0];
-        if (preferred) router.replace(`/sector?code=${preferred.code}`);
+        if (isTonghuashunIndustry(code) && data.items.some((item) => item.code === code)) return;
+        const preferred =
+          data.items.find((item) => item.code === "881121" || item.name === "半导体") ?? data.items[0];
+        if (preferred && preferred.code !== code) router.replace(`/sector?code=${preferred.code}`);
       })
       .catch((err) => setError(err instanceof Error ? err.message : "板块列表失败"));
   }, [code, router]);
@@ -81,7 +82,7 @@ export default function SectorTrendView() {
   }, []);
 
   useEffect(() => {
-    if (!code) return;
+    if (!isTonghuashunIndustry(code)) return;
     let cancelled = false;
     setLoading(true);
     setReport(null);
