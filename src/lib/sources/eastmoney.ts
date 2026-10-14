@@ -1,6 +1,6 @@
 import { marketOf, toEastMoneySecId, toTencentCode } from "../codes";
 import { toNumber } from "../format";
-import { fetchJson, fetchUtf } from "../http";
+import { fetchJson, fetchUtf, UpstreamError } from "../http";
 import type { BoardMember, KBar, RankItem, SearchItem, SectorItem } from "../types";
 
 type SuggestResponse = {
@@ -30,13 +30,19 @@ type KlineResponse = {
   };
 };
 
-const HOSTS = [
-  "https://push2delay.eastmoney.com",
-  "https://push2.eastmoney.com",
-  "https://79.push2.eastmoney.com",
-  "https://80.push2.eastmoney.com",
-  "https://82.push2.eastmoney.com",
+const CLIST_NUMBERS = [
+  88, 91, 82, 80, 79, 47, 33, 17, 11, 7, 99, 4, 19, 21, 29, 38, 42, 56, 59, 63, 69, 71, 75, 94, 2, 13, 15, 23,
+  27, 31, 36, 44, 52, 61, 66, 73, 77, 85, 93, 97,
 ];
+
+const CLIST_HOSTS = [
+  "https://push2delay.eastmoney.com",
+  ...CLIST_NUMBERS.map((num) => `https://${num}.push2delay.eastmoney.com`),
+  "https://push2.eastmoney.com",
+  "https://push2his.eastmoney.com",
+];
+
+let preferredClistHost: string | null = null;
 
 const HIS_KLINE = [
   "https://push2his.eastmoney.com/api/qt/stock/kline/get",
@@ -48,20 +54,60 @@ const MAIN_FLOW = [
   "https://86.push2his.eastmoney.com/api/qt/stock/fflow/daykline/get",
 ];
 
+function firstFulfilled<T>(tasks: Array<() => Promise<T>>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    let pending = tasks.length;
+    let settled = false;
+    let last: unknown;
+    if (!pending) {
+      reject(new UpstreamError("板块行情暂时取不到"));
+      return;
+    }
+    for (const task of tasks) {
+      task().then(
+        (value) => {
+          if (settled) return;
+          settled = true;
+          resolve(value);
+        },
+        (error) => {
+          last = error;
+          pending -= 1;
+          if (!settled && pending === 0) {
+            settled = true;
+            reject(last instanceof Error ? last : new UpstreamError("板块行情暂时取不到"));
+          }
+        },
+      );
+    }
+  });
+}
+
 async function clist(query: string): Promise<ClistResponse> {
-  let lastError: unknown;
-  for (const host of HOSTS) {
-    try {
-      const json = await fetchJson<ClistResponse>(`${host}${query}`, {
-        referer: "https://quote.eastmoney.com/center/hsbk.html",
-        timeoutMs: 7000,
-      });
-      if (json.data?.diff) return json;
-    } catch (error) {
-      lastError = error;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const hosts = preferredClistHost
+      ? [preferredClistHost, ...CLIST_HOSTS.filter((host) => host !== preferredClistHost)]
+      : CLIST_HOSTS;
+    for (let index = 0; index < hosts.length; index += 6) {
+      const batch = hosts.slice(index, index + 6);
+      try {
+        return await firstFulfilled(
+          batch.map((host) => async () => {
+            const json = await fetchJson<ClistResponse>(`${host}${query}`, {
+              referer: "https://quote.eastmoney.com/center/hsbk.html",
+              timeoutMs: 4000,
+            });
+            if (!json.data?.diff) throw new UpstreamError("板块列表为空");
+            preferredClistHost = host;
+            return json;
+          }),
+        );
+      } catch {
+        // 这一组节点不可用，换下一组。
+      }
     }
   }
-  throw lastError instanceof Error ? lastError : new Error("东财列表接口不可用");
+  throw new UpstreamError("板块行情暂时取不到");
 }
 
 export async function fetchEastMoneySearch(keyword: string): Promise<SearchItem[]> {
@@ -116,19 +162,12 @@ export async function fetchAllIndustryBoards(): Promise<SectorItem[]> {
     const query =
       `/api/qt/clist/get?pn=${pn}&pz=100&po=1&np=1&fltt=2&invt=2&fid=f12` +
       `&fs=m:90+t:2+f:!50&fields=f12,f14,f2,f3,f104,f105,f128,f140,f141`;
-    let json: ClistResponse | null = null;
-    let lastError: unknown;
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      try {
-        json = await clist(query);
-        break;
-      } catch (error) {
-        lastError = error;
-      }
-    }
-    if (!json) {
+    let json: ClistResponse;
+    try {
+      json = await clist(query);
+    } catch (error) {
       if (collected.length) break;
-      throw lastError instanceof Error ? lastError : new Error("行业板块列表不可用");
+      throw error;
     }
     if (typeof json.data?.total === "number") total = json.data.total;
     const rows = mapSectorRows(json.data?.diff ?? []);
