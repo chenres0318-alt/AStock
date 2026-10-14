@@ -1,6 +1,6 @@
 import { marketOf, toEastMoneySecId, toTencentCode } from "../codes";
 import { toNumber } from "../format";
-import { fetchJson, fetchUtf, UpstreamError } from "../http";
+import { fetchEastMoneyAddresses, fetchJson, fetchUtf, UpstreamError } from "../http";
 import type { BoardMember, KBar, RankItem, SearchItem, SectorItem } from "../types";
 
 type SuggestResponse = {
@@ -30,17 +30,8 @@ type KlineResponse = {
   };
 };
 
-const CLIST_NUMBERS = [
-  88, 91, 82, 80, 79, 47, 33, 17, 11, 7, 99, 4, 19, 21, 29, 38, 42, 56, 59, 63, 69, 71, 75, 94, 2, 13, 15, 23,
-  27, 31, 36, 44, 52, 61, 66, 73, 77, 85, 93, 97,
-];
-
-const CLIST_HOSTS = [
-  "https://push2delay.eastmoney.com",
-  ...CLIST_NUMBERS.map((num) => `https://${num}.push2delay.eastmoney.com`),
-  "https://push2.eastmoney.com",
-  "https://push2his.eastmoney.com",
-];
+// 与 PR #44 一样先走这两个节点。后面的镜像只在前一个失败后逐个尝试，避免同时撞几十个连接把 K 线请求一起打断。
+const CLIST_HOSTS = ["https://push2delay.eastmoney.com", "https://push2.eastmoney.com"];
 
 let preferredClistHost: string | null = null;
 
@@ -54,57 +45,22 @@ const MAIN_FLOW = [
   "https://86.push2his.eastmoney.com/api/qt/stock/fflow/daykline/get",
 ];
 
-function firstFulfilled<T>(tasks: Array<() => Promise<T>>): Promise<T> {
-  return new Promise((resolve, reject) => {
-    let pending = tasks.length;
-    let settled = false;
-    let last: unknown;
-    if (!pending) {
-      reject(new UpstreamError("板块行情暂时取不到"));
-      return;
-    }
-    for (const task of tasks) {
-      task().then(
-        (value) => {
-          if (settled) return;
-          settled = true;
-          resolve(value);
-        },
-        (error) => {
-          last = error;
-          pending -= 1;
-          if (!settled && pending === 0) {
-            settled = true;
-            reject(last instanceof Error ? last : new UpstreamError("板块行情暂时取不到"));
-          }
-        },
-      );
-    }
-  });
-}
-
 async function clist(query: string): Promise<ClistResponse> {
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    const hosts = preferredClistHost
-      ? [preferredClistHost, ...CLIST_HOSTS.filter((host) => host !== preferredClistHost)]
-      : CLIST_HOSTS;
-    for (let index = 0; index < hosts.length; index += 6) {
-      const batch = hosts.slice(index, index + 6);
-      try {
-        return await firstFulfilled(
-          batch.map((host) => async () => {
-            const json = await fetchJson<ClistResponse>(`${host}${query}`, {
-              referer: "https://quote.eastmoney.com/center/hsbk.html",
-              timeoutMs: 4000,
-            });
-            if (!json.data?.diff) throw new UpstreamError("板块列表为空");
-            preferredClistHost = host;
-            return json;
-          }),
-        );
-      } catch {
-        // 这一组节点不可用，换下一组。
+  const hosts = preferredClistHost
+    ? [preferredClistHost, ...CLIST_HOSTS.filter((host) => host !== preferredClistHost)]
+    : CLIST_HOSTS;
+  for (const host of hosts) {
+    try {
+      const json = await fetchJson<ClistResponse>(`${host}${query}`, {
+        referer: "https://quote.eastmoney.com/center/hsbk.html",
+        timeoutMs: 7000,
+      });
+      if (json.data?.diff) {
+        preferredClistHost = host;
+        return json;
       }
+    } catch {
+      // 换下一个节点。
     }
   }
   throw new UpstreamError("板块行情暂时取不到");
@@ -157,24 +113,31 @@ export async function fetchEastMoneySectors(limit = 24): Promise<SectorItem[]> {
 export async function fetchAllIndustryBoards(): Promise<SectorItem[]> {
   const collected: SectorItem[] = [];
   let total = Number.POSITIVE_INFINITY;
-  // 按代码倒序分页。只取前 4 页会把代码靠后的行业丢掉，例如游戏Ⅱ。
+  let complete = false;
+  // 按代码倒序分页。中途停在前几页会把代码靠后的行业丢掉，例如游戏Ⅱ。
   for (let pn = 1; pn <= 12 && collected.length < total; pn += 1) {
     const query =
       `/api/qt/clist/get?pn=${pn}&pz=100&po=1&np=1&fltt=2&invt=2&fid=f12` +
       `&fs=m:90+t:2+f:!50&fields=f12,f14,f2,f3,f104,f105,f128,f140,f141`;
-    let json: ClistResponse;
-    try {
-      json = await clist(query);
-    } catch (error) {
-      if (collected.length) break;
-      throw error;
+    let json: ClistResponse | null = null;
+    for (let attempt = 0; attempt < 2 && !json; attempt += 1) {
+      try {
+        json = await clist(query);
+      } catch {
+        json = null;
+      }
     }
+    if (!json) break;
     if (typeof json.data?.total === "number") total = json.data.total;
     const rows = mapSectorRows(json.data?.diff ?? []);
     if (!rows.length) break;
     collected.push(...rows);
-    if (rows.length < 100) break;
+    if (rows.length < 100 || collected.length >= total) {
+      complete = true;
+      break;
+    }
   }
+  if (!complete) throw new UpstreamError("板块行情暂时取不到");
   const seen = new Set<string>();
   const out: SectorItem[] = [];
   for (const item of collected) {
@@ -341,5 +304,19 @@ export async function fetchEastMoneyKline(secid: string, count = 80): Promise<KB
       }
     }
   }
-  throw lastError instanceof Error ? lastError : new Error("板块K线不可用");
+  for (const host of ["91.push2his.eastmoney.com", "99.push2his.eastmoney.com"]) {
+    const buf = await fetchEastMoneyAddresses(
+      `https://${host}/api/qt/stock/kline/get?${query}`,
+      3000,
+      "https://quote.eastmoney.com/",
+    );
+    if (!buf) continue;
+    try {
+      const bars = parseEmKlines(parseMaybeJsonp(buf.toString("utf8")).data?.klines);
+      if (bars.length >= 40) return bars;
+    } catch {
+      // 换下一个地址。
+    }
+  }
+  throw new UpstreamError(lastError instanceof Error && lastError.message !== "fetch failed" ? lastError.message : "板块K线暂时取不到");
 }
