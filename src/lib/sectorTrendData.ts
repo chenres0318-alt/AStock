@@ -50,7 +50,7 @@ export async function getSectorTrend(code: string): Promise<SectorTrendReport> {
   const boardCode = code.trim();
   if (!boardCode.startsWith("BK")) throw new Error("请从行业板块里选择一个东财行业");
   const [boards, bars, members] = await Promise.all([
-    listAllIndustryBoards().catch(() => [] as SectorItem[]),
+    listAllIndustryBoards(),
     cached(`board-kline:${boardCode}:160`, 10 * 60_000, () => fetchEastMoneyKline(`90.${boardCode}`, 160)),
     listBoardMembers(boardCode, 40, "amount"),
   ]);

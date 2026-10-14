@@ -1,6 +1,6 @@
 import { marketOf, toEastMoneySecId, toTencentCode } from "../codes";
 import { toNumber } from "../format";
-import { fetchHttps1, fetchJson, UpstreamError } from "../http";
+import { fetchJson, fetchUtf } from "../http";
 import type { BoardMember, KBar, RankItem, SearchItem, SectorItem } from "../types";
 
 type SuggestResponse = {
@@ -30,23 +30,18 @@ type KlineResponse = {
   };
 };
 
-// 与 PR #44 一样先走这两个节点。后面的镜像只在前一个失败后逐个尝试，避免同时撞几十个连接把 K 线请求一起打断。
-const CLIST_HOSTS = ["https://push2delay.eastmoney.com", "https://push2.eastmoney.com"];
-
-let preferredClistHost: string | null = null;
-
-const KLINE_NUMBERS = [
-  47, 70, 4, 91, 99, 86, 33, 88, 17, 7, 82, 80, 11, 13, 15, 18, 20, 22, 28, 30, 35, 38, 42, 45, 50, 55, 60, 63,
-  66, 72, 75, 77, 84, 90, 93, 95, 97,
+const HOSTS = [
+  "https://push2delay.eastmoney.com",
+  "https://push2.eastmoney.com",
+  "https://79.push2.eastmoney.com",
+  "https://80.push2.eastmoney.com",
+  "https://82.push2.eastmoney.com",
 ];
 
 const HIS_KLINE = [
   "https://push2his.eastmoney.com/api/qt/stock/kline/get",
   "https://86.push2his.eastmoney.com/api/qt/stock/kline/get",
-  ...KLINE_NUMBERS.map((num) => `https://${num}.push2his.eastmoney.com/api/qt/stock/kline/get`),
 ];
-
-let preferredKlineBase: string | null = null;
 
 const MAIN_FLOW = [
   "https://push2his.eastmoney.com/api/qt/stock/fflow/daykline/get",
@@ -54,24 +49,19 @@ const MAIN_FLOW = [
 ];
 
 async function clist(query: string): Promise<ClistResponse> {
-  const hosts = preferredClistHost
-    ? [preferredClistHost, ...CLIST_HOSTS.filter((host) => host !== preferredClistHost)]
-    : CLIST_HOSTS;
-  for (const host of hosts) {
+  let lastError: unknown;
+  for (const host of HOSTS.slice(0, 2)) {
     try {
       const json = await fetchJson<ClistResponse>(`${host}${query}`, {
         referer: "https://quote.eastmoney.com/center/hsbk.html",
         timeoutMs: 7000,
       });
-      if (json.data?.diff) {
-        preferredClistHost = host;
-        return json;
-      }
-    } catch {
-      // 换下一个节点。
+      if (json.data?.diff) return json;
+    } catch (error) {
+      lastError = error;
     }
   }
-  throw new UpstreamError("板块行情暂时取不到");
+  throw lastError instanceof Error ? lastError : new Error("东财列表接口不可用");
 }
 
 export async function fetchEastMoneySearch(keyword: string): Promise<SearchItem[]> {
@@ -120,32 +110,16 @@ export async function fetchEastMoneySectors(limit = 24): Promise<SectorItem[]> {
 
 export async function fetchAllIndustryBoards(): Promise<SectorItem[]> {
   const collected: SectorItem[] = [];
-  let total = Number.POSITIVE_INFINITY;
-  let complete = false;
-  // 按代码倒序分页。中途停在前几页会把代码靠后的行业丢掉，例如游戏Ⅱ。
-  for (let pn = 1; pn <= 12 && collected.length < total; pn += 1) {
-    const query =
+  for (let pn = 1; pn <= 4; pn += 1) {
+    const json = await clist(
       `/api/qt/clist/get?pn=${pn}&pz=100&po=1&np=1&fltt=2&invt=2&fid=f12` +
-      `&fs=m:90+t:2+f:!50&fields=f12,f14,f2,f3,f104,f105,f128,f140,f141`;
-    let json: ClistResponse | null = null;
-    for (let attempt = 0; attempt < 2 && !json; attempt += 1) {
-      try {
-        json = await clist(query);
-      } catch {
-        json = null;
-      }
-    }
-    if (!json) break;
-    if (typeof json.data?.total === "number") total = json.data.total;
+        `&fs=m:90+t:2+f:!50&fields=f12,f14,f2,f3,f104,f105,f128,f140,f141`,
+    );
     const rows = mapSectorRows(json.data?.diff ?? []);
     if (!rows.length) break;
     collected.push(...rows);
-    if (rows.length < 100 || collected.length >= total) {
-      complete = true;
-      break;
-    }
+    if (rows.length < 100) break;
   }
-  if (!complete) throw new UpstreamError("板块行情暂时取不到");
   const seen = new Set<string>();
   const out: SectorItem[] = [];
   for (const item of collected) {
@@ -291,55 +265,26 @@ export async function fetchEastMoneyMainNet(code: string, limit = 500): Promise<
   throw lastError instanceof Error ? lastError : new Error("主力资金不可用");
 }
 
-async function readKlineBase(base: string, query: string): Promise<KBar[]> {
-  const buf = await fetchHttps1(`${base}?${query}`, 3000, "https://quote.eastmoney.com/");
-  return parseEmKlines(parseMaybeJsonp(buf.toString("utf8")).data?.klines);
-}
-
 export async function fetchEastMoneyKline(secid: string, count = 80): Promise<KBar[]> {
   const query =
     `secid=${secid}&ut=fa5fd1943c7b386f172d6893dbfba10b` +
     `&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56` +
     `&klt=101&fqt=1&end=20500101&lmt=${count}`;
-  const bases = preferredKlineBase
-    ? [preferredKlineBase, ...HIS_KLINE.filter((base) => base !== preferredKlineBase)]
-    : HIS_KLINE;
-  const need = Math.min(40, count);
-  for (let pass = 0; pass < 2; pass += 1) {
-    for (let index = 0; index < bases.length; index += 6) {
-    const batch = bases.slice(index, index + 6);
-    const found = await new Promise<{ base: string; bars: KBar[] } | null>((resolve) => {
-      let pending = batch.length;
-      let settled = false;
-      if (!pending) {
-        resolve(null);
-        return;
+  let lastError: unknown;
+  for (const base of HIS_KLINE) {
+    for (const extra of ["", "&cb=j"]) {
+      try {
+        const text = await fetchUtf(`${base}?${query}${extra}`, {
+          referer: "https://quote.eastmoney.com/",
+          timeoutMs: 5000,
+        });
+        const json = parseMaybeJsonp(text);
+        const bars = parseEmKlines(json.data?.klines);
+        if (bars.length >= 40) return bars;
+      } catch (error) {
+        lastError = error;
       }
-      for (const base of batch) {
-        readKlineBase(base, query).then(
-          (bars) => {
-            if (settled) return;
-            if (bars.length >= need) {
-              settled = true;
-              resolve({ base, bars });
-              return;
-            }
-            pending -= 1;
-            if (pending === 0) resolve(null);
-          },
-          () => {
-            if (settled) return;
-            pending -= 1;
-            if (pending === 0) resolve(null);
-          },
-        );
-      }
-    });
-    if (found) {
-      preferredKlineBase = found.base;
-      return found.bars;
-    }
     }
   }
-  throw new UpstreamError("板块K线暂时取不到");
+  throw lastError instanceof Error ? lastError : new Error("板块K线不可用");
 }

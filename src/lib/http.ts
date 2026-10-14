@@ -1,5 +1,3 @@
-import dns from "node:dns/promises";
-import https from "node:https";
 import iconv from "iconv-lite";
 
 const UA =
@@ -10,75 +8,6 @@ export class UpstreamError extends Error {
     super(message);
     this.name = "UpstreamError";
   }
-}
-
-function eastMoneyHost(url: string): string | null {
-  try {
-    const hostname = new URL(url).hostname;
-    return hostname.endsWith("eastmoney.com") ? hostname : null;
-  } catch {
-    return null;
-  }
-}
-
-function requestAddress(url: string, address: string, timeoutMs: number, referer?: string): Promise<Buffer> {
-  const parsed = new URL(url);
-  return new Promise((resolve, reject) => {
-    const req = https.request(
-      {
-        host: address,
-        servername: parsed.hostname,
-        path: `${parsed.pathname}${parsed.search}`,
-        method: "GET",
-        headers: {
-          Host: parsed.hostname,
-          "User-Agent": UA,
-          Accept: "*/*",
-          Referer: referer ?? "https://finance.qq.com/",
-        },
-        timeout: timeoutMs,
-      },
-      (res) => {
-        const chunks: Buffer[] = [];
-        res.on("data", (chunk: Buffer) => chunks.push(chunk));
-        res.on("end", () => {
-          if ((res.statusCode ?? 500) >= 400) reject(new UpstreamError(`上游 ${res.statusCode}`, res.statusCode ?? 502));
-          else resolve(Buffer.concat(chunks));
-        });
-      },
-    );
-    req.on("timeout", () => {
-      req.destroy();
-      reject(new UpstreamError("上游超时"));
-    });
-    req.on("error", (error) => reject(error));
-    req.end();
-  });
-}
-
-export function fetchHttps1(url: string, timeoutMs: number, referer?: string): Promise<Buffer> {
-  const parsed = new URL(url);
-  return requestAddress(url, parsed.hostname, timeoutMs, referer);
-}
-
-export async function fetchEastMoneyAddresses(url: string, timeoutMs: number, referer?: string): Promise<Buffer | null> {
-  const hostname = eastMoneyHost(url);
-  if (!hostname) return null;
-  let addresses: string[] = [];
-  try {
-    const records = await dns.lookup(hostname, { all: true, family: 4 });
-    addresses = records.map((item) => item.address).slice(0, 3);
-  } catch {
-    return null;
-  }
-  for (const address of addresses) {
-    try {
-      return await requestAddress(url, address, Math.min(timeoutMs, 3000), referer);
-    } catch {
-      // 同一个域名往往有多台机器，换下一个地址。
-    }
-  }
-  return null;
 }
 
 export async function fetchBuffer(
