@@ -56,6 +56,11 @@ function requestAddress(url: string, address: string, timeoutMs: number, referer
   });
 }
 
+export function fetchHttps1(url: string, timeoutMs: number, referer?: string): Promise<Buffer> {
+  const parsed = new URL(url);
+  return requestAddress(url, parsed.hostname, timeoutMs, referer);
+}
+
 export async function fetchEastMoneyAddresses(url: string, timeoutMs: number, referer?: string): Promise<Buffer | null> {
   const hostname = eastMoneyHost(url);
   if (!hostname) return null;

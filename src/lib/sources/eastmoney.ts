@@ -1,6 +1,6 @@
 import { marketOf, toEastMoneySecId, toTencentCode } from "../codes";
 import { toNumber } from "../format";
-import { fetchEastMoneyAddresses, fetchJson, fetchUtf, UpstreamError } from "../http";
+import { fetchHttps1, fetchJson, UpstreamError } from "../http";
 import type { BoardMember, KBar, RankItem, SearchItem, SectorItem } from "../types";
 
 type SuggestResponse = {
@@ -35,10 +35,18 @@ const CLIST_HOSTS = ["https://push2delay.eastmoney.com", "https://push2.eastmone
 
 let preferredClistHost: string | null = null;
 
+const KLINE_NUMBERS = [
+  47, 70, 4, 91, 99, 86, 33, 88, 17, 7, 82, 80, 11, 13, 15, 18, 20, 22, 28, 30, 35, 38, 42, 45, 50, 55, 60, 63,
+  66, 72, 75, 77, 84, 90, 93, 95, 97,
+];
+
 const HIS_KLINE = [
   "https://push2his.eastmoney.com/api/qt/stock/kline/get",
   "https://86.push2his.eastmoney.com/api/qt/stock/kline/get",
+  ...KLINE_NUMBERS.map((num) => `https://${num}.push2his.eastmoney.com/api/qt/stock/kline/get`),
 ];
+
+let preferredKlineBase: string | null = null;
 
 const MAIN_FLOW = [
   "https://push2his.eastmoney.com/api/qt/stock/fflow/daykline/get",
@@ -283,40 +291,55 @@ export async function fetchEastMoneyMainNet(code: string, limit = 500): Promise<
   throw lastError instanceof Error ? lastError : new Error("主力资金不可用");
 }
 
+async function readKlineBase(base: string, query: string): Promise<KBar[]> {
+  const buf = await fetchHttps1(`${base}?${query}`, 3000, "https://quote.eastmoney.com/");
+  return parseEmKlines(parseMaybeJsonp(buf.toString("utf8")).data?.klines);
+}
+
 export async function fetchEastMoneyKline(secid: string, count = 80): Promise<KBar[]> {
   const query =
     `secid=${secid}&ut=fa5fd1943c7b386f172d6893dbfba10b` +
     `&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56` +
     `&klt=101&fqt=1&end=20500101&lmt=${count}`;
-  let lastError: unknown;
-  for (const base of HIS_KLINE) {
-    for (const extra of ["", "&cb=j"]) {
-      try {
-        const text = await fetchUtf(`${base}?${query}${extra}`, {
-          referer: "https://quote.eastmoney.com/",
-          timeoutMs: 5000,
-        });
-        const json = parseMaybeJsonp(text);
-        const bars = parseEmKlines(json.data?.klines);
-        if (bars.length >= 40) return bars;
-      } catch (error) {
-        lastError = error;
+  const bases = preferredKlineBase
+    ? [preferredKlineBase, ...HIS_KLINE.filter((base) => base !== preferredKlineBase)]
+    : HIS_KLINE;
+  const need = Math.min(40, count);
+  for (let pass = 0; pass < 2; pass += 1) {
+    for (let index = 0; index < bases.length; index += 6) {
+    const batch = bases.slice(index, index + 6);
+    const found = await new Promise<{ base: string; bars: KBar[] } | null>((resolve) => {
+      let pending = batch.length;
+      let settled = false;
+      if (!pending) {
+        resolve(null);
+        return;
       }
+      for (const base of batch) {
+        readKlineBase(base, query).then(
+          (bars) => {
+            if (settled) return;
+            if (bars.length >= need) {
+              settled = true;
+              resolve({ base, bars });
+              return;
+            }
+            pending -= 1;
+            if (pending === 0) resolve(null);
+          },
+          () => {
+            if (settled) return;
+            pending -= 1;
+            if (pending === 0) resolve(null);
+          },
+        );
+      }
+    });
+    if (found) {
+      preferredKlineBase = found.base;
+      return found.bars;
+    }
     }
   }
-  for (const host of ["91.push2his.eastmoney.com", "99.push2his.eastmoney.com"]) {
-    const buf = await fetchEastMoneyAddresses(
-      `https://${host}/api/qt/stock/kline/get?${query}`,
-      3000,
-      "https://quote.eastmoney.com/",
-    );
-    if (!buf) continue;
-    try {
-      const bars = parseEmKlines(parseMaybeJsonp(buf.toString("utf8")).data?.klines);
-      if (bars.length >= 40) return bars;
-    } catch {
-      // 换下一个地址。
-    }
-  }
-  throw new UpstreamError(lastError instanceof Error && lastError.message !== "fetch failed" ? lastError.message : "板块K线暂时取不到");
+  throw new UpstreamError("板块K线暂时取不到");
 }
