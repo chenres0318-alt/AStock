@@ -1,6 +1,6 @@
 import { marketOf, toEastMoneySecId, toTencentCode } from "../codes";
 import { toNumber } from "../format";
-import { fetchHttp1, fetchHttps1, fetchJson, UpstreamError } from "../http";
+import { fetchJson, fetchUtf } from "../http";
 import type { BoardMember, KBar, RankItem, SearchItem, SectorItem } from "../types";
 
 type SuggestResponse = {
@@ -38,7 +38,10 @@ const HOSTS = [
   "https://82.push2.eastmoney.com",
 ];
 
-let preferredHisOrigin: string | null = null;
+const HIS_KLINE = [
+  "https://push2his.eastmoney.com/api/qt/stock/kline/get",
+  "https://86.push2his.eastmoney.com/api/qt/stock/kline/get",
+];
 
 const MAIN_FLOW = [
   "https://push2his.eastmoney.com/api/qt/stock/fflow/daykline/get",
@@ -58,7 +61,7 @@ async function clist(query: string): Promise<ClistResponse> {
       lastError = error;
     }
   }
-  throw lastError instanceof UpstreamError ? lastError : new UpstreamError("板块行情暂时取不到");
+  throw lastError instanceof Error ? lastError : new Error("东财列表接口不可用");
 }
 
 export async function fetchEastMoneySearch(keyword: string): Promise<SearchItem[]> {
@@ -262,78 +265,26 @@ export async function fetchEastMoneyMainNet(code: string, limit = 500): Promise<
   throw lastError instanceof Error ? lastError : new Error("主力资金不可用");
 }
 
-type BoardSeries = { name: string | null; bars: KBar[] };
-
-function historyOrigins(): string[] {
-  const numbers = Array.from({ length: 99 }, (_, index) => index + 1);
-  const shift = Math.floor(Math.random() * numbers.length);
-  const rotated = numbers.slice(shift).concat(numbers.slice(0, shift));
-  // HTTP 编号节点先走完。HTTPS 经常要等超时，不能和 HTTP 夹在同一批里把失败拖长。
-  const origins = [
-    ...rotated.map((num) => `http://${num}.push2his.eastmoney.com`),
-    ...rotated.map((num) => `https://${num}.push2his.eastmoney.com`),
-  ];
-  if (!preferredHisOrigin) return origins;
-  return [preferredHisOrigin, ...origins.filter((origin) => origin !== preferredHisOrigin)];
-}
-
-async function readHistory(origin: string, query: string): Promise<BoardSeries> {
-  const url = `${origin}/api/qt/stock/kline/get?${query}`;
-  const text = origin.startsWith("https:")
-    ? await fetchHttps1(url, 3500, "https://quote.eastmoney.com/")
-    : await fetchHttp1(url, 3500, "http://quote.eastmoney.com/");
-  const json = parseMaybeJsonp(text);
-  return { name: json.data?.name?.trim() || null, bars: parseEmKlines(json.data?.klines) };
-}
-
-function firstHistory(origins: string[], query: string, need: number): Promise<(BoardSeries & { origin: string }) | null> {
-  return new Promise((resolve) => {
-    let pending = origins.length;
-    let settled = false;
-    if (!pending) {
-      resolve(null);
-      return;
-    }
-    for (const origin of origins) {
-      readHistory(origin, query).then(
-        (series) => {
-          if (settled) return;
-          if (series.bars.length >= need) {
-            settled = true;
-            resolve({ origin, ...series });
-            return;
-          }
-          pending -= 1;
-          if (pending === 0) resolve(null);
-        },
-        () => {
-          if (settled) return;
-          pending -= 1;
-          if (pending === 0) resolve(null);
-        },
-      );
-    }
-  });
-}
-
-/** 板块日线。默认 push2his 经常空回复，改走官网同款的编号节点，HTTP 优先。 */
-export async function fetchEastMoneyBoardSeries(secid: string, count = 80): Promise<BoardSeries> {
+export async function fetchEastMoneyKline(secid: string, count = 80): Promise<KBar[]> {
   const query =
     `secid=${secid}&ut=fa5fd1943c7b386f172d6893dbfba10b` +
     `&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56` +
     `&klt=101&fqt=1&end=20500101&lmt=${count}`;
-  const need = Math.min(40, count);
-  const origins = historyOrigins();
-  for (let index = 0; index < origins.length; index += 6) {
-    const found = await firstHistory(origins.slice(index, index + 6), query, need);
-    if (!found) continue;
-    preferredHisOrigin = found.origin;
-    return { name: found.name, bars: found.bars.slice(-count) };
+  let lastError: unknown;
+  for (const base of HIS_KLINE) {
+    for (const extra of ["", "&cb=j"]) {
+      try {
+        const text = await fetchUtf(`${base}?${query}${extra}`, {
+          referer: "https://quote.eastmoney.com/",
+          timeoutMs: 5000,
+        });
+        const json = parseMaybeJsonp(text);
+        const bars = parseEmKlines(json.data?.klines);
+        if (bars.length >= 40) return bars;
+      } catch (error) {
+        lastError = error;
+      }
+    }
   }
-  throw new UpstreamError("板块K线暂时取不到");
-}
-
-export async function fetchEastMoneyKline(secid: string, count = 80): Promise<KBar[]> {
-  const series = await fetchEastMoneyBoardSeries(secid, count);
-  return series.bars;
+  throw lastError instanceof Error ? lastError : new Error("板块K线不可用");
 }

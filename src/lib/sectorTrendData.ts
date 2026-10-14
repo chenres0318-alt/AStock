@@ -9,7 +9,7 @@ import {
   type SectorMemberPath,
   type SectorTrendSegment,
 } from "./sectorTrend";
-import { fetchEastMoneyBoardSeries } from "./sources/eastmoney";
+import { fetchEastMoneyKline } from "./sources/eastmoney";
 import { fetchTencentKline } from "./sources/tencent";
 import type { BoardMember, KBar, SectorItem } from "./types";
 
@@ -49,26 +49,23 @@ async function memberPaths(members: BoardMember[]): Promise<SectorMemberPath[]> 
 export async function getSectorTrend(code: string): Promise<SectorTrendReport> {
   const boardCode = code.trim();
   if (!boardCode.startsWith("BK")) throw new Error("请从行业板块里选择一个东财行业");
-  const [boards, series, members] = await Promise.all([
-    listAllIndustryBoards().catch(() => [] as SectorItem[]),
-    cached(`board-kline:${boardCode}:160:http1`, 10 * 60_000, () => fetchEastMoneyBoardSeries(`90.${boardCode}`, 160)),
-    listBoardMembers(boardCode, 40, "amount").catch(() => [] as BoardMember[]),
+  const [boards, bars, members] = await Promise.all([
+    listAllIndustryBoards(),
+    cached(`board-kline:${boardCode}:160`, 10 * 60_000, () => fetchEastMoneyKline(`90.${boardCode}`, 160)),
+    listBoardMembers(boardCode, 40, "amount"),
   ]);
-  const bars = series.bars;
   const found = boards.find((item) => item.code === boardCode);
-  const board: SectorItem = found
-    ? { ...found, name: found.name || series.name || boardCode }
-    : {
-        code: boardCode,
-        name: series.name || boardCode,
-        pct: null,
-        price: bars.at(-1)?.close ?? null,
-        leader: null,
-        leaderCode: null,
-        upCount: null,
-        downCount: null,
-        source: "bk",
-      };
+  const board: SectorItem = found ?? {
+    code: boardCode,
+    name: boardCode,
+    pct: null,
+    price: bars.at(-1)?.close ?? null,
+    leader: null,
+    leaderCode: null,
+    upCount: null,
+    downCount: null,
+    source: "bk",
+  };
   const paths = await memberPaths(members);
   const trends = captureSectorTrends(bars, paths).map((segment) => {
     const gains = new Map(
@@ -97,9 +94,9 @@ export async function listBoardsInTrend(): Promise<string[]> {
     const boards = await listAllIndustryBoards();
     const klines = await mapPool(boards, 6, async (board) => {
       try {
-        const bars = await cached(`board-kline:${board.code}:160:http1`, 10 * 60_000, () =>
-          fetchEastMoneyBoardSeries(`90.${board.code}`, 160),
-        ).then((series) => series.bars);
+        const bars = await cached(`board-kline:${board.code}:160`, 10 * 60_000, () =>
+          fetchEastMoneyKline(`90.${board.code}`, 160),
+        );
         return { code: board.code, bars };
       } catch {
         return { code: board.code, bars: [] as KBar[] };
