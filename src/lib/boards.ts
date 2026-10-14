@@ -20,7 +20,7 @@ export async function listIndustryBoards(): Promise<SectorItem[]> {
 }
 
 export async function listAllIndustryBoards(): Promise<SectorItem[]> {
-  return cached("industry-boards-all-v2", 10 * 60_000, async () => {
+  return cached("industry-boards-all-v4", 10 * 60_000, async () => {
     const boards = await fetchAllIndustryBoards();
     return boards.filter((item) => item.code.startsWith("BK"));
   });

@@ -71,7 +71,7 @@ export default function SectorTrendView() {
         const preferred = data.items.find((item) => item.name.includes("元件")) ?? data.items[0];
         if (preferred) router.replace(`/sector?code=${preferred.code}`);
       })
-      .catch((err) => setError(err instanceof Error ? err.message : "板块列表失败"));
+      .catch(() => undefined);
   }, [code, router]);
 
   useEffect(() => {
