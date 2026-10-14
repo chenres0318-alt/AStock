@@ -12,6 +12,7 @@ import {
 } from "lightweight-charts";
 import { displaySymbol } from "@/lib/codes";
 import { formatPct, formatPrice, toneClass } from "@/lib/format";
+import { loadSectorWatch, saveSectorWatch, type SectorWatchItem } from "@/lib/storage";
 import type { KBar, SectorItem } from "@/lib/types";
 import type { SectorTrendView as TrendBox } from "@/lib/sectorTrendData";
 import AppHeader from "./AppHeader";
@@ -56,6 +57,11 @@ export default function SectorTrendView() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [liveCodes, setLiveCodes] = useState<string[]>([]);
+  const [followed, setFollowed] = useState<SectorWatchItem[]>([]);
+
+  useEffect(() => {
+    setFollowed(loadSectorWatch());
+  }, []);
 
   useEffect(() => {
     readJson<{ items: SectorItem[] }>("/api/market/sectors?scope=all")
@@ -65,7 +71,7 @@ export default function SectorTrendView() {
         const preferred = data.items.find((item) => item.name.includes("元件")) ?? data.items[0];
         if (preferred) router.replace(`/sector?code=${preferred.code}`);
       })
-      .catch((err) => setError(err instanceof Error ? err.message : "板块列表失败"));
+      .catch(() => undefined);
   }, [code, router]);
 
   useEffect(() => {
@@ -115,7 +121,18 @@ export default function SectorTrendView() {
     return set;
   }, [liveCodes, report, code]);
 
+  function toggleWatch(item: SectorWatchItem) {
+    setFollowed((prev) => {
+      const next = prev.some((row) => row.code === item.code)
+        ? prev.filter((row) => row.code !== item.code)
+        : [item, ...prev];
+      saveSectorWatch(next);
+      return next;
+    });
+  }
+
   const selected = report?.trends.find((item) => item.start === picked) ?? report?.trends.at(-1) ?? null;
+  const watching = followed.some((item) => item.code === (report?.board.code ?? code));
   const upTotal =
     report?.board.upCount != null
       ? `${report.board.upCount}/${(report.board.upCount ?? 0) + (report.board.downCount ?? 0)}`
@@ -135,14 +152,48 @@ export default function SectorTrendView() {
           <BoardPicker
             boards={boards}
             code={code}
+            currentName={report?.board.code === code ? report.board.name : null}
             liveCodes={liveSet}
+            followed={followed}
             onPick={(next) => router.push(`/sector?code=${next}`)}
+            onToggle={toggleWatch}
           />
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-1.5">
+          <span className="mr-1 text-[11px] text-mute">常关注</span>
+          {followed.length === 0 ? (
+            <span className="text-[11px] text-mute">打开板块列表，点星标把常看的行业固定在这里</span>
+          ) : (
+            followed.map((item) => (
+              <button
+                key={item.code}
+                type="button"
+                className={`rounded-full px-2.5 py-1 text-xs ring-1 ${
+                  item.code === code ? "bg-white/10 ring-gold" : "bg-panel-2 ring-line"
+                } ${liveSet.has(item.code) ? "text-up" : "text-ink"}`}
+                onClick={() => {
+                  if (item.code !== code) router.push(`/sector?code=${item.code}`);
+                }}
+              >
+                {item.name}
+              </button>
+            ))
+          )}
         </div>
         {report ? (
           <div className="mt-3 flex flex-wrap items-baseline gap-x-6 gap-y-2">
             <div>
-              <div className={liveSet.has(report.board.code) ? "text-lg text-up" : "text-lg"}>{report.board.name}</div>
+              <div className="flex items-center gap-2">
+                <div className={liveSet.has(report.board.code) ? "text-lg text-up" : "text-lg"}>{report.board.name}</div>
+                <button
+                  type="button"
+                  className={`rounded-full px-2 py-0.5 text-xs ring-1 ring-line ${watching ? "text-gold" : "text-mute"}`}
+                  aria-pressed={watching}
+                  onClick={() => toggleWatch({ code: report.board.code, name: report.board.name })}
+                >
+                  {watching ? "★ 已关注" : "☆ 常关注"}
+                </button>
+              </div>
               <div className="text-[11px] text-mute">{report.board.code}</div>
             </div>
             <Stat label="5日涨幅" value={formatPct(report.pct5)} tone={report.pct5} />
@@ -205,25 +256,43 @@ export default function SectorTrendView() {
 function BoardPicker({
   boards,
   code,
+  currentName,
   liveCodes,
+  followed,
   onPick,
+  onToggle,
 }: {
   boards: SectorItem[];
   code: string;
+  currentName?: string | null;
   liveCodes: Set<string>;
+  followed: SectorWatchItem[];
   onPick: (code: string) => void;
+  onToggle: (item: SectorWatchItem) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const rootRef = useRef<HTMLDivElement>(null);
-  const ordered = useMemo(() => {
-    return [...boards].sort((a, b) => {
-      const rank = (item: SectorItem) => (liveCodes.has(item.code) ? 0 : 1);
-      const byLive = rank(a) - rank(b);
-      if (byLive !== 0) return byLive;
-      return a.name.localeCompare(b.name, "zh-CN");
-    });
-  }, [boards, liveCodes]);
-  const current = boards.find((item) => item.code === code);
+  const followedSet = useMemo(() => new Set(followed.map((item) => item.code)), [followed]);
+  const queryText = query.trim();
+  const matches = (item: SectorWatchItem) =>
+    !queryText || item.name.includes(queryText) || item.code.toLowerCase().includes(queryText.toLowerCase());
+  const followedRows = followed.filter(matches);
+  const rest = useMemo(() => {
+    return boards
+      .filter((item) => {
+        if (followedSet.has(item.code)) return false;
+        if (!queryText) return true;
+        return item.name.includes(queryText) || item.code.toLowerCase().includes(queryText.toLowerCase());
+      })
+      .sort((a, b) => {
+        const byLive = Number(liveCodes.has(b.code)) - Number(liveCodes.has(a.code));
+        if (byLive !== 0) return byLive;
+        return a.name.localeCompare(b.name, "zh-CN");
+      });
+  }, [boards, followedSet, liveCodes, queryText]);
+  const current = boards.find((item) => item.code === code) ?? followed.find((item) => item.code === code);
+  const buttonName = current?.name || currentName || "选择板块";
 
   useEffect(() => {
     if (!open) return;
@@ -243,6 +312,11 @@ function BoardPicker({
     };
   }, [open]);
 
+  function closeMenu() {
+    setOpen(false);
+    setQuery("");
+  }
+
   return (
     <div ref={rootRef} className="relative text-xs text-mute">
       <div className="mb-1">板块</div>
@@ -250,35 +324,96 @@ function BoardPicker({
         type="button"
         className="flex min-w-36 items-center justify-between gap-3 rounded bg-panel-2 px-2 py-1 text-left text-sm ring-1 ring-line"
         aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => {
+          if (open) closeMenu();
+          else setOpen(true);
+        }}
       >
-        <span className={liveCodes.has(code) ? "text-up" : "text-ink"}>{current?.name ?? "选择板块"}</span>
+        <span className={liveCodes.has(code) ? "text-up" : "text-ink"}>{buttonName}</span>
         <span aria-hidden="true">▾</span>
       </button>
       {open ? (
-        <div className="absolute right-0 z-30 mt-1 max-h-80 w-52 overflow-auto rounded bg-panel py-1 shadow-lg ring-1 ring-line scroll-thin">
-          {ordered.map((item) => {
-            const live = liveCodes.has(item.code);
-            const selected = item.code === code;
-            return (
-              <button
-                key={item.code}
-                type="button"
-                data-current={selected ? "true" : undefined}
-                className={`block w-full truncate px-3 py-1.5 text-left text-sm ${
-                  selected ? "bg-white/10" : "hover:bg-panel-2"
-                } ${live ? "text-up" : "text-ink"}`}
-                onClick={() => {
-                  setOpen(false);
-                  if (item.code !== code) onPick(item.code);
-                }}
-              >
-                {item.name}
-              </button>
-            );
-          })}
+        <div className="absolute right-0 z-30 mt-1 max-h-80 w-60 overflow-auto rounded bg-panel py-1 shadow-lg ring-1 ring-line scroll-thin">
+          <div className="sticky top-0 bg-panel px-2 py-1">
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="搜索板块"
+              className="w-full rounded bg-panel-2 px-2 py-1 text-sm text-ink ring-1 ring-line outline-none"
+            />
+          </div>
+          {followedRows.length ? <div className="px-3 pb-1 pt-2 text-[10px] text-mute">常关注</div> : null}
+          {followedRows.map((item) => (
+            <BoardRow
+              key={item.code}
+              item={item}
+              live={liveCodes.has(item.code)}
+              selected={item.code === code}
+              watched
+              onPick={() => {
+                closeMenu();
+                if (item.code !== code) onPick(item.code);
+              }}
+              onToggle={() => onToggle(item)}
+            />
+          ))}
+          <div className="px-3 pb-1 pt-2 text-[10px] text-mute">{queryText ? "搜索结果" : "全部板块"}</div>
+          {rest.length === 0 && followedRows.length === 0 ? (
+            <div className="px-3 py-2 text-sm text-mute">没有匹配的板块</div>
+          ) : null}
+          {rest.map((item) => (
+            <BoardRow
+              key={item.code}
+              item={item}
+              live={liveCodes.has(item.code)}
+              selected={item.code === code}
+              watched={false}
+              onPick={() => {
+                closeMenu();
+                if (item.code !== code) onPick(item.code);
+              }}
+              onToggle={() => onToggle({ code: item.code, name: item.name })}
+            />
+          ))}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function BoardRow({
+  item,
+  live,
+  selected,
+  watched,
+  onPick,
+  onToggle,
+}: {
+  item: SectorWatchItem;
+  live: boolean;
+  selected: boolean;
+  watched: boolean;
+  onPick: () => void;
+  onToggle: () => void;
+}) {
+  return (
+    <div className={`flex items-center ${selected ? "bg-white/10" : "hover:bg-panel-2"}`} data-current={selected ? "true" : undefined}>
+      <button
+        type="button"
+        className={`px-2 py-1.5 text-sm ${watched ? "text-gold" : "text-mute"}`}
+        aria-label={watched ? `移出常关注 ${item.name}` : `加入常关注 ${item.name}`}
+        aria-pressed={watched}
+        onClick={onToggle}
+      >
+        {watched ? "★" : "☆"}
+      </button>
+      <button
+        type="button"
+        className={`min-w-0 flex-1 truncate py-1.5 pr-3 text-left text-sm ${live ? "text-up" : "text-ink"}`}
+        onClick={onPick}
+      >
+        {item.name}
+      </button>
     </div>
   );
 }
