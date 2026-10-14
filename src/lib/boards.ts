@@ -1,29 +1,16 @@
 import { cached } from "./cache";
-import { fetchAllIndustryBoards, fetchBoardMembers, fetchIndustryBoards } from "./sources/eastmoney";
-import { fetchSinaBoardMembers, fetchSinaIndustries, type SinaNodeSort } from "./sources/sina";
+import { isTonghuashunIndustry } from "./codes";
+import { fetchBoardMembers } from "./sources/eastmoney";
+import { fetchSinaBoardMembers, type SinaNodeSort } from "./sources/sina";
+import { fetchTonghuashunIndustries, fetchTonghuashunMembers } from "./sources/tonghuashun";
 import type { BoardMember, SectorItem } from "./types";
 
 export async function listIndustryBoards(): Promise<SectorItem[]> {
-  return cached("industry-boards", 10 * 60_000, async () => {
-    const sina = await fetchSinaIndustries().catch(() => [] as SectorItem[]);
-    if (sina.length >= 10) return sina;
-    try {
-      const em = await fetchIndustryBoards();
-      const boards = em.filter((item) => item.code.startsWith("BK"));
-      if (boards.length >= 10) return boards;
-    } catch {
-      // East Money is optional
-    }
-    if (sina.length) return sina;
-    return [];
-  });
+  return listAllIndustryBoards();
 }
 
 export async function listAllIndustryBoards(): Promise<SectorItem[]> {
-  return cached("industry-boards-all", 10 * 60_000, async () => {
-    const boards = await fetchAllIndustryBoards();
-    return boards.filter((item) => item.code.startsWith("BK"));
-  });
+  return cached("ths-industry-boards", 3 * 60_000, () => fetchTonghuashunIndustries());
 }
 
 export async function listBoardMembers(
@@ -33,6 +20,13 @@ export async function listBoardMembers(
 ): Promise<BoardMember[]> {
   const key = `board-members:${boardCode}:${sort}:${limit}`;
   return cached(key, 30 * 60_000, async () => {
+    if (isTonghuashunIndustry(boardCode)) {
+      const rows = await fetchTonghuashunMembers(boardCode, limit);
+      if (sort === "turnover") {
+        return [...rows].sort((a, b) => (b.turnover ?? -1) - (a.turnover ?? -1));
+      }
+      return [...rows].sort((a, b) => (b.amount ?? -1) - (a.amount ?? -1));
+    }
     if (boardCode.startsWith("BK")) {
       try {
         const rows = await fetchBoardMembers(boardCode, limit);

@@ -86,7 +86,7 @@ export type SectorItem = {
   leaderCode: string | null;
   upCount: number | null;
   downCount: number | null;
-  source: "bk" | "etf" | "sina";
+  source: "bk" | "etf" | "sina" | "ths";
 };
 
 export type BoardMember = {
