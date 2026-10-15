@@ -1,3 +1,4 @@
+import { cached } from "../cache";
 import { isTonghuashunIndustry } from "../codes";
 import { toNumber } from "../format";
 import { fetchGbk, fetchUtf, UpstreamError } from "../http";
@@ -174,10 +175,66 @@ export async function fetchTonghuashunMembers(code: string, limit = 40): Promise
   return members.slice(0, limit);
 }
 
-export async function fetchTonghuashunSeries(code: string, count = 160): Promise<Series> {
-  if (!isTonghuashunIndustry(code)) {
-    throw new UpstreamError("请从同花顺行业里选择一个板块", 400);
+function parseJsonp<T>(text: string): T {
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start < 0 || end <= start) throw new UpstreamError("同花顺行业指数日线暂时取不到");
+  try {
+    return JSON.parse(text.slice(start, end + 1)) as T;
+  } catch {
+    throw new UpstreamError("同花顺行业指数日线暂时取不到");
   }
+}
+
+function positive(value: unknown): number | null {
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/** 日线文件只到上一个交易日。盘中的这一根在实时行情里。 */
+async function fetchTonghuashunToday(code: string): Promise<KBar | null> {
+  const referer = `https://q.10jqka.com.cn/thshy/detail/code/${code}/`;
+  try {
+    const text = await fetchUtf(`https://d.10jqka.com.cn/v6/realhead/48_${code}/last.js`, {
+      referer,
+      timeoutMs: 8_000,
+    });
+    const payload = parseJsonp<{ items?: Record<string, string> }>(text);
+    const items = payload.items;
+    if (!items) return null;
+    const stamp = items.time || items.updateTime || "";
+    const date = stamp.slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+    const open = positive(items["7"]);
+    const high = positive(items["8"]);
+    const low = positive(items["9"]);
+    const close = positive(items["10"]);
+    if (open == null || high == null || low == null || close == null) return null;
+    const volume = Number(items["13"]);
+    const turnover = Number(items["19"]);
+    return {
+      time: date,
+      open,
+      high: Math.max(high, open, close),
+      low: Math.min(low, open, close),
+      close,
+      volume: Number.isFinite(volume) ? volume : 0,
+      turnover: Number.isFinite(turnover) ? turnover : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function withToday(bars: KBar[], today: KBar | null): KBar[] {
+  if (!today) return bars;
+  const last = bars.at(-1);
+  if (!last || today.time > last.time) return [...bars, today];
+  if (today.time === last.time) return [...bars.slice(0, -1), today];
+  return bars;
+}
+
+async function fetchTonghuashunHistory(code: string, count: number): Promise<Series> {
   const referer = `https://q.10jqka.com.cn/thshy/detail/code/${code}/`;
   let text = "";
   try {
@@ -188,15 +245,7 @@ export async function fetchTonghuashunSeries(code: string, count = 160): Promise
   } catch {
     throw new UpstreamError("同花顺行业指数日线暂时取不到");
   }
-  const start = text.indexOf("{");
-  const end = text.lastIndexOf("}");
-  if (start < 0 || end <= start) throw new UpstreamError("同花顺行业指数日线暂时取不到");
-  let payload: { name?: string; data?: string };
-  try {
-    payload = JSON.parse(text.slice(start, end + 1)) as { name?: string; data?: string };
-  } catch {
-    throw new UpstreamError("同花顺行业指数日线暂时取不到");
-  }
+  const payload = parseJsonp<{ name?: string; data?: string }>(text);
   const bars: KBar[] = [];
   for (const row of String(payload.data ?? "").split(";")) {
     if (!row) continue;
@@ -223,4 +272,17 @@ export async function fetchTonghuashunSeries(code: string, count = 160): Promise
   const sliced = bars.slice(-Math.max(1, count));
   if (sliced.length < 2) throw new UpstreamError("同花顺行业指数日线暂时取不到");
   return { name: payload.name?.trim() || code, bars: sliced };
+}
+
+export async function fetchTonghuashunSeries(code: string, count = 160): Promise<Series> {
+  if (!isTonghuashunIndustry(code)) {
+    throw new UpstreamError("请从同花顺行业里选择一个板块", 400);
+  }
+  const history = await cached(`ths-kline-hist:${code}:${count}`, 10 * 60_000, () =>
+    fetchTonghuashunHistory(code, count),
+  );
+  const today = await cached(`ths-kline-today:${code}`, 20_000, () => fetchTonghuashunToday(code));
+  const room = Math.max(1, count);
+  const bars = withToday(history.bars, today).slice(-room);
+  return { name: history.name, bars };
 }
