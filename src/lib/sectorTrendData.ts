@@ -49,7 +49,7 @@ async function memberPaths(members: BoardMember[]): Promise<SectorMemberPath[]> 
 }
 
 async function industrySeries(code: string): Promise<{ name: string; bars: KBar[] }> {
-  return cached(`ths-kline:${code}:160`, 10 * 60_000, () => fetchTonghuashunSeries(code, 160));
+  return fetchTonghuashunSeries(code, 160);
 }
 
 export async function getSectorTrend(code: string): Promise<SectorTrendReport> {
@@ -68,7 +68,7 @@ export async function getSectorTrend(code: string): Promise<SectorTrendReport> {
   const board: SectorItem = {
     code: boardCode,
     name: found?.name || series.name || boardCode,
-    pct: found?.pct ?? dayPct,
+    pct: dayPct ?? found?.pct ?? null,
     price: last?.close ?? null,
     leader: found?.leader ?? null,
     leaderCode: found?.leaderCode ?? null,
