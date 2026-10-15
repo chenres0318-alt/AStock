@@ -171,26 +171,30 @@ function qualifies(
 }
 
 /**
- * 从每个局部低点走到启动日。涨幅、成分股、龙头第一次一起满足，当天就留下框。
+ * 从每个局部低点走到启动日。价格条件第一次满足，当天就留下框。
  * 还守着起点、涨幅也没回吐光：红框一直画到最新一根。
  * 之后跌破起点或回吐八成：不把这段擦掉，收成灰框，终点留在仍然符合条件的高点。
  * 还没满足条件就失败的脉冲，不画框。
  */
-function walkSegments(bars: KBar[], members: SectorMemberPath[]): RawSegment[] {
+function walkSegments(
+  bars: KBar[],
+  launchedAt: (index: number) => boolean,
+  qualifiesAt: (start: number, end: number) => boolean,
+): RawSegment[] {
   const found: RawSegment[] = [];
   let cursor = 0;
   for (let start = LEFT_WING; start < bars.length; start += 1) {
     if (start < cursor || !isPivotLow(bars, start)) continue;
     const floor = bars[start].low;
-    const launched = sameDayLaunch(bars, members, start);
+    const launched = launchedAt(start);
     let peak = start;
     let bornPeak = launched ? start : -1;
     let outcome: "open" | "closed" | "fail" | "pending" = "pending";
     let endAt = start;
     for (let j = start + 1; j < bars.length; j += 1) {
       if (bars[j].close >= bars[peak].close) peak = j;
-      if (qualifies(bars, members, start, j)) bornPeak = peak;
-      const giveback = givebackRatio(bars, start, peak, j, launched != null);
+      if (qualifiesAt(start, j)) bornPeak = peak;
+      const giveback = givebackRatio(bars, start, peak, j, launched);
       const failed = bars[j].close < floor || giveback >= FAIL_GIVEBACK;
       if (failed) {
         if (bornPeak >= 0) {
@@ -208,7 +212,7 @@ function walkSegments(bars: KBar[], members: SectorMemberPath[]): RawSegment[] {
     }
     if (outcome === "pending") {
       if (bornPeak < 0) continue;
-      const giveback = givebackRatio(bars, start, peak, endAt, launched != null);
+      const giveback = givebackRatio(bars, start, peak, endAt, launched);
       if (endAt === bars.length - 1 && giveback < COMPLETE_GIVEBACK) {
         outcome = "open";
         endAt = bars.length - 1;
@@ -218,13 +222,111 @@ function walkSegments(bars: KBar[], members: SectorMemberPath[]): RawSegment[] {
       }
     }
     if (outcome !== "open" && outcome !== "closed") continue;
-    const stillQualified = endAt === start ? launched != null : qualifies(bars, members, start, endAt) != null;
+    const stillQualified = endAt === start ? launched : qualifiesAt(start, endAt);
     const metricEnd = outcome === "open" && stillQualified ? endAt : bornPeak;
     if (metricEnd < start) continue;
     found.push({ start, end: endAt, metricEnd, status: outcome });
     cursor = endAt + 1;
   }
   return found;
+}
+
+/** 个股只看价格：低点拉起、这段涨够并且走得顺。不要求成分股。 */
+function priceQualifies(bars: KBar[], start: number, end: number): boolean {
+  if (end === start) return priceReversal(bars, start);
+  const count = end - start + 1;
+  if (count < MIN_BARS || !(bars[start].close > 0)) return false;
+  let path = 0;
+  let maxHigh = bars[start].high;
+  let minLow = bars[start].low;
+  for (let i = start + 1; i <= end; i += 1) {
+    path += Math.abs(bars[i].close - bars[i - 1].close);
+    if (bars[i].high > maxHigh) maxHigh = bars[i].high;
+    if (bars[i].low < minLow) minLow = bars[i].low;
+  }
+  const gain = bars[end].close / bars[start].close - 1;
+  const efficiency = path > 0 ? (bars[end].close - bars[start].close) / path : 0;
+  const amplitude = (maxHigh - minLow) / bars[start].close;
+  return gain >= MIN_GAIN && efficiency >= MIN_EFFICIENCY && amplitude >= MIN_GAIN;
+}
+
+export type PriceTrendSegment = {
+  start: string;
+  end: string;
+  gain: number;
+  status: "open" | "closed";
+};
+
+/** 个股日线上的趋势框。只用板块趋势的前两个价格条件。 */
+export function capturePriceTrends(bars: KBar[]): PriceTrendSegment[] {
+  if (bars.length < LEFT_WING + 1) return [];
+  const segments: PriceTrendSegment[] = [];
+  for (const raw of walkSegments(
+    bars,
+    (index) => priceReversal(bars, index),
+    (start, end) => priceQualifies(bars, start, end),
+  )) {
+    if (!(bars[raw.end].close > 0) || !(bars[raw.start].close > 0)) continue;
+    const gain =
+      raw.end === raw.start
+        ? bars[raw.start].close / bars[raw.start - 1].close - 1
+        : bars[raw.end].close / bars[raw.start].close - 1;
+    if (!Number.isFinite(gain)) continue;
+    segments.push({
+      start: bars[raw.start].time,
+      end: bars[raw.end].time,
+      gain,
+      status: raw.status,
+    });
+  }
+  return segments;
+}
+
+/** 个股区间涨幅至少要比行业指数多出的幅度，才算这段里的龙头。 */
+const RESONANCE_GAP = 0.02;
+
+export type ResonantStock = {
+  code: string;
+  name: string;
+  /** 板块这段区间里的涨幅。 */
+  gain: number;
+};
+
+function gainOnSectorWindow(sectorBars: KBar[], stockBars: KBar[], startTime: string, endTime: string): number | null {
+  const start = sectorBars.findIndex((bar) => bar.time === startTime);
+  const end = sectorBars.findIndex((bar) => bar.time === endTime);
+  if (start < 0 || end < start) return null;
+  const fromIndex = start === end && start > 0 ? start - 1 : start;
+  const times = sectorBars.map((bar) => bar.time);
+  const closes = new Map<string, number>();
+  for (const bar of stockBars) closes.set(bar.time, bar.close);
+  const from = closeOn(closes, times, fromIndex);
+  const to = closeOn(closes, times, end);
+  if (from == null || to == null) return null;
+  return to / from - 1;
+}
+
+/**
+ * 板块这段趋势里，日线自己也走出价格趋势、并且区间涨幅比行业指数多出 2% 的个股。
+ * 个股趋势的起点要落在板块这段区间内。
+ */
+export function listResonantStocks(
+  sectorBars: KBar[],
+  segment: { start: string; end: string; gain: number },
+  stocks: Array<{ code: string; name: string; bars: KBar[] }>,
+): ResonantStock[] {
+  const hits: ResonantStock[] = [];
+  for (const stock of stocks) {
+    const own = capturePriceTrends(stock.bars).some(
+      (trend) => trend.start >= segment.start && trend.start <= segment.end,
+    );
+    if (!own) continue;
+    const gain = gainOnSectorWindow(sectorBars, stock.bars, segment.start, segment.end);
+    if (gain == null || gain < segment.gain + RESONANCE_GAP) continue;
+    hits.push({ code: stock.code, name: stock.name, gain });
+  }
+  hits.sort((a, b) => b.gain - a.gain);
+  return hits;
 }
 
 /**
@@ -288,7 +390,11 @@ export function trendCoversLastBar(segments: SectorTrendSegment[], lastTime: str
 export function captureSectorTrends(bars: KBar[], members: SectorMemberPath[]): SectorTrendSegment[] {
   if (bars.length < LEFT_WING + 1 || members.length < MIN_MEMBERS) return [];
   const segments: SectorTrendSegment[] = [];
-  for (const raw of walkSegments(bars, members)) {
+  for (const raw of walkSegments(
+    bars,
+    (index) => sameDayLaunch(bars, members, index) != null,
+    (start, end) => qualifies(bars, members, start, end) != null,
+  )) {
     const passed =
       raw.metricEnd === raw.start
         ? sameDayLaunch(bars, members, raw.start)

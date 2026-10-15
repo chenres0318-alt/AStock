@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ColorType,
@@ -10,7 +11,7 @@ import {
   type ISeriesApi,
   type Time,
 } from "lightweight-charts";
-import { displaySymbol, isTonghuashunIndustry } from "@/lib/codes";
+import { displaySymbol, isTonghuashunIndustry, toTencentCode } from "@/lib/codes";
 import { formatPct, formatPrice, toneClass } from "@/lib/format";
 import type { KBar, SectorItem } from "@/lib/types";
 import type { SectorTrendView as TrendBox } from "@/lib/sectorTrendData";
@@ -193,6 +194,25 @@ export default function SectorTrendView() {
               区间内上涨 {selected.upCount}/{selected.memberCount}，占比 {(selected.upRatio * 100).toFixed(0)}%。
             </div>
           ) : null}
+          <div className="mt-4 border-t border-line pt-3">
+            <div className="text-sm">共振个股</div>
+            {selected?.resonant.length ? (
+              <ol className="mt-2 max-h-72 space-y-2 overflow-auto scroll-thin">
+                {selected.resonant.map((item, index) => (
+                  <li key={item.code} className="flex items-center justify-between gap-2 text-sm">
+                    <Link href={`/?code=${toTencentCode(item.code)}`} className="min-w-0 hover:text-gold">
+                      <span className="mr-2 text-mute">{index + 1}</span>
+                      {item.name}
+                      <span className="ml-2 text-[11px] text-mute">{displaySymbol(item.code)}</span>
+                    </Link>
+                    <span className={`num shrink-0 ${toneClass(item.gain)}`}>{gainText(item.gain)}</span>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <EmptyHint text="这段没有和板块共振的个股" />
+            )}
+          </div>
         </section>
         <section className="panel overflow-hidden">
           <div className="border-b border-line px-3 py-2 text-sm">成分股</div>

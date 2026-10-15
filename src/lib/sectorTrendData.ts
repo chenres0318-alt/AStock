@@ -6,6 +6,7 @@ import { mapPool } from "./pool";
 import {
   captureSectorTrends,
   indexCouldBeOpen,
+  listResonantStocks,
   memberGainsInWindow,
   trendCoversLastBar,
   type SectorMemberPath,
@@ -19,8 +20,15 @@ export type SectorTrendMember = BoardMember & {
   gain: number | null;
 };
 
+export type ResonantStockView = {
+  code: string;
+  name: string;
+  gain: number;
+};
+
 export type SectorTrendView = SectorTrendSegment & {
   roster: SectorTrendMember[];
+  resonant: ResonantStockView[];
 };
 
 export type SectorTrendReport = {
@@ -31,21 +39,27 @@ export type SectorTrendReport = {
   memberCount: number;
 };
 
-async function memberPaths(members: BoardMember[]): Promise<SectorMemberPath[]> {
+async function memberSeries(members: BoardMember[]): Promise<Array<{ code: string; name: string; bars: KBar[] }>> {
   const rows = await mapPool(members, 5, async (member) => {
     try {
-      const bars = await cached(`trend-member:${member.code}:140`, 10 * 60_000, () =>
-        fetchTencentKline(member.code, "day", 140),
+      const bars = await cached(`trend-member:${member.code}:160`, 10 * 60_000, () =>
+        fetchTencentKline(member.code, "day", 160),
       );
-      const closes = new Map<string, number>();
-      for (const bar of bars) closes.set(bar.time, bar.close);
-      if (!closes.size) return null;
-      return { code: member.code, name: member.name, closes } satisfies SectorMemberPath;
+      if (!bars.length) return null;
+      return { code: member.code, name: member.name, bars };
     } catch {
       return null;
     }
   });
-  return rows.filter((item): item is SectorMemberPath => item != null);
+  return rows.filter((item): item is { code: string; name: string; bars: KBar[] } => item != null);
+}
+
+function toMemberPaths(series: Array<{ code: string; name: string; bars: KBar[] }>): SectorMemberPath[] {
+  return series.map((stock) => {
+    const closes = new Map<string, number>();
+    for (const bar of stock.bars) closes.set(bar.time, bar.close);
+    return { code: stock.code, name: stock.name, closes };
+  });
 }
 
 async function industrySeries(code: string): Promise<{ name: string; bars: KBar[] }> {
@@ -76,7 +90,8 @@ export async function getSectorTrend(code: string): Promise<SectorTrendReport> {
     downCount: found?.downCount ?? null,
     source: "ths",
   };
-  const paths = await memberPaths(members);
+  const stocks = await memberSeries(members);
+  const paths = toMemberPaths(stocks);
   const trends = captureSectorTrends(bars, paths).map((segment) => {
     const gains = new Map(
       memberGainsInWindow(bars, paths, segment.start, segment.end).map((item) => [item.code, item.gain]),
@@ -84,7 +99,8 @@ export async function getSectorTrend(code: string): Promise<SectorTrendReport> {
     const roster = members
       .map((item) => ({ ...item, gain: gains.get(item.code) ?? null }))
       .sort((a, b) => (b.gain ?? -999) - (a.gain ?? -999));
-    return { ...segment, roster };
+    const resonant = listResonantStocks(bars, segment, stocks);
+    return { ...segment, roster, resonant };
   });
   const base = bars.length >= 6 ? bars[bars.length - 6] : null;
   const pct5 = last && base && base.close > 0 ? (last.close / base.close - 1) * 100 : null;
@@ -113,7 +129,7 @@ export async function listBoardsInTrend(): Promise<string[]> {
     const confirmed = await mapPool(candidates, 3, async (item) => {
       try {
         const members = await listBoardMembers(item.code, 40, "amount");
-        const paths = await memberPaths(members);
+        const paths = toMemberPaths(await memberSeries(members));
         const trends = captureSectorTrends(item.bars, paths);
         return trendCoversLastBar(trends, item.bars.at(-1)?.time) ? item.code : null;
       } catch {
