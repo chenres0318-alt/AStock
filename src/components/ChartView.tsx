@@ -164,6 +164,8 @@ export default function ChartView({
   const dragRef = useRef<BarSpan | null>(null);
   const pickedRef = useRef<BarSpan | null>(null);
   const placeRef = useRef<() => void>(() => {});
+  const trendMarksRef = useRef<Array<{ timestamp: number; price: number; side: "top" | "bottom" }>>([]);
+  const [trendTags, setTrendTags] = useState<Array<{ timestamp: number; price: number; side: "top" | "bottom"; x: number; y: number }>>([]);
   const [macdTip, setMacdTip] = useState<MacdfsBar | null>(null);
   const [rangeMode, setRangeMode] = useState(false);
   const [picked, setPicked] = useState<BarSpan | null>(null);
@@ -184,11 +186,37 @@ export default function ChartView({
   placeRef.current = () => {
     const chart = chartRef.current;
     const span = dragRef.current ?? pickedRef.current;
-    if (!chart || !span || modeRef.current === "trend") {
-      setHighlight(null);
+    if (!chart || !span || modeRef.current === "trend") setHighlight(null);
+    else setHighlight(selectionBox(chart, span.from, span.to));
+
+    const line = lineRef.current;
+    const box = boxRef.current;
+    if (!chart || !line || !box || modeRef.current !== "trend") {
+      setTrendTags((current) => (current.length === 0 ? current : []));
       return;
     }
-    setHighlight(selectionBox(chart, span.from, span.to));
+    const width = box.clientWidth;
+    const next = trendMarksRef.current.flatMap((mark) => {
+      const x = chart.timeScale().timeToCoordinate(mark.timestamp as UTCTimestamp);
+      const y = line.priceToCoordinate(mark.price);
+      if (x == null || y == null) return [];
+      const half = 156;
+      const left = Math.min(Math.max(x, half), Math.max(half, width - half));
+      const top = mark.side === "top" ? Math.max(2, y - 22) : y + 16;
+      return [{ ...mark, x: Math.round(left), y: Math.round(top) }];
+    });
+    setTrendTags((current) => {
+      if (
+        current.length === next.length &&
+        current.every(
+          (item, index) =>
+            item.x === next[index].x && item.y === next[index].y && item.timestamp === next[index].timestamp && item.side === next[index].side,
+        )
+      ) {
+        return current;
+      }
+      return next;
+    });
   };
 
   useEffect(() => {
@@ -460,28 +488,32 @@ export default function ChartView({
           title: "昨收",
         });
       }
+      const marks = intradayExtremes(points).map((mark) => ({
+        timestamp: points[mark.index].timestamp,
+        price: mark.price,
+        side: mark.side,
+      }));
+      trendMarksRef.current = marks;
       line.setMarkers(
-        intradayExtremes(points).map((mark) => {
-          const point = points[mark.index];
-          return mark.side === "top"
+        marks.map((mark) =>
+          mark.side === "top"
             ? {
-                time: point.timestamp as UTCTimestamp,
+                time: mark.timestamp as UTCTimestamp,
                 position: "aboveBar" as const,
                 color: UP,
                 shape: "arrowDown" as const,
-                text: "顶",
-                size: 1,
+                size: 2,
               }
             : {
-                time: point.timestamp as UTCTimestamp,
+                time: mark.timestamp as UTCTimestamp,
                 position: "belowBar" as const,
                 color: DOWN,
                 shape: "arrowUp" as const,
-                text: "底",
-                size: 1,
-              };
-        }),
+                size: 2,
+              },
+        ),
       );
+      requestAnimationFrame(() => placeRef.current());
       const trendKey = `trend:${trend.points.length}:${trend.points.at(-1)?.timestamp ?? ""}`;
       const resetTrend = rangeKeyRef.current !== trendKey;
       rangeKeyRef.current = trendKey;
@@ -494,8 +526,10 @@ export default function ChartView({
     vol.applyOptions({ priceFormat: { type: "volume" } });
     dif.setData([]);
     dea.setData([]);
+    trendMarksRef.current = [];
     line.setData(maLine(bars, 20));
     line.setMarkers([]);
+    requestAnimationFrame(() => placeRef.current());
     avg.setData([]);
     ma4.setData(maLine(bars, 4));
     ma7.setData(maLine(bars, 7));
@@ -646,6 +680,22 @@ export default function ChartView({
       </div>
       <div className="relative min-h-0 flex-1">
         <div ref={boxRef} className="absolute inset-0" />
+        {mode === "trend"
+          ? trendTags.map((tag) => (
+              <div
+                key={`${tag.side}-${tag.timestamp}`}
+                className="pointer-events-none absolute z-10 whitespace-nowrap rounded bg-[#10151e]/92 px-2 py-1 text-[18px] font-semibold leading-none"
+                style={{
+                  left: tag.x,
+                  top: tag.y,
+                  color: tag.side === "top" ? UP : DOWN,
+                  transform: tag.side === "top" ? "translate(-50%, -100%)" : "translate(-50%, 0)",
+                }}
+              >
+                {tag.side === "top" ? `顶部(股价:${formatPrice(tag.price)})，卖` : `底部(股价:${formatPrice(tag.price)})，买`}
+              </div>
+            ))
+          : null}
         {mode === "trend" && macdTip ? (
           <div className="pointer-events-none absolute bottom-[22%] left-2 z-10 flex flex-wrap gap-x-2 text-[11px] leading-4">
             <span className="text-mute">MACDFS(12,26,9)</span>
