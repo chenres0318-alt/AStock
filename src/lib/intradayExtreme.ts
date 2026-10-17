@@ -8,7 +8,8 @@
  *     绿柱动能连续三分钟减弱，这一分钟还没上叉。
  * 同一段连续满足时只标第一分钟。之后顶和底交替。
  * 还没配上对面时，更高的顶要红柱不低于前一个顶的八成才换掉；更低的底直接换掉前一个底。
- * 配成一对时，一手差价要盖过 5 元佣金，再加这一手卖出价的 0.05% 印花税。
+ * 配成一对时，股票一手差价要盖过 5 元最低佣金，再加卖出一手的 0.05% 印花税。
+ * ETF 免 5 元最低佣金，只看印花税。
  */
 
 const LOT = 100;
@@ -72,12 +73,12 @@ export function macdfsSeries(prices: number[]): Array<MacdfsBar | null> {
   return out;
 }
 
-/** 一手买卖的差价，要多于 5 元佣金加卖出一手的印花税。 */
-export function lotSpreadCoversCost(low: number, high: number): boolean {
+/** 一手买卖的差价，要多于最低佣金加卖出一手的印花税。ETF 把最低佣金传 0。 */
+export function lotSpreadCoversCost(low: number, high: number, minCommission = COMMISSION): boolean {
   if (!(high > low)) return false;
   const spread = (high - low) * LOT;
   const stamp = high * LOT * STAMP_RATE;
-  return spread > COMMISSION + stamp;
+  return spread > minCommission + stamp;
 }
 
 function strictlyDown(values: number[], index: number): boolean {
@@ -145,8 +146,9 @@ function dropMark(marks: Candidate[], target: Candidate) {
   if (index >= 0) marks.splice(index, 1);
 }
 
-export function intradayExtremes(points: IntradayMinute[]): IntradayMark[] {
+export function intradayExtremes(points: IntradayMinute[], options?: { minCommission?: number }): IntradayMark[] {
   if (points.length < SLOPE_BARS + 1) return [];
+  const minCommission = options?.minCommission ?? COMMISSION;
   const marks: Candidate[] = [];
   let seek: "either" | "bottom" | "top" = "either";
   let openBottom: Candidate | null = null;
@@ -171,7 +173,7 @@ export function intradayExtremes(points: IntradayMinute[]): IntradayMark[] {
         seek = "bottom";
         continue;
       }
-      if (seek !== "top" || !openBottom || !lotSpreadCoversCost(openBottom.price, candidate.price)) continue;
+      if (seek !== "top" || !openBottom || !lotSpreadCoversCost(openBottom.price, candidate.price, minCommission)) continue;
       openTop = candidate;
       marks.push(candidate);
       seek = "bottom";
@@ -191,7 +193,7 @@ export function intradayExtremes(points: IntradayMinute[]): IntradayMark[] {
       seek = "top";
       continue;
     }
-    if (seek !== "bottom" || !openTop || !lotSpreadCoversCost(candidate.price, openTop.price)) continue;
+    if (seek !== "bottom" || !openTop || !lotSpreadCoversCost(candidate.price, openTop.price, minCommission)) continue;
     openBottom = candidate;
     marks.push(candidate);
     seek = "top";

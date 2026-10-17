@@ -13,6 +13,7 @@ import {
   type Time,
   type UTCTimestamp,
 } from "lightweight-charts";
+import { isEtf } from "@/lib/codes";
 import { formatPrice } from "@/lib/format";
 import { intradayExtremes, macdfsSeries, type MacdfsBar } from "@/lib/intradayExtreme";
 import { buildMaLines, klineRangeChange, maAt } from "@/lib/indicators";
@@ -170,6 +171,7 @@ export default function ChartView({
   const [rangeMode, setRangeMode] = useState(false);
   const [picked, setPicked] = useState<BarSpan | null>(null);
   const [highlight, setHighlight] = useState<{ left: number; width: number } | null>(null);
+  const etf = quote ? isEtf(quote.code, quote.name) : false;
   const seriesKey = `${mode}:${bars[0]?.time ?? ""}:${bars.at(-1)?.time ?? ""}`;
   const [trackedKey, setTrackedKey] = useState(seriesKey);
   if (trackedKey !== seriesKey) {
@@ -488,7 +490,7 @@ export default function ChartView({
           title: "昨收",
         });
       }
-      const marks = intradayExtremes(points).map((mark) => ({
+      const marks = intradayExtremes(points, etf ? { minCommission: 0 } : undefined).map((mark) => ({
         timestamp: points[mark.index].timestamp,
         price: mark.price,
         side: mark.side,
@@ -576,7 +578,7 @@ export default function ChartView({
     rangeKeyRef.current = rangeKey;
     applyTimeScale(chart, mode, bars.length, resetRange);
     requestAnimationFrame(() => placeRef.current());
-  }, [bars, trend, mode]);
+  }, [bars, trend, mode, etf]);
 
   const stats = useMemo(() => {
     if (!picked || mode === "trend") return null;
