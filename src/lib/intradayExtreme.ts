@@ -2,9 +2,8 @@
  * 用分时 MACDFS(12,26,9) 标出一轮红柱或绿柱的转折。不是同花顺的公式。
  * 柱 = 2 * (DIF - DEA)。
  *
- * 顶：同一段红柱先堆高，再从最高的红柱缩短。DIF 在 0 轴上方且 DIF > DEA，
- *     DEA 可以还在 0 轴下方。这一分钟是附近高点，下一分钟不再更高，
- *     成交量也小于前 8 分钟里的最大量。
+ * 顶：同一段红柱先堆高，再从最高的红柱缩短。DIF > DEA，0 轴上下都算。
+ *     这一分钟是附近高点，下一分钟不再更高，成交量也小于前 8 分钟里的最大量。
  * 底：同一段绿柱先拉长，再从最长的绿柱缩短。DIF、DEA 都在 0 轴下方且 DEA > DIF。
  *     这一分钟是附近低点，下一分钟不再更低，成交量也小于前 8 分钟里的最大量。
  * 同色柱没堆满 3 分钟，或柱高不到股价的万分之五，不算。
@@ -20,8 +19,8 @@ const MIN_COLUMN = 1e-4;
 /** 同色柱至少先走出这么多分钟，极值才算这一波的顶或底。 */
 const BUILD_BARS = 3;
 const VOLUME_LOOKBACK = 8;
-/** 柱高和这一波极值相差在这个比例内，取其中更极端的价格。 */
-const PEAK_BAND = 0.02;
+/** 柱高达到这一波极值的九成四以上时，取其中更极端的价格。 */
+const PEAK_BAND = 0.06;
 /** 柱高至少要到股价的这个比例，太短的柱子没有做 T 的空间。 */
 const HIST_FLOOR_RATIO = 0.0005;
 /** 更高的价格要配上差不多高的红柱，才换掉已经标出的顶。 */
@@ -143,7 +142,7 @@ function waveCandidates(points: IntradayMinute[]): Candidate[] {
     const column = macd[ext];
     if (!column) continue;
     if (red) {
-      if (!(column.dif > 0 && column.dif > column.dea)) continue;
+      if (!(column.dif > column.dea)) continue;
     } else if (!(column.dif < 0 && column.dea < 0 && column.dea > column.dif)) continue;
 
     const volume = points[mark].volume;
