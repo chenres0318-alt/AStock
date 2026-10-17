@@ -638,7 +638,7 @@ export default function ChartView({
           {loading
             ? "加载中…"
             : mode === "trend"
-              ? "黄线现价 · 蓝线均价 · 下图 MACDFS(12,26,9) · DIF连缩、DEA连放三分钟为顶，DEA连缩且DIF拐头为底"
+              ? "黄线现价 · 蓝线均价 · 下图 MACDFS(12,26,9) · DEA连放、红柱连弱三分钟且DIF拐头为顶，DEA连缩且DIF拐头为底"
               : mode === "day"
                 ? `红MA4 · 青MA7 · 黄MA20 · 绿柱缩短或转红买 · 4下穿7且4日仍在20上方不卖 · 买 ${ribbonCounts.buy} 卖 ${ribbonCounts.sell}`
                 : `红MA4 · 青MA7 · 黄MA20 · 4上穿7且站上20买 · 4下穿7或跌破20卖 · 买 ${ribbonCounts.buy} 卖 ${ribbonCounts.sell}`}

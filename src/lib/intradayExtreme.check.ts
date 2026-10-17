@@ -39,13 +39,14 @@ const slowTop = session(
   20,
 );
 const topMarks = intradayExtremes(slowTop);
-assert(topMarks.length === 1 && topMarks[0].side === "top" && topMarks[0].time === "10:27", "three minutes of DIF falling and DEA rising mark a top");
-assert(Math.abs(topMarks[0].price - 22.16) < 1e-9, "the top is the minute the three-minute rollover completes");
+assert(topMarks.length === 1 && topMarks[0].side === "top" && topMarks[0].time === "10:25", "DEA rising and the red column fading mark a top when DIF turns down");
+assert(Math.abs(topMarks[0].price - 22.24) < 1e-9, "the top is the minute DIF turns down, before it has fallen for three minutes");
 const topMacd = macdfsSeries(slowTop.map((point) => point.price));
 const topDif = topMacd.map((bar) => bar?.dif ?? Number.NaN);
 const topDea = topMacd.map((bar) => bar?.dea ?? Number.NaN);
 const topHist = topMacd.map((bar) => bar?.hist ?? Number.NaN);
-assert(down3(topDif, topMarks[0].index) && up3(topDea, topMarks[0].index) && down3(topHist, topMarks[0].index), "the top has DIF and the red column shrinking while DEA expands");
+assert(!down3(topDif, topMarks[0].index) && topDif[topMarks[0].index] < topDif[topMarks[0].index - 1], "DIF has only just turned down");
+assert(up3(topDea, topMarks[0].index) && down3(topHist, topMarks[0].index), "DEA has expanded for three minutes and the red column has weakened for three minutes");
 assert(topDif[topMarks[0].index] > topDea[topMarks[0].index], "the top is still before DIF crosses below DEA");
 assert(topDif[topMarks[0].index] > 0 && topDea[topMarks[0].index] > 0, "this top is above the zero axis");
 
@@ -87,19 +88,18 @@ assert(
   replaced.length === 2 && replaced[0].side === "top" && replaced[1].side === "bottom",
   "a later lower bottom replaces the earlier bottom",
 );
-assert(Math.abs(replaced[0].price - 22.2) < 1e-9 && Math.abs(replaced[1].price - 20.12) < 1e-9, "the kept bottom is the lower one");
+assert(Math.abs(replaced[0].price - 22.4) < 1e-9 && Math.abs(replaced[1].price - 20.12) < 1e-9, "the kept bottom is the lower one");
 
-const quickDrop = intradayExtremes(
+const steadyRise = intradayExtremes(
   session(
     [
       { n: 40, step: 0 },
-      { n: 6, step: 0.05 },
-      { n: 8, step: -0.08 },
+      { n: 20, step: 0.1 },
     ],
     20,
   ),
 );
-assert(quickDrop.length === 0, "a fast drop does not mark a top unless DEA keeps expanding for three minutes");
+assert(steadyRise.length === 0, "a rise where DIF has not turned down has no top");
 
 console.log(
   "intradayExtreme.check ok",
