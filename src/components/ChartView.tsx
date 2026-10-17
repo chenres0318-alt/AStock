@@ -375,23 +375,23 @@ export default function ChartView({
         });
       }
       line.setMarkers(
-        intradayExtremes(points, trend.preClose).map((mark) => {
+        intradayExtremes(points).map((mark) => {
           const point = points[mark.index];
-          return mark.side === "bottom"
+          return mark.side === "top"
             ? {
                 time: point.timestamp as UTCTimestamp,
-                position: "belowBar" as const,
+                position: "aboveBar" as const,
                 color: UP,
-                shape: "arrowUp" as const,
-                text: "底",
+                shape: "arrowDown" as const,
+                text: "顶",
                 size: 1,
               }
             : {
                 time: point.timestamp as UTCTimestamp,
-                position: "aboveBar" as const,
+                position: "belowBar" as const,
                 color: DOWN,
-                shape: "arrowDown" as const,
-                text: "顶",
+                shape: "arrowUp" as const,
+                text: "底",
                 size: 1,
               };
         }),
@@ -547,7 +547,7 @@ export default function ChartView({
           {loading
             ? "加载中…"
             : mode === "trend"
-              ? "黄线现价 · 蓝线均价 · 红底绿顶为模拟信号"
+              ? "黄线现价 · 蓝线均价 · 红顶绿底为模拟信号"
               : mode === "day"
                 ? `红MA4 · 青MA7 · 黄MA20 · 绿柱缩短或转红买 · 4下穿7且4日仍在20上方不卖 · 买 ${ribbonCounts.buy} 卖 ${ribbonCounts.sell}`
                 : `红MA4 · 青MA7 · 黄MA20 · 4上穿7且站上20买 · 4下穿7或跌破20卖 · 买 ${ribbonCounts.buy} 卖 ${ribbonCounts.sell}`}
