@@ -27,7 +27,7 @@ export type IntradayMark = {
   price: number;
 };
 
-type MacdBar = { dif: number; dea: number; hist: number };
+export type MacdfsBar = { dif: number; dea: number; hist: number };
 
 function emaSeries(values: number[], period: number): Array<number | null> {
   const out: Array<number | null> = Array(values.length).fill(null);
@@ -44,7 +44,7 @@ function emaSeries(values: number[], period: number): Array<number | null> {
   return out;
 }
 
-function macdfs(prices: number[]): Array<MacdBar | null> {
+export function macdfsSeries(prices: number[]): Array<MacdfsBar | null> {
   const ema12 = emaSeries(prices, 12);
   const ema26 = emaSeries(prices, 26);
   const difVals: number[] = [];
@@ -55,7 +55,7 @@ function macdfs(prices: number[]): Array<MacdBar | null> {
     map.push(i);
   }
   const deaVals = emaSeries(difVals, 9);
-  const out: Array<MacdBar | null> = Array(prices.length).fill(null);
+  const out: Array<MacdfsBar | null> = Array(prices.length).fill(null);
   for (let j = 0; j < difVals.length; j += 1) {
     if (deaVals[j] == null) continue;
     const dif = difVals[j];
@@ -104,7 +104,7 @@ function redWaveEnough(hist: number[], from: number, greenDepth: number): boolea
 
 export function intradayExtremes(points: IntradayMinute[]): IntradayMark[] {
   if (points.length < 40) return [];
-  const macd = macdfs(points.map((point) => point.price));
+  const macd = macdfsSeries(points.map((point) => point.price));
   const hist = macd.map((bar) => bar?.hist ?? 0);
   const marks: IntradayMark[] = [];
   let lastTop = -MIN_GAP;

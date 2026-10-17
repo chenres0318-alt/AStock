@@ -14,7 +14,7 @@ import {
   type UTCTimestamp,
 } from "lightweight-charts";
 import { formatPrice } from "@/lib/format";
-import { intradayExtremes } from "@/lib/intradayExtreme";
+import { intradayExtremes, macdfsSeries, type MacdfsBar } from "@/lib/intradayExtreme";
 import { buildMaLines, klineRangeChange, maAt } from "@/lib/indicators";
 import type { KBar, Quote, TrendPoint } from "@/lib/types";
 
@@ -24,6 +24,7 @@ const UP = "#ff5c5c";
 const DOWN = "#1ecb93";
 const MA7_COLOR = "#2ad4c8";
 const MA20_COLOR = "#e4b454";
+const DIFF_COLOR = "#f4f7fb";
 
 function formatChartTime(time: unknown, withDate: boolean): string {
   if (typeof time === "string") return withDate ? time : time.slice(5);
@@ -113,6 +114,11 @@ function selectionBox(chart: IChartApi, from: string, to: string): { left: numbe
   return { left, width: Math.max(spacing, right - left) };
 }
 
+function formatMacd(value: number) {
+  const text = Math.abs(value).toFixed(3);
+  return value > 0 ? `+${text}` : value < 0 ? `-${text}` : "0.000";
+}
+
 function barTimeAt(chart: IChartApi, bars: KBar[], x: number): string | null {
   if (bars.length === 0) return null;
   const time = chart.timeScale().coordinateToTime(x);
@@ -142,6 +148,10 @@ export default function ChartView({
   const chartRef = useRef<IChartApi | null>(null);
   const candleRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const volRef = useRef<ISeriesApi<"Histogram"> | null>(null);
+  const difRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const deaRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const macdZeroRef = useRef<IPriceLine | null>(null);
+  const macdPointsRef = useRef<Array<MacdfsBar | null>>([]);
   const lineRef = useRef<ISeriesApi<"Line"> | null>(null);
   const ma4Ref = useRef<ISeriesApi<"Line"> | null>(null);
   const ma7Ref = useRef<ISeriesApi<"Line"> | null>(null);
@@ -154,6 +164,7 @@ export default function ChartView({
   const dragRef = useRef<BarSpan | null>(null);
   const pickedRef = useRef<BarSpan | null>(null);
   const placeRef = useRef<() => void>(() => {});
+  const [macdTip, setMacdTip] = useState<MacdfsBar | null>(null);
   const [rangeMode, setRangeMode] = useState(false);
   const [picked, setPicked] = useState<BarSpan | null>(null);
   const [highlight, setHighlight] = useState<{ left: number; width: number } | null>(null);
@@ -227,6 +238,24 @@ export default function ChartView({
     wheelHost.addEventListener("wheel", onWheel, { passive: false });
     const onVisible = () => placeRef.current();
     chart.timeScale().subscribeVisibleLogicalRangeChange(onVisible);
+    const onCrosshair = (param: { time?: Time; logical?: number }) => {
+      if (modeRef.current !== "trend") return;
+      const list = macdPointsRef.current;
+      if (list.length === 0) return;
+      let index = list.length - 1;
+      if (param.time != null && param.logical != null) index = Math.min(list.length - 1, Math.max(0, Math.round(param.logical)));
+      let tip = list[index];
+      if (!tip) {
+        for (let j = index; j >= 0; j -= 1) {
+          if (list[j]) {
+            tip = list[j];
+            break;
+          }
+        }
+      }
+      setMacdTip(tip);
+    };
+    chart.subscribeCrosshairMove(onCrosshair);
     const autoscaleInfoProvider = (original: () => AutoscaleInfo | null) => {
       if (modeRef.current === "trend") return original();
       return magnifiedPriceRange(chart, barsRef.current) ?? original();
@@ -274,6 +303,24 @@ export default function ChartView({
     const vol = chart.addHistogramSeries({
       priceFormat: { type: "volume" },
       priceScaleId: "",
+      lastValueVisible: false,
+      priceLineVisible: false,
+    });
+    const dif = chart.addLineSeries({
+      color: DIFF_COLOR,
+      lineWidth: 1,
+      priceScaleId: "",
+      priceLineVisible: false,
+      lastValueVisible: false,
+      crosshairMarkerVisible: false,
+    });
+    const dea = chart.addLineSeries({
+      color: MA20_COLOR,
+      lineWidth: 1,
+      priceScaleId: "",
+      priceLineVisible: false,
+      lastValueVisible: false,
+      crosshairMarkerVisible: false,
     });
     chart.priceScale("").applyOptions({
       scaleMargins: { top: 0.82, bottom: 0 },
@@ -286,6 +333,8 @@ export default function ChartView({
     lineRef.current = line;
     avgRef.current = avg;
     volRef.current = vol;
+    difRef.current = dif;
+    deaRef.current = dea;
     const ro = new ResizeObserver(() => {
       const { mode: currentMode, barCount } = viewRef.current;
       applyTimeScale(chart, currentMode, barCount, false);
@@ -295,6 +344,7 @@ export default function ChartView({
     return () => {
       wheelHost.removeEventListener("wheel", onWheel);
       chart.timeScale().unsubscribeVisibleLogicalRangeChange(onVisible);
+      chart.unsubscribeCrosshairMove(onCrosshair);
       ro.disconnect();
       chart.remove();
       chartRef.current = null;
@@ -313,20 +363,29 @@ export default function ChartView({
   useEffect(() => {
     const candle = candleRef.current;
     const vol = volRef.current;
+    const dif = difRef.current;
+    const dea = deaRef.current;
     const line = lineRef.current;
     const ma4 = ma4Ref.current;
     const ma7 = ma7Ref.current;
     const avg = avgRef.current;
     const chart = chartRef.current;
-    if (!candle || !vol || !line || !ma4 || !ma7 || !avg || !chart) return;
+    if (!candle || !vol || !dif || !dea || !line || !ma4 || !ma7 || !avg || !chart) return;
 
     if (preCloseLineRef.current) {
       line.removePriceLine(preCloseLineRef.current);
       preCloseLineRef.current = null;
     }
+    if (macdZeroRef.current) {
+      vol.removePriceLine(macdZeroRef.current);
+      macdZeroRef.current = null;
+    }
 
     chart.priceScale("right").applyOptions({
-      scaleMargins: { top: 0.06, bottom: mode === "day" ? 0.28 : 0.22 },
+      scaleMargins: { top: 0.06, bottom: mode === "trend" ? 0.32 : mode === "day" ? 0.28 : 0.22 },
+    });
+    chart.priceScale("").applyOptions({
+      scaleMargins: { top: mode === "trend" ? 0.72 : 0.82, bottom: 0 },
     });
     line.applyOptions({
       color: MA20_COLOR,
@@ -354,16 +413,43 @@ export default function ChartView({
             value: item.avg as number,
           })),
       );
+      const macd = macdfsSeries(points.map((item) => item.price));
+      macdPointsRef.current = macd;
+      setMacdTip(macd.findLast((item) => item != null) ?? null);
+      vol.applyOptions({ priceFormat: { type: "price", precision: 3, minMove: 0.001 } });
       vol.setData(
-        points.map((item, index) => {
-          const prev = index > 0 ? points[index - 1].price : trend.preClose ?? item.price;
-          return {
-            time: item.timestamp as UTCTimestamp,
-            value: item.volume,
-            color: item.price >= prev ? "rgba(255,92,92,0.6)" : "rgba(30,203,147,0.6)",
-          };
+        points.flatMap((item, index) => {
+          const bar = macd[index];
+          if (!bar) return [];
+          return [
+            {
+              time: item.timestamp as UTCTimestamp,
+              value: bar.hist,
+              color: bar.hist >= 0 ? "rgba(255,92,92,0.9)" : "rgba(30,203,147,0.9)",
+            },
+          ];
         }),
       );
+      dif.setData(
+        points.flatMap((item, index) => {
+          const bar = macd[index];
+          return bar ? [{ time: item.timestamp as UTCTimestamp, value: bar.dif }] : [];
+        }),
+      );
+      dea.setData(
+        points.flatMap((item, index) => {
+          const bar = macd[index];
+          return bar ? [{ time: item.timestamp as UTCTimestamp, value: bar.dea }] : [];
+        }),
+      );
+      macdZeroRef.current = vol.createPriceLine({
+        price: 0,
+        color: "#5c6b82",
+        lineWidth: 1,
+        lineStyle: LineStyle.Dotted,
+        axisLabelVisible: false,
+        title: "",
+      });
       if (trend.preClose) {
         preCloseLineRef.current = line.createPriceLine({
           price: trend.preClose,
@@ -403,6 +489,11 @@ export default function ChartView({
       return;
     }
 
+    macdPointsRef.current = [];
+    setMacdTip(null);
+    vol.applyOptions({ priceFormat: { type: "volume" } });
+    dif.setData([]);
+    dea.setData([]);
     line.setData(maLine(bars, 20));
     line.setMarkers([]);
     avg.setData([]);
@@ -547,7 +638,7 @@ export default function ChartView({
           {loading
             ? "加载中…"
             : mode === "trend"
-              ? "黄线现价 · 蓝线均价 · MACDFS交叉，红顶绿底为模拟信号"
+              ? "黄线现价 · 蓝线均价 · 下图 MACDFS(12,26,9) · 红顶绿底为模拟信号"
               : mode === "day"
                 ? `红MA4 · 青MA7 · 黄MA20 · 绿柱缩短或转红买 · 4下穿7且4日仍在20上方不卖 · 买 ${ribbonCounts.buy} 卖 ${ribbonCounts.sell}`
                 : `红MA4 · 青MA7 · 黄MA20 · 4上穿7且站上20买 · 4下穿7或跌破20卖 · 买 ${ribbonCounts.buy} 卖 ${ribbonCounts.sell}`}
@@ -555,6 +646,16 @@ export default function ChartView({
       </div>
       <div className="relative min-h-0 flex-1">
         <div ref={boxRef} className="absolute inset-0" />
+        {mode === "trend" && macdTip ? (
+          <div className="pointer-events-none absolute bottom-[22%] left-2 z-10 flex flex-wrap gap-x-2 text-[11px] leading-4">
+            <span className="text-mute">MACDFS(12,26,9)</span>
+            <span className={macdTip.hist > 0 ? "text-up" : macdTip.hist < 0 ? "text-down" : "text-mute"}>
+              MACDFS {formatMacd(macdTip.hist)}
+            </span>
+            <span style={{ color: DIFF_COLOR }}>DIFF {formatMacd(macdTip.dif)}</span>
+            <span className="text-gold">DEA {formatMacd(macdTip.dea)}</span>
+          </div>
+        ) : null}
         {highlight && mode !== "trend" ? (
           <div
             className="pointer-events-none absolute bottom-0 top-0 z-10 bg-gold/15"
