@@ -3,7 +3,8 @@
  * 柱 = 2 * (DIF - DEA)。
  *
  * 顶：同一段红柱先堆高，再从最高的红柱缩短。DIF > DEA，0 轴上下都算。
- *     这一分钟是附近高点，下一分钟不再更高，成交量也小于前 8 分钟里的最大量。
+ *     这一分钟是附近高点，下一分钟不再更高。
+ *     成交量小于前 8 分钟的最大量；如果这一分钟放量，但价格没有超过 10 点前的最高价，也算顶。
  * 底：同一段绿柱先拉长，再从最长的绿柱缩短。DEA > DIF，0 轴上下都算。
  *     这一分钟是附近低点，下一分钟不再更低，成交量也小于前 8 分钟里的最大量。
  * 同色柱没堆满 3 分钟，或柱高不到股价的万分之五，不算。
@@ -95,7 +96,18 @@ function maxVolumeBefore(points: IntradayMinute[], index: number): number {
   return vmax;
 }
 
+/** 10 点之前出现过的最高价。没有 10 点前的分钟时返回 null。 */
+function highBeforeTen(points: IntradayMinute[]): number | null {
+  let high: number | null = null;
+  for (const point of points) {
+    if (point.time >= "10:00") break;
+    high = high == null ? point.price : Math.max(high, point.price);
+  }
+  return high;
+}
+
 function waveCandidates(points: IntradayMinute[]): Candidate[] {
+  const morningHigh = highBeforeTen(points);
   const macd = macdfsSeries(points.map((point) => point.price));
   const hist = macd.map((bar) => bar?.hist ?? 0);
   const candidates: Candidate[] = [];
@@ -146,7 +158,11 @@ function waveCandidates(points: IntradayMinute[]): Candidate[] {
     } else if (!(column.dea > column.dif)) continue;
 
     const volume = points[mark].volume;
-    if (!(volume > 0 && volume < maxVolumeBefore(points, mark))) continue;
+    const priorVolume = maxVolumeBefore(points, mark);
+    const volumeFaded = volume > 0 && volume < priorVolume;
+    const heavyBelowMorningHigh =
+      red && volume > priorVolume && morningHigh != null && points[mark].time >= "10:00" && price <= morningHigh;
+    if (!(volumeFaded || heavyBelowMorningHigh)) continue;
 
     candidates.push({
       index: mark,
