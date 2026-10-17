@@ -1,18 +1,21 @@
 /**
  * 用分时 MACDFS(12,26,9) 模拟顶底。不是同花顺的公式。
+ * 柱 = 2 * (DIF - DEA)。
  *
- * DIF 下穿 DEA，且这一波红柱已经缩短，标顶。
- * DIF 上穿 DEA，且这一波绿柱已经缩短，标底。
- * 零轴下方的金叉要等红柱放出来：红柱高度不到前一波绿柱的一半，或红柱没放大就又缩短，不标底。
- * 柱的算法和日线 MACD 一样，柱 = 2 * (DIF - DEA)。
+ * 顶：DIF、DEA 都在 0 轴上方，这一根是当天最高的红柱，DIF > DEA，
+ *     下一根仍是红柱但更短，并且这一分钟创出日内新高后下一分钟不再创新高。
+ * 底：DIF、DEA 都在 0 轴下方，这一根是当天最长的绿柱，DEA > DIF，
+ *     下一根仍是绿柱但更短，并且这一分钟创出日内新低后下一分钟不再创新低。
+ * 先有底才能标顶，先有顶才能再标下一个底。
+ * 一对手的差价要盖过 5 元佣金，再加这一手卖出价的 0.05% 印花税，否则不标。
+ * 底还没配上顶时，更低的底换掉前一个底；顶还没配上下一个底时，更高的顶换掉前一个顶。
  */
 
-const RED_ENOUGH = 0.5;
-const MIN_GAP = 5;
-/** 这一波柱高不到当天已出现过的最大柱的这个比例，当作毛刺，不标。 */
-const MIN_WAVE = 0.35;
-/** 红柱或绿柱至少连续缩短这么多根，才算量能不足。 */
-const MIN_SHRINK = 2;
+const LOT = 100;
+const COMMISSION = 5;
+const STAMP_RATE = 0.0005;
+/** 柱高接近 0 时只是浮点毛刺，不算红柱或绿柱。 */
+const MIN_COLUMN = 1e-4;
 
 export type IntradayMinute = {
   time: string;
@@ -65,78 +68,119 @@ export function macdfsSeries(prices: number[]): Array<MacdfsBar | null> {
   return out;
 }
 
-function redWave(hist: number[], end: number): { faded: boolean; peak: number } {
-  let peak = 0;
-  let shrink = 0;
-  for (let j = end; j >= 0; j -= 1) {
-    if (hist[j] < 0) break;
-    if (hist[j] > peak) peak = hist[j];
-  }
-  for (let j = end; j >= 1 && hist[j] >= 0 && hist[j] <= hist[j - 1]; j -= 1) shrink += 1;
-  return { faded: peak > 0 && shrink >= MIN_SHRINK, peak };
+/** 一手买卖的差价，要多于 5 元佣金加卖出一手的印花税。 */
+export function lotSpreadCoversCost(low: number, high: number): boolean {
+  if (!(high > low)) return false;
+  const spread = (high - low) * LOT;
+  const stamp = high * LOT * STAMP_RATE;
+  return spread > COMMISSION + stamp;
 }
 
-function greenWave(hist: number[], end: number): { faded: boolean; depth: number } {
-  let trough = 0;
-  let shrink = 0;
-  for (let j = end; j >= 0; j -= 1) {
-    if (hist[j] > 0) break;
-    if (hist[j] < trough) trough = hist[j];
+function waveHoldsSessionExtreme(prices: number[], hist: number[], index: number, side: "bottom" | "top"): boolean {
+  const wantHigh = side === "top";
+  let start = index;
+  while (start > 0) {
+    const prev = hist[start - 1];
+    if (wantHigh ? !(prev > 0) : !(prev < 0)) break;
+    start -= 1;
   }
-  for (let j = end; j >= 1 && hist[j] <= 0 && hist[j] >= hist[j - 1]; j -= 1) shrink += 1;
-  return { faded: trough < 0 && shrink >= MIN_SHRINK, depth: Math.abs(trough) };
+  let extreme = prices[start];
+  for (let j = start; j <= index; j += 1) {
+    extreme = wantHigh ? Math.max(extreme, prices[j]) : Math.min(extreme, prices[j]);
+  }
+  let session = prices[0];
+  for (let j = 1; j <= index; j += 1) {
+    session = wantHigh ? Math.max(session, prices[j]) : Math.min(session, prices[j]);
+  }
+  if (extreme !== session) return false;
+  return wantHigh ? session > prices[0] : session < prices[0];
 }
 
-/** 零轴下金叉之后，红柱要放到前一波绿柱的一半以上，才算底。 */
-function redWaveEnough(hist: number[], from: number, greenDepth: number): boolean {
-  if (!(greenDepth > 0)) return false;
-  let peak = 0;
-  for (let j = from; j < hist.length; j += 1) {
-    const bar = hist[j];
-    if (bar > peak) peak = bar;
-    if (peak >= greenDepth * RED_ENOUGH) return true;
-    const rolledOver = j > from && peak > 0 && bar < peak * 0.7;
-    const flippedGreen = j > from && bar <= 0;
-    if ((rolledOver || flippedGreen) && peak < greenDepth * RED_ENOUGH) return false;
-  }
-  return false;
+function dropMark(marks: IntradayMark[], target: IntradayMark) {
+  const index = marks.findIndex((mark) => mark.index === target.index && mark.side === target.side);
+  if (index >= 0) marks.splice(index, 1);
 }
 
 export function intradayExtremes(points: IntradayMinute[]): IntradayMark[] {
-  if (points.length < 40) return [];
+  if (points.length < 3) return [];
   const macd = macdfsSeries(points.map((point) => point.price));
+  const prices = points.map((point) => point.price);
   const hist = macd.map((bar) => bar?.hist ?? 0);
+  const candidates: IntradayMark[] = [];
+  let maxRed = 0;
+  let minGreen = 0;
+
+  for (let i = 0; i < points.length - 1; i += 1) {
+    const bar = macd[i];
+    const next = macd[i + 1];
+    if (!bar || !next) continue;
+    const price = prices[i];
+    const nextPrice = prices[i + 1];
+    if (
+      bar.dif > 0 &&
+      bar.dea > 0 &&
+      bar.dif > bar.dea &&
+      bar.hist > MIN_COLUMN &&
+      bar.hist >= maxRed &&
+      next.hist > 0 &&
+      next.hist < bar.hist &&
+      waveHoldsSessionExtreme(prices, hist, i, "top") &&
+      nextPrice <= Math.max(...prices.slice(0, i + 1))
+    ) {
+      candidates.push({ index: i, time: points[i].time, side: "top", price });
+    }
+    if (
+      bar.dif < 0 &&
+      bar.dea < 0 &&
+      bar.dea > bar.dif &&
+      bar.hist < -MIN_COLUMN &&
+      bar.hist <= minGreen &&
+      next.hist < 0 &&
+      next.hist > bar.hist &&
+      waveHoldsSessionExtreme(prices, hist, i, "bottom") &&
+      nextPrice >= Math.min(...prices.slice(0, i + 1))
+    ) {
+      candidates.push({ index: i, time: points[i].time, side: "bottom", price });
+    }
+    if (bar.hist > maxRed) maxRed = bar.hist;
+    if (bar.hist < minGreen) minGreen = bar.hist;
+  }
+
   const marks: IntradayMark[] = [];
-  let lastTop = -MIN_GAP;
-  let lastBottom = -MIN_GAP;
-  let biggest = 0;
+  let seek: "bottom" | "top" = "bottom";
+  let openBottom: IntradayMark | null = null;
+  let openTop: IntradayMark | null = null;
 
-  for (let i = 1; i < points.length; i += 1) {
-    const prev = macd[i - 1];
-    const cur = macd[i];
-    if (!prev || !cur) continue;
-    const death = prev.dif >= prev.dea && cur.dif < cur.dea;
-    const golden = prev.dif <= prev.dea && cur.dif > cur.dea;
-    if (!death && !golden) continue;
-
-    if (death && i - lastTop >= MIN_GAP) {
-      const red = redWave(hist, i - 1);
-      if (red.peak > biggest) biggest = red.peak;
-      if (red.faded && red.peak >= biggest * MIN_WAVE) {
-        marks.push({ index: i, time: points[i].time, side: "top", price: points[i].price });
-        lastTop = i;
+  for (const candidate of candidates) {
+    if (candidate.side === "bottom") {
+      if (seek === "top" && openBottom && candidate.price < openBottom.price) {
+        dropMark(marks, openBottom);
+        openBottom = candidate;
+        marks.push(candidate);
+        continue;
       }
+      if (seek !== "bottom") continue;
+      if (openTop && !lotSpreadCoversCost(candidate.price, openTop.price)) continue;
+      if (openBottom && candidate.price >= openBottom.price) continue;
+      if (openBottom) dropMark(marks, openBottom);
+      openBottom = candidate;
+      marks.push(candidate);
+      seek = "top";
+      openTop = null;
       continue;
     }
 
-    if (!(golden && i - lastBottom >= MIN_GAP)) continue;
-    const green = greenWave(hist, i - 1);
-    if (green.depth > biggest) biggest = green.depth;
-    if (!green.faded || green.depth < biggest * MIN_WAVE) continue;
-    const belowZero = cur.dif < 0 && cur.dea < 0;
-    if (belowZero && !redWaveEnough(hist, i, green.depth)) continue;
-    marks.push({ index: i, time: points[i].time, side: "bottom", price: points[i].price });
-    lastBottom = i;
+    if (seek === "bottom" && openTop && candidate.price > openTop.price) {
+      dropMark(marks, openTop);
+      openTop = candidate;
+      marks.push(candidate);
+      continue;
+    }
+    if (seek !== "top" || !openBottom || !lotSpreadCoversCost(openBottom.price, candidate.price)) continue;
+    openTop = candidate;
+    marks.push(candidate);
+    seek = "bottom";
+    openBottom = null;
   }
   return marks;
 }

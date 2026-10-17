@@ -1,4 +1,4 @@
-import { intradayExtremes, type IntradayMinute } from "./intradayExtreme.ts";
+import { intradayExtremes, lotSpreadCoversCost, type IntradayMinute } from "./intradayExtreme.ts";
 
 function assert(cond: unknown, message: string) {
   if (!cond) throw new Error(message);
@@ -6,7 +6,7 @@ function assert(cond: unknown, message: string) {
 
 function minutes(prices: number[]): IntradayMinute[] {
   return prices.map((price, index) => ({
-    time: String(index),
+    time: `t${index}`,
     price,
     volume: 1000,
   }));
@@ -26,53 +26,31 @@ function ramp(from: number, count: number, step: number) {
   return { prices, end: price };
 }
 
-assert(intradayExtremes(minutes(flat(100, 10))).length === 0, "a flat session has no top or bottom");
+assert(lotSpreadCoversCost(10, 10.04) === false, "four cents does not cover a 5 yuan commission plus stamp tax");
+assert(lotSpreadCoversCost(10, 10.06) === true, "six cents on one lot covers the commission and stamp tax");
+assert(intradayExtremes(minutes(flat(80, 10))).length === 0, "a flat session has no top or bottom");
 
-const wiggle = flat(40, 10);
-let wigglePrice = 10;
-for (let i = 0; i < 50; i += 1) {
-  wigglePrice += i % 2 === 0 ? 0.01 : -0.01;
-  wiggle.push(wigglePrice);
-}
-assert(intradayExtremes(minutes(wiggle)).length === 0, "a small bend is not a signal");
+const swing = flat(40, 10);
+let leg = ramp(10, 8, -0.25);
+swing.push(...leg.prices);
+swing.push(leg.end, leg.end + 0.05, leg.end + 0.08);
+leg = ramp(leg.end + 0.08, 30, 0.02);
+swing.push(...leg.prices);
+leg = ramp(leg.end, 12, 0.12);
+swing.push(...leg.prices);
+swing.push(leg.end - 0.04, leg.end - 0.1, leg.end - 0.12);
+const marks = intradayExtremes(minutes(swing));
+assert(marks.length === 2 && marks[0].side === "bottom" && marks[1].side === "top", "a bottom comes before the top");
+assert(Math.abs(marks[0].price - 8) < 1e-9 && Math.abs(marks[1].price - 10.12) < 1e-9, "the bottom is the day low and the top is the later high");
+assert(lotSpreadCoversCost(marks[0].price, marks[1].price), "the pair clears the one-lot cost");
 
-const rally = flat(45, 10);
-let rolled = ramp(10, 35, 0.05);
-rally.push(...rolled.prices);
-rolled = ramp(rolled.end, 30, -0.06);
-rally.push(...rolled.prices);
-const tops = intradayExtremes(minutes(rally)).filter((mark) => mark.side === "top");
-assert(tops.length === 1, "a rally that rolls over has one top where DIF crosses under DEA");
-
-const rebound = flat(45, 12);
-let leg = ramp(12, 40, -0.05);
-rebound.push(...leg.prices);
-leg = ramp(leg.end, 35, 0.07);
-rebound.push(...leg.prices);
-const bottoms = intradayExtremes(minutes(rebound)).filter((mark) => mark.side === "bottom");
-assert(bottoms.length === 1, "a decline that turns up has one bottom where DIF crosses above DEA");
-
-const weak = flat(45, 12);
-leg = ramp(12, 25, -0.02);
-weak.push(...leg.prices);
-leg = ramp(leg.end, 15, -0.12);
-weak.push(...leg.prices);
-leg = ramp(leg.end, 8, 0.02);
-weak.push(...leg.prices);
-leg = ramp(leg.end, 20, -0.06);
-weak.push(...leg.prices);
-const weakMarks = intradayExtremes(minutes(weak));
+const earlyTop = flat(40, 10);
+leg = ramp(10, 40, 0.05);
+earlyTop.push(...leg.prices);
+earlyTop.push(leg.end - 0.02, leg.end - 0.05);
 assert(
-  weakMarks.every((mark) => mark.side !== "bottom"),
-  "a weak red column below zero is not a bottom",
-);
-assert(
-  weakMarks.some((mark) => mark.side === "top"),
-  "the failed bounce still marks a top when the red column fades",
+  intradayExtremes(minutes(earlyTop)).every((mark) => mark.side !== "top"),
+  "a top is not marked before any bottom",
 );
 
-console.log("intradayExtreme.check ok", {
-  top: tops[0]?.index,
-  bottom: bottoms[0]?.index,
-  weak: weakMarks.map((mark) => mark.side),
-});
+console.log("intradayExtreme.check ok", marks.map((mark) => `${mark.side}@${mark.price}`));
