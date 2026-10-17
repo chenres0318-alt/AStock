@@ -75,6 +75,23 @@ assert(Math.abs(belowZeroMarks[0].price - 18.6) < 1e-9, "the below-zero top is t
 const belowZeroColumn = macdfsSeries(belowZero.map((point) => point.price))[belowZeroMarks[0].index];
 assert(belowZeroColumn != null && belowZeroColumn.dif < 0 && belowZeroColumn.dea < 0, "this top is under the zero axis");
 
+const aboveZero = build(
+  [
+    { n: 40, step: 0, volume: 1000 },
+    { n: 8, step: 0.2, volume: 6000 },
+    { n: 4, step: 0.05, volume: 1500 },
+    { n: 6, step: -0.12, volume: 7000 },
+    { n: 4, step: -0.06, volume: 1600 },
+    { n: 3, step: 0.1, volume: 1200 },
+  ],
+  20,
+);
+const aboveZeroMarks = intradayExtremes(aboveZero);
+assert(aboveZeroMarks.length === 1 && aboveZeroMarks[0].side === "bottom", "a green column above zero can still be a bottom");
+assert(Math.abs(aboveZeroMarks[0].price - 20.84) < 1e-9, "the above-zero bottom is the pullback low");
+const aboveZeroColumn = macdfsSeries(aboveZero.map((point) => point.price))[aboveZeroMarks[0].index];
+assert(aboveZeroColumn != null && aboveZeroColumn.dif > 0 && aboveZeroColumn.dea > 0, "this bottom is over the zero axis");
+
 console.log(
   "intradayExtreme.check ok",
   marks.map((mark) => `${mark.side}@${mark.price}`),
