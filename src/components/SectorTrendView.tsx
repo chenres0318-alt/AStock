@@ -195,22 +195,22 @@ export default function SectorTrendView() {
             </div>
           ) : null}
           <div className="mt-4 border-t border-line pt-3">
-            <div className="text-sm">共振个股</div>
-            {selected?.resonant.length ? (
+            <div className="text-sm">MA4上穿MA7</div>
+            {selected?.maCrosses.length ? (
               <ol className="mt-2 max-h-72 space-y-2 overflow-auto scroll-thin">
-                {selected.resonant.map((item, index) => (
+                {selected.maCrosses.map((item, index) => (
                   <li key={item.code} className="flex items-center justify-between gap-2 text-sm">
                     <Link href={`/?code=${toTencentCode(item.code)}`} className="min-w-0 hover:text-gold">
                       <span className="mr-2 text-mute">{index + 1}</span>
                       {item.name}
                       <span className="ml-2 text-[11px] text-mute">{displaySymbol(item.code)}</span>
                     </Link>
-                    <span className={`num shrink-0 ${toneClass(item.gain)}`}>{gainText(item.gain)}</span>
+                    <span className="num shrink-0 text-mute">{item.time.slice(5)}</span>
                   </li>
                 ))}
               </ol>
             ) : (
-              <EmptyHint text="这段没有和板块共振的个股" />
+              <EmptyHint text="这段没有MA4上穿MA7的个股" />
             )}
           </div>
         </section>

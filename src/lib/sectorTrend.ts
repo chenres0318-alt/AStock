@@ -231,101 +231,47 @@ function walkSegments(
   return found;
 }
 
-/** 个股只看价格：低点拉起、这段涨够并且走得顺。不要求成分股。 */
-function priceQualifies(bars: KBar[], start: number, end: number): boolean {
-  if (end === start) return priceReversal(bars, start);
-  const count = end - start + 1;
-  if (count < MIN_BARS || !(bars[start].close > 0)) return false;
-  let path = 0;
-  let maxHigh = bars[start].high;
-  let minLow = bars[start].low;
-  for (let i = start + 1; i <= end; i += 1) {
-    path += Math.abs(bars[i].close - bars[i - 1].close);
-    if (bars[i].high > maxHigh) maxHigh = bars[i].high;
-    if (bars[i].low < minLow) minLow = bars[i].low;
-  }
-  const gain = bars[end].close / bars[start].close - 1;
-  const efficiency = path > 0 ? (bars[end].close - bars[start].close) / path : 0;
-  const amplitude = (maxHigh - minLow) / bars[start].close;
-  return gain >= MIN_GAIN && efficiency >= MIN_EFFICIENCY && amplitude >= MIN_GAIN;
-}
-
-export type PriceTrendSegment = {
-  start: string;
-  end: string;
-  gain: number;
-  status: "open" | "closed";
-};
-
-/** 个股日线上的趋势框。只用板块趋势的前两个价格条件。 */
-export function capturePriceTrends(bars: KBar[]): PriceTrendSegment[] {
-  if (bars.length < LEFT_WING + 1) return [];
-  const segments: PriceTrendSegment[] = [];
-  for (const raw of walkSegments(
-    bars,
-    (index) => priceReversal(bars, index),
-    (start, end) => priceQualifies(bars, start, end),
-  )) {
-    if (!(bars[raw.end].close > 0) || !(bars[raw.start].close > 0)) continue;
-    const gain =
-      raw.end === raw.start
-        ? bars[raw.start].close / bars[raw.start - 1].close - 1
-        : bars[raw.end].close / bars[raw.start].close - 1;
-    if (!Number.isFinite(gain)) continue;
-    segments.push({
-      start: bars[raw.start].time,
-      end: bars[raw.end].time,
-      gain,
-      status: raw.status,
-    });
-  }
-  return segments;
-}
-
-/** 个股区间涨幅至少要比行业指数多出的幅度，才算这段里的龙头。 */
-const RESONANCE_GAP = 0.02;
-
-export type ResonantStock = {
+export type MaCrossStock = {
   code: string;
   name: string;
-  /** 板块这段区间里的涨幅。 */
-  gain: number;
+  /** 这段趋势里最近一次 4 日均线上穿 7 日均线的交易日。 */
+  time: string;
 };
 
-function gainOnSectorWindow(sectorBars: KBar[], stockBars: KBar[], startTime: string, endTime: string): number | null {
-  const start = sectorBars.findIndex((bar) => bar.time === startTime);
-  const end = sectorBars.findIndex((bar) => bar.time === endTime);
-  if (start < 0 || end < start) return null;
-  const fromIndex = start === end && start > 0 ? start - 1 : start;
-  const times = sectorBars.map((bar) => bar.time);
-  const closes = new Map<string, number>();
-  for (const bar of stockBars) closes.set(bar.time, bar.close);
-  const from = closeOn(closes, times, fromIndex);
-  const to = closeOn(closes, times, end);
-  if (from == null || to == null) return null;
-  return to / from - 1;
+/** 前一日 MA4 还不超过 MA7，当日 MA4 升到 MA7 之上。 */
+function maAtClose(closes: number[], period: number, index: number): number | null {
+  if (index < period - 1 || index >= closes.length) return null;
+  let sum = 0;
+  for (let i = index - period + 1; i <= index; i += 1) sum += closes[i];
+  return sum / period;
 }
 
-/**
- * 板块这段趋势里，日线自己也走出价格趋势、并且区间涨幅比行业指数多出 2% 的个股。
- * 个股趋势的起点要落在板块这段区间内。
- */
-export function listResonantStocks(
-  sectorBars: KBar[],
-  segment: { start: string; end: string; gain: number },
+function ma4CrossedUpMa7(closes: number[], index: number): boolean {
+  const ma4 = maAtClose(closes, 4, index);
+  const ma4Prev = maAtClose(closes, 4, index - 1);
+  const ma7 = maAtClose(closes, 7, index);
+  const ma7Prev = maAtClose(closes, 7, index - 1);
+  if (ma4 == null || ma4Prev == null || ma7 == null || ma7Prev == null) return false;
+  return ma4Prev <= ma7Prev && ma4 > ma7;
+}
+
+/** 板块这段趋势的日期里，日线出现过 MA4 上穿 MA7 的成分股。多次上穿只留最近一次。 */
+export function listMa4CrossStocks(
+  segment: { start: string; end: string },
   stocks: Array<{ code: string; name: string; bars: KBar[] }>,
-): ResonantStock[] {
-  const hits: ResonantStock[] = [];
+): MaCrossStock[] {
+  const hits: MaCrossStock[] = [];
   for (const stock of stocks) {
-    const own = capturePriceTrends(stock.bars).some(
-      (trend) => trend.start >= segment.start && trend.start <= segment.end,
-    );
-    if (!own) continue;
-    const gain = gainOnSectorWindow(sectorBars, stock.bars, segment.start, segment.end);
-    if (gain == null || gain < segment.gain + RESONANCE_GAP) continue;
-    hits.push({ code: stock.code, name: stock.name, gain });
+    const closes = stock.bars.map((bar) => bar.close);
+    let latest: string | null = null;
+    for (let i = 1; i < stock.bars.length; i += 1) {
+      const time = stock.bars[i].time;
+      if (time < segment.start || time > segment.end) continue;
+      if (ma4CrossedUpMa7(closes, i)) latest = time;
+    }
+    if (latest) hits.push({ code: stock.code, name: stock.name, time: latest });
   }
-  hits.sort((a, b) => b.gain - a.gain);
+  hits.sort((a, b) => (a.time === b.time ? a.name.localeCompare(b.name, "zh-CN") : a.time < b.time ? 1 : -1));
   return hits;
 }
 

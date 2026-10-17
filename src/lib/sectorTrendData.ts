@@ -6,7 +6,7 @@ import { mapPool } from "./pool";
 import {
   captureSectorTrends,
   indexCouldBeOpen,
-  listResonantStocks,
+  listMa4CrossStocks,
   memberGainsInWindow,
   trendCoversLastBar,
   type SectorMemberPath,
@@ -20,15 +20,15 @@ export type SectorTrendMember = BoardMember & {
   gain: number | null;
 };
 
-export type ResonantStockView = {
+export type MaCrossStockView = {
   code: string;
   name: string;
-  gain: number;
+  time: string;
 };
 
 export type SectorTrendView = SectorTrendSegment & {
   roster: SectorTrendMember[];
-  resonant: ResonantStockView[];
+  maCrosses: MaCrossStockView[];
 };
 
 export type SectorTrendReport = {
@@ -99,8 +99,8 @@ export async function getSectorTrend(code: string): Promise<SectorTrendReport> {
     const roster = members
       .map((item) => ({ ...item, gain: gains.get(item.code) ?? null }))
       .sort((a, b) => (b.gain ?? -999) - (a.gain ?? -999));
-    const resonant = listResonantStocks(bars, segment, stocks);
-    return { ...segment, roster, resonant };
+    const maCrosses = listMa4CrossStocks(segment, stocks);
+    return { ...segment, roster, maCrosses };
   });
   const base = bars.length >= 6 ? bars[bars.length - 6] : null;
   const pct5 = last && base && base.close > 0 ? (last.close / base.close - 1) * 100 : null;

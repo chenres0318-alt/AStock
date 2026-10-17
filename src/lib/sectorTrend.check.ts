@@ -1,4 +1,4 @@
-import { capturePriceTrends, captureSectorTrends, indexCouldBeOpen, listResonantStocks, trendCoversLastBar, type SectorMemberPath } from "./sectorTrend.ts";
+import { captureSectorTrends, indexCouldBeOpen, listMa4CrossStocks, trendCoversLastBar, type SectorMemberPath } from "./sectorTrend.ts";
 import type { KBar } from "./types.ts";
 
 function assert(cond: unknown, message: string) {
@@ -227,70 +227,34 @@ console.log("sectorTrend.check ok", {
   closed: finishedTrends[0].gain,
 });
 
-function isoBar(time: string, close: number, low: number, high: number, open = close): KBar {
-  return { time, open, high, low, close, volume: 1000 };
+function isoBar(time: string, close: number): KBar {
+  return { time, open: close, high: close, low: close, close, volume: 1000 };
 }
 
-const sectorDates = ["2026-05-01", "2026-05-02", "2026-05-03", "2026-05-06", "2026-05-07", "2026-05-08", "2026-05-09"];
-const sectorMove = [100, 100, 102, 103, 104, 105, 106].map((close, index) =>
-  isoBar(sectorDates[index], close, close * 0.99, close * 1.01, close),
-);
-const leadMove = [
-  isoBar("2026-05-01", 100, 99, 101, 100),
-  isoBar("2026-05-02", 100, 99.2, 101, 100),
-  isoBar("2026-05-03", 103, 97, 104, 98),
-  isoBar("2026-05-06", 106, 101, 107, 103),
-  isoBar("2026-05-07", 110, 105, 111, 106),
-  isoBar("2026-05-08", 112, 108, 113, 110),
-  isoBar("2026-05-09", 114, 110, 115, 112),
-];
-const sectorSegment = { start: "2026-05-03", end: "2026-05-09", gain: 106 / 102 - 1 };
-const resonant = listResonantStocks(sectorMove, sectorSegment, [
-  { code: "sh688001", name: "领涨", bars: leadMove },
-]);
-assert(
-  resonant.length === 1 && resonant[0].name === "领涨" && resonant[0].gain >= sectorSegment.gain + 0.02,
-  "a stock that launches inside the sector trend and outruns it by 2% is resonant",
-);
-assert(capturePriceTrends(leadMove).some((trend) => trend.start === "2026-05-03"), "the leader's own box starts on the sector low");
+function closesToBars(closes: number[], start = "2026-04-01"): KBar[] {
+  return closes.map((close, index) => {
+    const day = String(index + 1).padStart(2, "0");
+    return isoBar(`${start.slice(0, 8)}${day}`, close);
+  });
+}
 
-const matched = leadMove.map((bar, index) => {
-  const close = [100, 100, 102, 103, 104, 105, 106.4][index];
-  const low = index === 2 ? 97 : close * 0.995;
-  const high = index === 2 ? 103.2 : close * 1.005;
-  return isoBar(bar.time, close, low, high, index === 2 ? 98 : close);
-});
-assert(
-  listResonantStocks(sectorMove, sectorSegment, [{ code: "sh688002", name: "只跟涨", bars: matched }]).length === 0,
-  "a stock inside the trend but short of a 2% lead is left out",
+const flatThenJump = closesToBars([...Array(12).fill(10), 20, 20, 20]);
+const inside = listMa4CrossStocks(
+  { start: "2026-04-10", end: "2026-04-15" },
+  [{ code: "sh600001", name: "上穿", bars: flatThenJump }],
 );
+assert(inside.length === 1 && inside[0].time === "2026-04-13", "MA4 crossing above MA7 inside the trend is kept");
 
-const grind = sectorDates.map((time, index) => {
-  const close = 100 * 1.03 ** index;
-  return isoBar(time, close, close * 0.998, close * 1.002, close * 0.999);
-});
-assert(
-  listResonantStocks(sectorMove, sectorSegment, [{ code: "sh688003", name: "缓涨", bars: grind }]).length === 0,
-  "a stock that never prints its own low-day launch is not resonant",
+const beforeWindow = listMa4CrossStocks(
+  { start: "2026-04-14", end: "2026-04-15" },
+  [{ code: "sh600001", name: "上穿", bars: flatThenJump }],
 );
+assert(beforeWindow.length === 0, "a 4/7 cross before this trend is left out");
 
-const earlierLead = [
-  isoBar("2026-04-28", 100, 99, 101, 100),
-  isoBar("2026-04-29", 100, 99.2, 101, 100),
-  isoBar("2026-04-30", 104, 97, 105, 98),
-  isoBar("2026-05-01", 108, 104, 109, 104),
-  isoBar("2026-05-02", 112, 108, 113, 108),
-  isoBar("2026-05-03", 116, 112, 117, 112),
-  isoBar("2026-05-06", 120, 116, 121, 116),
-  isoBar("2026-05-07", 124, 120, 125, 120),
-  isoBar("2026-05-08", 128, 124, 129, 124),
-  isoBar("2026-05-09", 132, 128, 133, 128),
-];
+const stillUnder = closesToBars(Array.from({ length: 16 }, () => 10));
 assert(
-  capturePriceTrends(earlierLead).every((trend) => trend.start < "2026-05-03"),
-  "the early leader's box starts before the sector window",
-);
-assert(
-  listResonantStocks(sectorMove, sectorSegment, [{ code: "sh688004", name: "更早", bars: earlierLead }]).length === 0,
-  "a trend that started before this sector interval does not resonate with it",
+  listMa4CrossStocks({ start: "2026-04-08", end: "2026-04-16" }, [
+    { code: "sh600002", name: "持平", bars: stillUnder },
+  ]).length === 0,
+  "MA4 sitting on MA7 is not an upward cross",
 );
