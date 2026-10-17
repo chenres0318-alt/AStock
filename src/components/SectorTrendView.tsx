@@ -11,7 +11,7 @@ import {
   type ISeriesApi,
   type Time,
 } from "lightweight-charts";
-import { displaySymbol, isTonghuashunIndustry, toTencentCode } from "@/lib/codes";
+import { displaySymbol, isTonghuashunBoard, isTonghuashunConcept, toTencentCode } from "@/lib/codes";
 import { formatPct, formatPrice, toneClass } from "@/lib/format";
 import type { KBar, SectorItem } from "@/lib/types";
 import type { SectorTrendView as TrendBox } from "@/lib/sectorTrendData";
@@ -62,7 +62,7 @@ export default function SectorTrendView() {
     readJson<{ items: SectorItem[] }>("/api/market/sectors?scope=all")
       .then((data) => {
         setBoards(data.items);
-        if (isTonghuashunIndustry(code) && data.items.some((item) => item.code === code)) return;
+        if (isTonghuashunBoard(code) && data.items.some((item) => item.code === code)) return;
         const preferred =
           data.items.find((item) => item.code === "881121" || item.name === "半导体") ?? data.items[0];
         if (preferred && preferred.code !== code) router.replace(`/sector?code=${preferred.code}`);
@@ -83,7 +83,7 @@ export default function SectorTrendView() {
   }, []);
 
   useEffect(() => {
-    if (!isTonghuashunIndustry(code)) return;
+    if (!isTonghuashunBoard(code)) return;
     let cancelled = false;
     setLoading(true);
     setReport(null);
@@ -236,13 +236,17 @@ function BoardPicker({
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
-  const ordered = useMemo(() => {
-    return [...boards].sort((a, b) => {
-      const rank = (item: SectorItem) => (liveCodes.has(item.code) ? 0 : 1);
-      const byLive = rank(a) - rank(b);
-      if (byLive !== 0) return byLive;
-      return a.name.localeCompare(b.name, "zh-CN");
-    });
+  const grouped = useMemo(() => {
+    const sortGroup = (items: SectorItem[]) =>
+      [...items].sort((a, b) => {
+        const byLive = Number(!liveCodes.has(a.code)) - Number(!liveCodes.has(b.code));
+        if (byLive !== 0) return byLive;
+        return a.name.localeCompare(b.name, "zh-CN");
+      });
+    return [
+      { label: "行业", items: sortGroup(boards.filter((item) => !isTonghuashunConcept(item.code))) },
+      { label: "概念", items: sortGroup(boards.filter((item) => isTonghuashunConcept(item.code))) },
+    ].filter((group) => group.items.length > 0);
   }, [boards, liveCodes]);
   const current = boards.find((item) => item.code === code);
 
@@ -277,27 +281,32 @@ function BoardPicker({
         <span aria-hidden="true">▾</span>
       </button>
       {open ? (
-        <div className="absolute right-0 z-30 mt-1 max-h-80 w-52 overflow-auto rounded bg-panel py-1 shadow-lg ring-1 ring-line scroll-thin">
-          {ordered.map((item) => {
-            const live = liveCodes.has(item.code);
-            const selected = item.code === code;
-            return (
-              <button
-                key={item.code}
-                type="button"
-                data-current={selected ? "true" : undefined}
-                className={`block w-full truncate px-3 py-1.5 text-left text-sm ${
-                  selected ? "bg-white/10" : "hover:bg-panel-2"
-                } ${live ? "text-up" : "text-ink"}`}
-                onClick={() => {
-                  setOpen(false);
-                  if (item.code !== code) onPick(item.code);
-                }}
-              >
-                {item.name}
-              </button>
-            );
-          })}
+        <div className="absolute right-0 z-30 mt-1 max-h-80 w-64 overflow-auto rounded bg-panel py-1 shadow-lg ring-1 ring-line scroll-thin">
+          {grouped.map((group) => (
+            <div key={group.label}>
+              <div className="px-3 py-1 text-[10px] text-mute">{group.label}</div>
+              {group.items.map((item) => {
+                const live = liveCodes.has(item.code);
+                const selected = item.code === code;
+                return (
+                  <button
+                    key={item.code}
+                    type="button"
+                    data-current={selected ? "true" : undefined}
+                    className={`block w-full truncate px-3 py-1.5 text-left text-sm ${
+                      selected ? "bg-white/10" : "hover:bg-panel-2"
+                    } ${live ? "text-up" : "text-ink"}`}
+                    onClick={() => {
+                      setOpen(false);
+                      if (item.code !== code) onPick(item.code);
+                    }}
+                  >
+                    {item.name}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
         </div>
       ) : null}
     </div>

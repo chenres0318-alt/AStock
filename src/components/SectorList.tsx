@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
-import { displaySymbol, isListedStockCode, isTonghuashunIndustry } from "@/lib/codes";
+import { displaySymbol, isListedStockCode, isTonghuashunBoard } from "@/lib/codes";
 import { formatPct, formatPrice, toneClass } from "@/lib/format";
 import type { SectorItem } from "@/lib/types";
 import { EmptyHint, PanelTitle } from "./ui";
@@ -61,7 +61,7 @@ export default function SectorList({
                     : item.code}
               </div>
             </button>
-            {isTonghuashunIndustry(item.code) || item.code.startsWith("BK") ? (
+            {isTonghuashunBoard(item.code) || item.code.startsWith("BK") ? (
               <Link href={`/sector?code=${item.code}`} className="shrink-0 text-[10px] text-gold">
                 趋势
               </Link>

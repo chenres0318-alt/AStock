@@ -1,3 +1,4 @@
+import { isTonghuashunBoard, isTonghuashunConcept, isTonghuashunIndustry } from "./codes.ts";
 import { captureSectorTrends, indexCouldBeOpen, listMa4CrossStocks, trendCoversLastBar, type SectorMemberPath } from "./sectorTrend.ts";
 import type { KBar } from "./types.ts";
 
@@ -221,6 +222,11 @@ assert(
     heldLowTrends[0].end === heldLow.at(-1)?.time,
   "once the next day holds the low, the box stays and runs through the latest bar",
 );
+
+assert(isTonghuashunIndustry("881121") && !isTonghuashunConcept("881121"), "an industry code stays an industry");
+assert(isTonghuashunConcept("885457") && isTonghuashunConcept("886056"), "concept indexes use 885 and 886");
+assert(isTonghuashunBoard("881121") && isTonghuashunBoard("885457"), "both industry and concept boards can open the trend page");
+assert(!isTonghuashunBoard("601138"), "a stock code is not a Tonghuashun board");
 
 console.log("sectorTrend.check ok", {
   open: heldTrends[0].gain,
