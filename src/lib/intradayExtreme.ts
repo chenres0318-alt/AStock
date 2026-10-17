@@ -1,28 +1,18 @@
 /**
- * 模拟分时顶底。按最近一段 1 分钟的高低位置、动量衰竭和成交量过滤来标。
- * 不是同花顺的公式，标记不会和客户端里的分时顶底一一对应。
+ * 用分时 MACDFS(12,26,9) 模拟顶底。不是同花顺的公式。
  *
- * 顶：价格在这段区间的高位，上涨比前一段慢（或创新高但力度更弱），
- *     高位成交量没有放大，下一分钟向下拐头。
- * 底：价格在这段区间的低位，下跌比前一段慢（或创新低但力度更弱），
- *     低位成交量缩小，下一分钟向上拐头。
- * 这一分钟放量急拉或急跌时不标。标记打在极值那一分钟，要等下一分钟走出来才确认。
+ * DIF 下穿 DEA，且这一波红柱已经缩短，标顶。
+ * DIF 上穿 DEA，且这一波绿柱已经缩短，标底。
+ * 零轴下方的金叉要等红柱放出来：红柱高度不到前一波绿柱的一半，或红柱没放大就又缩短，不标底。
+ * 柱的算法和日线 MACD 一样，柱 = 2 * (DIF - DEA)。
  */
 
-const LOOK = 20;
-const SPAN = 3;
-const POS_HIGH = 0.85;
-const POS_LOW = 0.15;
-const SLOW = 0.7;
-const VOL_BARS = 8;
-const TOP_VOL = 1;
-const BOTTOM_VOL = 0.9;
-const BLOWOFF = 1.6;
-const SHARP = 0.3;
-const MIN_RANGE = 0.004;
-const START = SPAN + VOL_BARS;
-/** 同一个拐头上相邻的分钟只留第一次。 */
+const RED_ENOUGH = 0.5;
 const MIN_GAP = 5;
+/** 这一波柱高不到当天已出现过的最大柱的这个比例，当作毛刺，不标。 */
+const MIN_WAVE = 0.35;
+/** 红柱或绿柱至少连续缩短这么多根，才算量能不足。 */
+const MIN_SHRINK = 2;
 
 export type IntradayMinute = {
   time: string;
@@ -37,92 +27,116 @@ export type IntradayMark = {
   price: number;
 };
 
-function windowRange(prices: number[], index: number) {
-  let high = prices[index];
-  let low = prices[index];
-  for (let j = Math.max(0, index - LOOK); j <= index; j += 1) {
-    if (prices[j] > high) high = prices[j];
-    if (prices[j] < low) low = prices[j];
+type MacdBar = { dif: number; dea: number; hist: number };
+
+function emaSeries(values: number[], period: number): Array<number | null> {
+  const out: Array<number | null> = Array(values.length).fill(null);
+  if (values.length < period) return out;
+  const k = 2 / (period + 1);
+  let sum = 0;
+  for (let i = 0; i < period; i += 1) sum += values[i];
+  let prev = sum / period;
+  out[period - 1] = prev;
+  for (let i = period; i < values.length; i += 1) {
+    prev = values[i] * k + prev * (1 - k);
+    out[i] = prev;
   }
-  return { high, low, span: high - low };
+  return out;
 }
 
-function averageVolume(volumes: number[], from: number, to: number) {
-  let sum = 0;
-  let count = 0;
-  for (let j = from; j <= to; j += 1) {
-    sum += volumes[j];
-    count += 1;
+function macdfs(prices: number[]): Array<MacdBar | null> {
+  const ema12 = emaSeries(prices, 12);
+  const ema26 = emaSeries(prices, 26);
+  const difVals: number[] = [];
+  const map: number[] = [];
+  for (let i = 0; i < prices.length; i += 1) {
+    if (ema12[i] == null || ema26[i] == null) continue;
+    difVals.push(ema12[i]! - ema26[i]!);
+    map.push(i);
   }
-  return count > 0 ? sum / count : 0;
+  const deaVals = emaSeries(difVals, 9);
+  const out: Array<MacdBar | null> = Array(prices.length).fill(null);
+  for (let j = 0; j < difVals.length; j += 1) {
+    if (deaVals[j] == null) continue;
+    const dif = difVals[j];
+    const dea = deaVals[j]!;
+    out[map[j]] = { dif, dea, hist: 2 * (dif - dea) };
+  }
+  return out;
+}
+
+function redWave(hist: number[], end: number): { faded: boolean; peak: number } {
+  let peak = 0;
+  let shrink = 0;
+  for (let j = end; j >= 0; j -= 1) {
+    if (hist[j] < 0) break;
+    if (hist[j] > peak) peak = hist[j];
+  }
+  for (let j = end; j >= 1 && hist[j] >= 0 && hist[j] <= hist[j - 1]; j -= 1) shrink += 1;
+  return { faded: peak > 0 && shrink >= MIN_SHRINK, peak };
+}
+
+function greenWave(hist: number[], end: number): { faded: boolean; depth: number } {
+  let trough = 0;
+  let shrink = 0;
+  for (let j = end; j >= 0; j -= 1) {
+    if (hist[j] > 0) break;
+    if (hist[j] < trough) trough = hist[j];
+  }
+  for (let j = end; j >= 1 && hist[j] <= 0 && hist[j] >= hist[j - 1]; j -= 1) shrink += 1;
+  return { faded: trough < 0 && shrink >= MIN_SHRINK, depth: Math.abs(trough) };
+}
+
+/** 零轴下金叉之后，红柱要放到前一波绿柱的一半以上，才算底。 */
+function redWaveEnough(hist: number[], from: number, greenDepth: number): boolean {
+  if (!(greenDepth > 0)) return false;
+  let peak = 0;
+  for (let j = from; j < hist.length; j += 1) {
+    const bar = hist[j];
+    if (bar > peak) peak = bar;
+    if (peak >= greenDepth * RED_ENOUGH) return true;
+    const rolledOver = j > from && peak > 0 && bar < peak * 0.7;
+    const flippedGreen = j > from && bar <= 0;
+    if ((rolledOver || flippedGreen) && peak < greenDepth * RED_ENOUGH) return false;
+  }
+  return false;
 }
 
 export function intradayExtremes(points: IntradayMinute[]): IntradayMark[] {
-  if (points.length < START + 2) return [];
-  const prices = points.map((point) => point.price);
-  const volumes = points.map((point) => point.volume);
+  if (points.length < 40) return [];
+  const macd = macdfs(points.map((point) => point.price));
+  const hist = macd.map((bar) => bar?.hist ?? 0);
   const marks: IntradayMark[] = [];
   let lastTop = -MIN_GAP;
   let lastBottom = -MIN_GAP;
+  let biggest = 0;
 
-  for (let i = START; i < points.length - 1; i += 1) {
-    const price = prices[i];
-    if (!(price > 0)) continue;
-    const { low, span } = windowRange(prices, i);
-    if (!(span > 0) || span / price < MIN_RANGE) continue;
-    const pos = (price - low) / span;
+  for (let i = 1; i < points.length; i += 1) {
+    const prev = macd[i - 1];
+    const cur = macd[i];
+    if (!prev || !cur) continue;
+    const death = prev.dif >= prev.dea && cur.dif < cur.dea;
+    const golden = prev.dif <= prev.dea && cur.dif > cur.dea;
+    if (!death && !golden) continue;
 
-    const earlierVol = averageVolume(volumes, i - SPAN - VOL_BARS, i - SPAN - 1);
-    const recentVol = averageVolume(volumes, i - SPAN + 1, i);
-    if (!(earlierVol > 0)) continue;
-
-    const recent = price - prices[i - SPAN];
-    const prior = prices[i - SPAN] - prices[i - 2 * SPAN];
-    let peak = Math.max(SPAN, i - LOOK);
-    let trough = peak;
-    for (let j = peak + 1; j <= i - SPAN - 1; j += 1) {
-      if (prices[j] >= prices[peak]) peak = j;
-      if (prices[j] <= prices[trough]) trough = j;
-    }
-    const peakPush = prices[peak] - prices[peak - SPAN];
-    const troughDrop = prices[trough - SPAN] - prices[trough];
-    const step = price - prices[i - 1];
-    const blowoff = volumes[i] >= earlierVol * BLOWOFF && Math.abs(step) >= span * SHARP;
-
-    const upSlowed = prior > 0 && recent < prior * SLOW;
-    const newHighWeaker = price >= prices[peak] && peakPush > 0 && recent < peakPush;
-    const downSlowed = prior < 0 && recent > prior * SLOW;
-    const newLowWeaker = price <= prices[trough] && troughDrop > 0 && -recent < troughDrop;
-
-    const localHigh = price >= prices[i - 1] && price >= prices[i - 2];
-    const localLow = price <= prices[i - 1] && price <= prices[i - 2];
-
-    if (
-      i - lastTop >= MIN_GAP &&
-      pos >= POS_HIGH &&
-      localHigh &&
-      prices[i + 1] < price &&
-      (upSlowed || newHighWeaker) &&
-      recentVol <= earlierVol * TOP_VOL &&
-      !blowoff
-    ) {
-      marks.push({ index: i, time: points[i].time, side: "top", price });
-      lastTop = i;
+    if (death && i - lastTop >= MIN_GAP) {
+      const red = redWave(hist, i - 1);
+      if (red.peak > biggest) biggest = red.peak;
+      if (red.faded && red.peak >= biggest * MIN_WAVE) {
+        marks.push({ index: i, time: points[i].time, side: "top", price: points[i].price });
+        lastTop = i;
+      }
       continue;
     }
 
-    if (
-      i - lastBottom >= MIN_GAP &&
-      pos <= POS_LOW &&
-      localLow &&
-      prices[i + 1] > price &&
-      (downSlowed || newLowWeaker) &&
-      recentVol <= earlierVol * BOTTOM_VOL &&
-      !blowoff
-    ) {
-      marks.push({ index: i, time: points[i].time, side: "bottom", price });
-      lastBottom = i;
-    }
+    if (!(golden && i - lastBottom >= MIN_GAP)) continue;
+    const green = greenWave(hist, i - 1);
+    if (green.depth > biggest) biggest = green.depth;
+    if (!green.faded || green.depth < biggest * MIN_WAVE) continue;
+    const belowZero = cur.dif < 0 && cur.dea < 0;
+    if (belowZero && !redWaveEnough(hist, i, green.depth)) continue;
+    marks.push({ index: i, time: points[i].time, side: "bottom", price: points[i].price });
+    lastBottom = i;
   }
   return marks;
 }
