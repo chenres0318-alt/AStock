@@ -152,6 +152,16 @@ export function isTonghuashunIndustry(code: string): boolean {
   return /^881\d{3}$/.test(code.trim());
 }
 
+/** 同花顺概念指数，代码以 885 或 886 开头。 */
+export function isTonghuashunConcept(code: string): boolean {
+  return /^88[5-9]\d{3}$/.test(code.trim());
+}
+
+/** 同花顺行业或概念，都能打开板块趋势。 */
+export function isTonghuashunBoard(code: string): boolean {
+  return isTonghuashunIndustry(code) || isTonghuashunConcept(code);
+}
+
 /** 场内 ETF。名称里有 ETF，或代码是沪深 ETF 的常见前缀。 */
 export function isEtf(code: string, name = ""): boolean {
   if (name.toUpperCase().includes("ETF")) return true;

@@ -1,10 +1,12 @@
 import { cached } from "../cache";
-import { isTonghuashunIndustry } from "../codes";
+import { isTonghuashunBoard, isTonghuashunConcept, isTonghuashunIndustry } from "../codes";
 import { toNumber } from "../format";
 import { fetchGbk, fetchUtf, UpstreamError } from "../http";
+import { mapPool } from "../pool";
 import type { BoardMember, KBar, SectorItem } from "../types";
 
 const LIST_REFERER = "https://q.10jqka.com.cn/thshy/";
+const CONCEPT_REFERER = "https://q.10jqka.com.cn/gn/";
 
 type Series = {
   name: string;
@@ -26,8 +28,14 @@ function cellHtmls(row: string): string[] {
 }
 
 function tableRows(html: string): string[] {
-  const body = html.match(/<tbody>([\s\S]*?)<\/tbody>/i)?.[1] ?? "";
-  return body.match(/<tr\b[\s\S]*?<\/tr>/gi) ?? [];
+  const bodies = [...html.matchAll(/<tbody>([\s\S]*?)<\/tbody>/gi)].map((match) => match[1]);
+  let best: string[] = [];
+  for (const body of bodies) {
+    const rows = body.match(/<tr\b[\s\S]*?<\/tr>/gi) ?? [];
+    const wide = rows.filter((row) => (row.match(/<td\b/gi) ?? []).length >= 10);
+    if (wide.length > best.length) best = wide;
+  }
+  return best;
 }
 
 function firstLink(html: string): { href: string; text: string } | null {
@@ -144,23 +152,18 @@ export async function fetchTonghuashunIndustries(): Promise<SectorItem[]> {
   return quoted;
 }
 
-export async function fetchTonghuashunMembers(code: string, limit = 40): Promise<BoardMember[]> {
-  if (!isTonghuashunIndustry(code)) return [];
-  const referer = `https://q.10jqka.com.cn/thshy/detail/code/${code}/`;
-  const pages = Math.min(3, Math.max(1, Math.ceil(limit / 20)));
+async function fetchMemberPages(base: string, limit: number, emptyMessage: string): Promise<BoardMember[]> {
+  const pages = Math.min(4, Math.max(1, Math.ceil(limit / 10)));
   const members: BoardMember[] = [];
   const seen = new Set<string>();
   for (let page = 1; page <= pages && members.length < limit; page += 1) {
-    const url =
-      page === 1
-        ? referer
-        : `https://q.10jqka.com.cn/thshy/detail/code/${code}/page/${page}/`;
+    const url = page === 1 ? base : `${base}page/${page}/`;
     let html = "";
     try {
-      html = await readHtml(url, referer);
+      html = await readHtml(url, base);
     } catch {
       if (members.length) break;
-      throw new UpstreamError("同花顺行业成分股暂时读不到");
+      throw new UpstreamError(emptyMessage);
     }
     let added = 0;
     for (const item of parseMemberRows(html)) {
@@ -175,14 +178,148 @@ export async function fetchTonghuashunMembers(code: string, limit = 40): Promise
   return members.slice(0, limit);
 }
 
+const conceptDetailCodes = new Map<string, string>();
+
+type ConceptCatalog = {
+  items: SectorItem[];
+  detailCodes: Record<string, string>;
+};
+
+function parseConceptSection(html: string): Map<string, { plate: string; name: string; pct: number | null }> {
+  const raw = html.match(/id="gnSection" value='([^']*)'/)?.[1] ?? "";
+  const rows = new Map<string, { plate: string; name: string; pct: number | null }>();
+  if (!raw) return rows;
+  let parsed: Record<string, { platecode?: string; platename?: string; cid?: string; "199112"?: number }> = {};
+  try {
+    parsed = JSON.parse(raw) as typeof parsed;
+  } catch {
+    return rows;
+  }
+  for (const row of Object.values(parsed)) {
+    const cid = row.cid?.trim() ?? "";
+    const plate = row.platecode?.trim() ?? "";
+    const name = decodeText(row.platename ?? "");
+    if (!/^\d{6}$/.test(cid) || !isTonghuashunConcept(plate) || !name) continue;
+    rows.set(cid, { plate, name, pct: toNumber(row["199112"]) });
+  }
+  return rows;
+}
+
+function parseConceptDirectory(html: string): Array<{ cid: string; name: string }> {
+  const items: Array<{ cid: string; name: string }> = [];
+  const seen = new Set<string>();
+  for (const match of html.matchAll(/gn\/detail\/code\/(\d{6})\/"[^>]*>\s*([^<]+?)\s*</g)) {
+    const cid = match[1];
+    const name = decodeText(match[2]);
+    if (!name || seen.has(cid)) continue;
+    seen.add(cid);
+    items.push({ cid, name });
+  }
+  return items;
+}
+
+async function conceptPlateCode(cid: string): Promise<string | null> {
+  try {
+    const html = await readHtml(`https://q.10jqka.com.cn/gn/detail/code/${cid}/`, CONCEPT_REFERER);
+    const plate = html.match(/id="clid" value='(\d{6})'/)?.[1] ?? "";
+    return isTonghuashunConcept(plate) ? plate : null;
+  } catch {
+    return null;
+  }
+}
+
+async function loadConceptCatalog(): Promise<ConceptCatalog> {
+  let html = "";
+  try {
+    html = await readHtml("https://q.10jqka.com.cn/gn/", CONCEPT_REFERER);
+  } catch {
+    throw new UpstreamError("同花顺概念名单暂时读不到");
+  }
+  const quoted = parseConceptSection(html);
+  const detailCodes: Record<string, string> = {};
+  const items: SectorItem[] = [];
+  const seen = new Set<string>();
+  for (const [cid, row] of quoted) {
+    if (seen.has(row.plate)) continue;
+    seen.add(row.plate);
+    detailCodes[row.plate] = cid;
+    items.push({
+      code: row.plate,
+      name: row.name,
+      pct: row.pct,
+      price: null,
+      leader: null,
+      leaderCode: null,
+      upCount: null,
+      downCount: null,
+      source: "ths",
+    });
+  }
+  const missing = parseConceptDirectory(html).filter((item) => !quoted.has(item.cid));
+  const resolved = await mapPool(missing, 8, async (item) => {
+    const plate = await conceptPlateCode(item.cid);
+    return plate ? { ...item, plate } : null;
+  });
+  for (const item of resolved) {
+    if (!item || seen.has(item.plate)) continue;
+    seen.add(item.plate);
+    detailCodes[item.plate] = item.cid;
+    items.push({
+      code: item.plate,
+      name: item.name,
+      pct: null,
+      price: null,
+      leader: null,
+      leaderCode: null,
+      upCount: null,
+      downCount: null,
+      source: "ths",
+    });
+  }
+  if (items.length < 100) throw new UpstreamError("同花顺概念名单暂时读不到");
+  return { items, detailCodes };
+}
+
+export async function fetchTonghuashunConcepts(): Promise<SectorItem[]> {
+  const catalog = await cached("ths-concept-boards", 10 * 60_000, loadConceptCatalog);
+  conceptDetailCodes.clear();
+  for (const [plate, cid] of Object.entries(catalog.detailCodes)) conceptDetailCodes.set(plate, cid);
+  return catalog.items;
+}
+
+async function conceptDetailCode(plate: string): Promise<string | null> {
+  const known = conceptDetailCodes.get(plate);
+  if (known) return known;
+  await fetchTonghuashunConcepts();
+  return conceptDetailCodes.get(plate) ?? null;
+}
+
+export async function fetchTonghuashunMembers(code: string, limit = 40): Promise<BoardMember[]> {
+  if (isTonghuashunIndustry(code)) {
+    return fetchMemberPages(
+      `https://q.10jqka.com.cn/thshy/detail/code/${code}/`,
+      limit,
+      "同花顺行业成分股暂时读不到",
+    );
+  }
+  if (!isTonghuashunConcept(code)) return [];
+  const cid = await conceptDetailCode(code);
+  if (!cid) return [];
+  return fetchMemberPages(
+    `https://q.10jqka.com.cn/gn/detail/code/${cid}/`,
+    limit,
+    "同花顺概念成分股暂时读不到",
+  );
+}
+
 function parseJsonp<T>(text: string): T {
   const start = text.indexOf("{");
   const end = text.lastIndexOf("}");
-  if (start < 0 || end <= start) throw new UpstreamError("同花顺行业指数日线暂时取不到");
+  if (start < 0 || end <= start) throw new UpstreamError("同花顺板块指数日线暂时取不到");
   try {
     return JSON.parse(text.slice(start, end + 1)) as T;
   } catch {
-    throw new UpstreamError("同花顺行业指数日线暂时取不到");
+    throw new UpstreamError("同花顺板块指数日线暂时取不到");
   }
 }
 
@@ -191,9 +328,13 @@ function positive(value: unknown): number | null {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
+function boardReferer(code: string): string {
+  return isTonghuashunConcept(code) ? CONCEPT_REFERER : `https://q.10jqka.com.cn/thshy/detail/code/${code}/`;
+}
+
 /** 日线文件只到上一个交易日。盘中的这一根在实时行情里。 */
 async function fetchTonghuashunToday(code: string): Promise<KBar | null> {
-  const referer = `https://q.10jqka.com.cn/thshy/detail/code/${code}/`;
+  const referer = boardReferer(code);
   try {
     const text = await fetchUtf(`https://d.10jqka.com.cn/v6/realhead/48_${code}/last.js`, {
       referer,
@@ -235,7 +376,7 @@ function withToday(bars: KBar[], today: KBar | null): KBar[] {
 }
 
 async function fetchTonghuashunHistory(code: string, count: number): Promise<Series> {
-  const referer = `https://q.10jqka.com.cn/thshy/detail/code/${code}/`;
+  const referer = boardReferer(code);
   let text = "";
   try {
     text = await fetchUtf(`https://d.10jqka.com.cn/v6/line/48_${code}/01/last.js`, {
@@ -243,7 +384,7 @@ async function fetchTonghuashunHistory(code: string, count: number): Promise<Ser
       timeoutMs: 12_000,
     });
   } catch {
-    throw new UpstreamError("同花顺行业指数日线暂时取不到");
+    throw new UpstreamError("同花顺板块指数日线暂时取不到");
   }
   const payload = parseJsonp<{ name?: string; data?: string }>(text);
   const bars: KBar[] = [];
@@ -270,13 +411,13 @@ async function fetchTonghuashunHistory(code: string, count: number): Promise<Ser
     });
   }
   const sliced = bars.slice(-Math.max(1, count));
-  if (sliced.length < 2) throw new UpstreamError("同花顺行业指数日线暂时取不到");
+  if (sliced.length < 2) throw new UpstreamError("同花顺板块指数日线暂时取不到");
   return { name: payload.name?.trim() || code, bars: sliced };
 }
 
 export async function fetchTonghuashunSeries(code: string, count = 160): Promise<Series> {
-  if (!isTonghuashunIndustry(code)) {
-    throw new UpstreamError("请从同花顺行业里选择一个板块", 400);
+  if (!isTonghuashunBoard(code)) {
+    throw new UpstreamError("请从同花顺行业或概念里选择一个板块", 400);
   }
   const history = await cached(`ths-kline-hist:${code}:${count}`, 10 * 60_000, () =>
     fetchTonghuashunHistory(code, count),

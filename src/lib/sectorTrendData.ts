@@ -1,6 +1,6 @@
-import { listAllIndustryBoards, listBoardMembers } from "./boards";
+import { listAllIndustryBoards, listBoardMembers, listSelectableBoards } from "./boards";
 import { cached } from "./cache";
-import { isTonghuashunIndustry } from "./codes";
+import { isTonghuashunBoard } from "./codes";
 import { UpstreamError } from "./http";
 import { mapPool } from "./pool";
 import {
@@ -68,9 +68,9 @@ async function industrySeries(code: string): Promise<{ name: string; bars: KBar[
 
 export async function getSectorTrend(code: string): Promise<SectorTrendReport> {
   const boardCode = code.trim();
-  if (!isTonghuashunIndustry(boardCode)) throw new UpstreamError("请从同花顺行业里选择一个板块", 400);
+  if (!isTonghuashunBoard(boardCode)) throw new UpstreamError("请从同花顺行业或概念里选择一个板块", 400);
   const [boards, series, members] = await Promise.all([
-    listAllIndustryBoards().catch(() => [] as SectorItem[]),
+    listSelectableBoards().catch(() => [] as SectorItem[]),
     industrySeries(boardCode),
     listBoardMembers(boardCode, 40, "amount").catch(() => [] as BoardMember[]),
   ]);
