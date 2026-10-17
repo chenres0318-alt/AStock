@@ -1,33 +1,21 @@
 /**
- * 用分时 MACDFS(12,26,9) 标出一轮红柱或绿柱的转折。不是同花顺的公式。
- * 柱 = 2 * (DIF - DEA)。
+ * 用分时 MACDFS(12,26,9) 标出 DIF、DEA 连续三分钟的拐头。不是同花顺的公式。
+ * 柱 = 2 * (DIF - DEA)。红柱是 DIF > DEA，绿柱是 DEA > DIF。
  *
- * 顶：同一段红柱先堆高，再从最高的红柱缩短。DIF > DEA，0 轴上下都算。
- *     这一分钟是附近高点，下一分钟不再更高。
- *     成交量小于前 8 分钟的最大量；如果这一分钟放量，但价格没有超过 10 点前的最高价，也算顶。
- * 底：同一段绿柱先拉长，再从最长的绿柱缩短。DEA > DIF，0 轴上下都算。
- *     这一分钟是附近低点，下一分钟不再更低，成交量也小于前 8 分钟里的最大量。
- *     另一路底：绿柱转成红柱后，红柱还不多，连续两根红柱且第二根量比第一根大，就在这段下跌的最低价标止跌。
- * 同色柱没堆满 3 分钟，或柱高不到股价的万分之五，不算。
- * 顶和底哪一边先出现都可以，之后交替。还没配上对面时，更高的顶要红柱不低于前一个顶的八成才换掉；
- * 更低的底直接换掉前一个底。配成一对时，一手差价要盖过 5 元佣金，再加这一手卖出价的 0.05% 印花税。
+ * 顶：处在 DIF > DEA。DIF 连续三分钟缩小，DEA 连续三分钟放大，
+ *     DIF 在向下靠近 DEA，红柱动能也连续三分钟减弱，这一分钟还没下叉。
+ * 底：处在 DEA > DIF。DEA 连续三分钟缩小，DIF 这一分钟已经拐头向上、缺口在收，
+ *     绿柱动能连续三分钟减弱，这一分钟还没上叉。
+ * 同一段连续满足时只标第一分钟。之后顶和底交替。
+ * 还没配上对面时，更高的顶要红柱不低于前一个顶的八成才换掉；更低的底直接换掉前一个底。
+ * 配成一对时，一手差价要盖过 5 元佣金，再加这一手卖出价的 0.05% 印花税。
  */
 
 const LOT = 100;
 const COMMISSION = 5;
 const STAMP_RATE = 0.0005;
-/** 柱高接近 0 时只是浮点毛刺，不算红柱或绿柱。 */
-const MIN_COLUMN = 1e-4;
-/** 同色柱至少先走出这么多分钟，极值才算这一波的顶或底。 */
-const BUILD_BARS = 3;
-const VOLUME_LOOKBACK = 8;
-/** 绿柱至少走这么多分钟，后面两根放量红柱才算止跌。 */
-const STOP_GREEN_BARS = 5;
-const STOP_RED_BARS = 2;
-/** 柱高达到这一波极值的九成四以上时，取其中更极端的价格。 */
-const PEAK_BAND = 0.06;
-/** 柱高至少要到股价的这个比例，太短的柱子没有做 T 的空间。 */
-const HIST_FLOOR_RATIO = 0.0005;
+/** 缩小或放大要连续这么多分钟。 */
+const SLOPE_BARS = 3;
 /** 更高的价格要配上差不多高的红柱，才换掉已经标出的顶。 */
 const REPLACE_HIST_RATIO = 0.8;
 
@@ -92,88 +80,61 @@ export function lotSpreadCoversCost(low: number, high: number): boolean {
   return spread > COMMISSION + stamp;
 }
 
-function maxVolumeBefore(points: IntradayMinute[], index: number): number {
-  let vmax = 0;
-  for (let j = Math.max(0, index - VOLUME_LOOKBACK); j < index; j += 1) {
-    vmax = Math.max(vmax, points[j].volume);
+function strictlyDown(values: number[], index: number): boolean {
+  for (let step = 0; step < SLOPE_BARS; step += 1) {
+    if (!(values[index - step] < values[index - step - 1])) return false;
   }
-  return vmax;
+  return true;
 }
 
-/** 10 点之前出现过的最高价。没有 10 点前的分钟时返回 null。 */
-function highBeforeTen(points: IntradayMinute[]): number | null {
-  let high: number | null = null;
-  for (const point of points) {
-    if (point.time >= "10:00") break;
-    high = high == null ? point.price : Math.max(high, point.price);
+function strictlyUp(values: number[], index: number): boolean {
+  for (let step = 0; step < SLOPE_BARS; step += 1) {
+    if (!(values[index - step] > values[index - step - 1])) return false;
   }
-  return high;
+  return true;
 }
 
-function waveCandidates(points: IntradayMinute[]): Candidate[] {
-  const morningHigh = highBeforeTen(points);
+function slopeCandidates(points: IntradayMinute[]): Candidate[] {
   const macd = macdfsSeries(points.map((point) => point.price));
-  const hist = macd.map((bar) => bar?.hist ?? 0);
+  const dif = macd.map((bar) => bar?.dif ?? Number.NaN);
+  const dea = macd.map((bar) => bar?.dea ?? Number.NaN);
+  const hist = macd.map((bar) => bar?.hist ?? Number.NaN);
   const candidates: Candidate[] = [];
+  let lastSide: "top" | "bottom" | null = null;
+  let lastIndex = -1;
 
-  let i = 0;
-  while (i < points.length) {
-    if (!macd[i] || Math.abs(hist[i]) < MIN_COLUMN) {
-      i += 1;
+  for (let i = SLOPE_BARS; i < points.length; i += 1) {
+    if (!macd[i] || !macd[i - SLOPE_BARS]) continue;
+    const redZone = dif[i] > dea[i] && dif[i - 1] > dea[i - 1] && dif[i - 2] > dea[i - 2];
+    const greenZone = dea[i] > dif[i] && dea[i - 1] > dif[i - 1] && dea[i - 2] > dif[i - 2];
+    let side: "top" | "bottom" | null = null;
+    if (redZone && strictlyDown(dif, i) && strictlyUp(dea, i) && strictlyDown(hist, i)) {
+      side = "top";
+    } else if (
+      greenZone &&
+      strictlyDown(dea, i) &&
+      dif[i] > dif[i - 1] &&
+      dea[i] - dif[i] < dea[i - 1] - dif[i - 1] &&
+      strictlyUp(hist, i)
+    ) {
+      side = "bottom";
+    }
+    if (!side) {
+      lastSide = null;
       continue;
     }
-    const red = hist[i] > 0;
-    const start = i;
-    while (i < points.length && macd[i] && (red ? hist[i] > MIN_COLUMN : hist[i] < -MIN_COLUMN)) i += 1;
-    const end = i - 1;
-
-    let ext = start;
-    for (let j = start + 1; j <= end; j += 1) {
-      if (red ? hist[j] > hist[ext] : hist[j] < hist[ext]) ext = j;
+    if (side === lastSide && i === lastIndex + 1) {
+      lastIndex = i;
+      continue;
     }
-    if (ext - start < BUILD_BARS) continue;
-    let shrunk = false;
-    for (let j = ext + 1; j <= end; j += 1) {
-      if (red ? hist[j] < hist[ext] : hist[j] > hist[ext]) {
-        shrunk = true;
-        break;
-      }
-    }
-    if (!shrunk || Math.abs(hist[ext]) < points[ext].price * HIST_FLOOR_RATIO) continue;
-
-    let mark = ext;
-    const from = Math.max(start, ext - 2);
-    const to = Math.min(end, ext + 1);
-    for (let j = from; j <= to; j += 1) {
-      if (Math.abs(hist[j]) < Math.abs(hist[ext]) * (1 - PEAK_BAND)) continue;
-      if (red ? points[j].price > points[mark].price : points[j].price < points[mark].price) mark = j;
-    }
-    if (mark === 0 || mark + 1 >= points.length) continue;
-
-    const price = points[mark].price;
-    const prev = points[mark - 1].price;
-    const next = points[mark + 1].price;
-    if (red ? !(price >= prev && next < price) : !(price <= prev && next > price)) continue;
-
-    const column = macd[ext];
-    if (!column) continue;
-    if (red) {
-      if (!(column.dif > column.dea)) continue;
-    } else if (!(column.dea > column.dif)) continue;
-
-    const volume = points[mark].volume;
-    const priorVolume = maxVolumeBefore(points, mark);
-    const volumeFaded = volume > 0 && volume < priorVolume;
-    const heavyBelowMorningHigh =
-      red && volume > priorVolume && morningHigh != null && points[mark].time >= "10:00" && price <= morningHigh;
-    if (!(volumeFaded || heavyBelowMorningHigh)) continue;
-
+    lastSide = side;
+    lastIndex = i;
     candidates.push({
-      index: mark,
-      time: points[mark].time,
-      side: red ? "top" : "bottom",
-      price,
-      hist: hist[ext],
+      index: i,
+      time: points[i].time,
+      side,
+      price: points[i].price,
+      hist: hist[i],
     });
   }
   return candidates;
@@ -184,47 +145,14 @@ function dropMark(marks: Candidate[], target: Candidate) {
   if (index >= 0) marks.splice(index, 1);
 }
 
-/** 绿柱结束后连续两根红柱，并且第二根放量，把这段绿柱的最低价标成底。 */
-function declineStops(points: IntradayMinute[]): IntradayMark[] {
-  const macd = macdfsSeries(points.map((point) => point.price));
-  const hist = macd.map((bar) => bar?.hist ?? 0);
-  const marks: IntradayMark[] = [];
-  let i = 0;
-  while (i < points.length) {
-    if (!macd[i] || !(hist[i] < -MIN_COLUMN)) {
-      i += 1;
-      continue;
-    }
-    const start = i;
-    while (i < points.length && macd[i] && hist[i] < -MIN_COLUMN) i += 1;
-    const end = i - 1;
-    if (end - start + 1 < STOP_GREEN_BARS) continue;
-    const reds: number[] = [];
-    let cursor = end + 1;
-    while (cursor < points.length && macd[cursor] && hist[cursor] > MIN_COLUMN && reds.length < STOP_RED_BARS) {
-      reds.push(cursor);
-      cursor += 1;
-    }
-    if (reds.length < STOP_RED_BARS) continue;
-    if (!(points[reds[1]].volume > points[reds[0]].volume)) continue;
-    let low = start;
-    for (let j = start + 1; j <= end; j += 1) {
-      if (points[j].price <= points[low].price) low = j;
-    }
-    if (!(points[reds[1]].price > points[low].price)) continue;
-    marks.push({ index: low, time: points[low].time, side: "bottom", price: points[low].price });
-  }
-  return marks;
-}
-
 export function intradayExtremes(points: IntradayMinute[]): IntradayMark[] {
-  if (points.length < 3) return [];
+  if (points.length < SLOPE_BARS + 1) return [];
   const marks: Candidate[] = [];
   let seek: "either" | "bottom" | "top" = "either";
   let openBottom: Candidate | null = null;
   let openTop: Candidate | null = null;
 
-  for (const candidate of waveCandidates(points)) {
+  for (const candidate of slopeCandidates(points)) {
     if (candidate.side === "top") {
       if (
         seek === "bottom" &&
@@ -270,11 +198,5 @@ export function intradayExtremes(points: IntradayMinute[]): IntradayMark[] {
     openTop = null;
   }
 
-  const paired = marks.map(({ index, time, side, price }) => ({ index, time, side, price }));
-  for (const stop of declineStops(points)) {
-    const already = paired.some((mark) => mark.side === "bottom" && Math.abs(mark.index - stop.index) <= 3);
-    if (!already) paired.push(stop);
-  }
-  paired.sort((left, right) => left.index - right.index);
-  return paired;
+  return marks.map(({ index, time, side, price }) => ({ index, time, side, price }));
 }
