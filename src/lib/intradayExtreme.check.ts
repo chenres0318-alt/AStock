@@ -92,6 +92,49 @@ assert(Math.abs(aboveZeroMarks[0].price - 20.84) < 1e-9, "the above-zero bottom 
 const aboveZeroColumn = macdfsSeries(aboveZero.map((point) => point.price))[aboveZeroMarks[0].index];
 assert(aboveZeroColumn != null && aboveZeroColumn.dif > 0 && aboveZeroColumn.dea > 0, "this bottom is over the zero axis");
 
+function session(parts: Array<{ n: number; step: number; volume: number }>, origin: number): IntradayMinute[] {
+  const points: IntradayMinute[] = [];
+  let price = origin;
+  for (const part of parts) {
+    for (let i = 0; i < part.n; i += 1) {
+      price = Math.round((price + part.step) * 100) / 100;
+      const minute = 9 * 60 + 30 + points.length;
+      const time = `${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`;
+      points.push({ time, price, volume: part.volume });
+    }
+  }
+  return points;
+}
+
+const heavyUnderHigh = session(
+  [
+    { n: 40, step: 0, volume: 1000 },
+    { n: 8, step: -0.3, volume: 2000 },
+    { n: 8, step: 0.2, volume: 8000 },
+    { n: 1, step: 0.2, volume: 15000 },
+    { n: 3, step: -0.15, volume: 3000 },
+  ],
+  30,
+);
+const heavyTop = intradayExtremes(heavyUnderHigh).find((mark) => mark.side === "top");
+assert(heavyTop != null && Math.abs(heavyTop.price - 29.4) < 1e-9, "heavy volume still marks a top when price stays under the pre-10 high");
+assert((heavyTop?.price ?? 0) <= 30, "that top does not exceed the price before 10:00");
+
+const heavyThroughHigh = session(
+  [
+    { n: 40, step: 0, volume: 1000 },
+    { n: 4, step: -0.1, volume: 2000 },
+    { n: 8, step: 0.25, volume: 8000 },
+    { n: 1, step: 0.25, volume: 15000 },
+    { n: 3, step: -0.15, volume: 3000 },
+  ],
+  30,
+);
+assert(
+  intradayExtremes(heavyThroughHigh).every((mark) => mark.side !== "top"),
+  "heavy volume is not a top after price exceeds the pre-10 high",
+);
+
 console.log(
   "intradayExtreme.check ok",
   marks.map((mark) => `${mark.side}@${mark.price}`),
