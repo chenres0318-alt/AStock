@@ -4,7 +4,7 @@
  *
  * 顶：同一段红柱先堆高，再从最高的红柱缩短。DIF > DEA，0 轴上下都算。
  *     这一分钟是附近高点，下一分钟不再更高，成交量也小于前 8 分钟里的最大量。
- * 底：同一段绿柱先拉长，再从最长的绿柱缩短。DIF、DEA 都在 0 轴下方且 DEA > DIF。
+ * 底：同一段绿柱先拉长，再从最长的绿柱缩短。DEA > DIF，0 轴上下都算。
  *     这一分钟是附近低点，下一分钟不再更低，成交量也小于前 8 分钟里的最大量。
  * 同色柱没堆满 3 分钟，或柱高不到股价的万分之五，不算。
  * 顶和底哪一边先出现都可以，之后交替。还没配上对面时，更高的顶要红柱不低于前一个顶的八成才换掉；
@@ -143,7 +143,7 @@ function waveCandidates(points: IntradayMinute[]): Candidate[] {
     if (!column) continue;
     if (red) {
       if (!(column.dif > column.dea)) continue;
-    } else if (!(column.dif < 0 && column.dea < 0 && column.dea > column.dif)) continue;
+    } else if (!(column.dea > column.dif)) continue;
 
     const volume = points[mark].volume;
     if (!(volume > 0 && volume < maxVolumeBefore(points, mark))) continue;
