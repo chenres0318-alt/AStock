@@ -4,47 +4,75 @@ function assert(cond: unknown, message: string) {
   if (!cond) throw new Error(message);
 }
 
-function minutes(prices: number[], volumes: number[]): IntradayMinute[] {
+function minutes(prices: number[]): IntradayMinute[] {
   return prices.map((price, index) => ({
-    time: `${String(9 + Math.floor((30 + index) / 60)).padStart(2, "0")}:${String((30 + index) % 60).padStart(2, "0")}`,
+    time: String(index),
     price,
-    volume: volumes[index] ?? 1000,
+    volume: 1000,
   }));
 }
 
-const flat = minutes(Array.from({ length: 40 }, () => 10), Array.from({ length: 40 }, () => 1000));
-assert(intradayExtremes(flat).length === 0, "a flat session has no top or bottom");
+function flat(count: number, price: number) {
+  return Array.from({ length: count }, () => price);
+}
 
-const topPrices = [
-  ...Array(20).fill(10),
-  10, 10.04, 10.1, 10.2, 10.26, 10.3, 10.32, 10.24,
-  ...Array(8).fill(10.2),
-];
-const topVolumes = [...Array(24).fill(1000), 700, 700, 700, ...Array(9).fill(800)];
-const tops = intradayExtremes(minutes(topPrices, topVolumes));
-assert(tops.length === 1 && tops[0].side === "top" && tops[0].price === 10.32, "a slowing rally with fading volume is a top");
+function ramp(from: number, count: number, step: number) {
+  const prices: number[] = [];
+  let price = from;
+  for (let i = 0; i < count; i += 1) {
+    price += step;
+    prices.push(price);
+  }
+  return { prices, end: price };
+}
 
-const bottomPrices = [
-  ...Array(20).fill(10),
-  10, 9.96, 9.9, 9.8, 9.74, 9.7, 9.68, 9.76,
-  ...Array(8).fill(9.8),
-];
-const bottomVolumes = [...Array(24).fill(1000), 600, 600, 600, ...Array(9).fill(700)];
-const bottoms = intradayExtremes(minutes(bottomPrices, bottomVolumes));
+assert(intradayExtremes(minutes(flat(100, 10))).length === 0, "a flat session has no top or bottom");
+
+const wiggle = flat(40, 10);
+let wigglePrice = 10;
+for (let i = 0; i < 50; i += 1) {
+  wigglePrice += i % 2 === 0 ? 0.01 : -0.01;
+  wiggle.push(wigglePrice);
+}
+assert(intradayExtremes(minutes(wiggle)).length === 0, "a small bend is not a signal");
+
+const rally = flat(45, 10);
+let rolled = ramp(10, 35, 0.05);
+rally.push(...rolled.prices);
+rolled = ramp(rolled.end, 30, -0.06);
+rally.push(...rolled.prices);
+const tops = intradayExtremes(minutes(rally)).filter((mark) => mark.side === "top");
+assert(tops.length === 1, "a rally that rolls over has one top where DIF crosses under DEA");
+
+const rebound = flat(45, 12);
+let leg = ramp(12, 40, -0.05);
+rebound.push(...leg.prices);
+leg = ramp(leg.end, 35, 0.07);
+rebound.push(...leg.prices);
+const bottoms = intradayExtremes(minutes(rebound)).filter((mark) => mark.side === "bottom");
+assert(bottoms.length === 1, "a decline that turns up has one bottom where DIF crosses above DEA");
+
+const weak = flat(45, 12);
+leg = ramp(12, 25, -0.02);
+weak.push(...leg.prices);
+leg = ramp(leg.end, 15, -0.12);
+weak.push(...leg.prices);
+leg = ramp(leg.end, 8, 0.02);
+weak.push(...leg.prices);
+leg = ramp(leg.end, 20, -0.06);
+weak.push(...leg.prices);
+const weakMarks = intradayExtremes(minutes(weak));
 assert(
-  bottoms.length === 1 && bottoms[0].side === "bottom" && bottoms[0].price === 9.68,
-  "a slowing drop with shrinking volume is a bottom",
+  weakMarks.every((mark) => mark.side !== "bottom"),
+  "a weak red column below zero is not a bottom",
+);
+assert(
+  weakMarks.some((mark) => mark.side === "top"),
+  "the failed bounce still marks a top when the red column fades",
 );
 
-const spikePrices = [
-  ...Array(20).fill(10),
-  10.05, 10.15, 10.25, 10.35, 10.36, 10.22, 10.42, 10.3,
-  ...Array(8).fill(10.28),
-];
-const spikeVolumes = [...Array(24).fill(1000), 50, 50, 2000, ...Array(9).fill(800)];
-assert(intradayExtremes(minutes(spikePrices, spikeVolumes)).length === 0, "a sharp volume spike is not a top");
-
-const wigglePrices = [...Array(20).fill(10), 10.01, 10.02, 10.015, ...Array(8).fill(10.01)];
-assert(intradayExtremes(minutes(wigglePrices, Array(wigglePrices.length).fill(1000))).length === 0, "a small bend is not a signal");
-
-console.log("intradayExtreme.check ok", { top: tops[0].time, bottom: bottoms[0].time });
+console.log("intradayExtreme.check ok", {
+  top: tops[0]?.index,
+  bottom: bottoms[0]?.index,
+  weak: weakMarks.map((mark) => mark.side),
+});
