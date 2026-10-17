@@ -4,50 +4,81 @@ function assert(cond: unknown, message: string) {
   if (!cond) throw new Error(message);
 }
 
-function build(parts: Array<{ n: number; step: number; volume: number }>, origin: number): IntradayMinute[] {
+function session(parts: Array<{ n: number; step: number }>, origin: number): IntradayMinute[] {
   const points: IntradayMinute[] = [];
   let price = origin;
   for (const part of parts) {
     for (let i = 0; i < part.n; i += 1) {
       price = Math.round((price + part.step) * 100) / 100;
-      points.push({ time: `t${points.length}`, price, volume: part.volume });
+      const minute = 9 * 60 + 30 + points.length;
+      const time = `${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`;
+      points.push({ time, price, volume: 1000 });
     }
   }
   return points;
 }
 
-const riseThenDrop = [
-  { n: 40, step: 0, volume: 1000 },
-  { n: 6, step: 0.25, volume: 9000 },
-  { n: 6, step: 0.25, volume: 2000 },
-  { n: 3, step: -0.15, volume: 1400 },
-  { n: 8, step: -0.3, volume: 9000 },
-  { n: 6, step: -0.3, volume: 1800 },
-  { n: 3, step: 0.2, volume: 1200 },
-];
+function down3(values: number[], index: number) {
+  return values[index] < values[index - 1] && values[index - 1] < values[index - 2] && values[index - 2] < values[index - 3];
+}
+
+function up3(values: number[], index: number) {
+  return values[index] > values[index - 1] && values[index - 1] > values[index - 2] && values[index - 2] > values[index - 3];
+}
 
 assert(lotSpreadCoversCost(10, 10.04) === false, "four cents does not cover a 5 yuan commission plus stamp tax");
 assert(lotSpreadCoversCost(10, 10.06) === true, "six cents on one lot covers the commission and stamp tax");
-assert(intradayExtremes(build([{ n: 80, step: 0, volume: 1000 }], 10)).length === 0, "a flat session has no top or bottom");
-assert(
-  intradayExtremes(build(riseThenDrop.map((part) => ({ ...part, volume: 1000 })), 20)).length === 0,
-  "a swing with no volume fade has no top or bottom",
-);
+assert(intradayExtremes(session([{ n: 80, step: 0 }], 20)).length === 0, "a flat session has no top or bottom");
 
-const marks = intradayExtremes(build(riseThenDrop, 20));
-assert(marks.length === 2 && marks[0].side === "top" && marks[1].side === "bottom", "a top can be marked before any bottom");
-assert(Math.abs(marks[0].price - 23) < 1e-9, "the top is the price where the red column turns");
-assert(Math.abs(marks[1].price - 18.35) < 1e-9, "the bottom is the price where the green column turns");
-assert(lotSpreadCoversCost(marks[1].price, marks[0].price), "the pair clears the one-lot cost");
+const slowTop = session(
+  [
+    { n: 40, step: 0 },
+    { n: 12, step: 0.2 },
+    { n: 8, step: -0.04 },
+  ],
+  20,
+);
+const topMarks = intradayExtremes(slowTop);
+assert(topMarks.length === 1 && topMarks[0].side === "top" && topMarks[0].time === "10:27", "three minutes of DIF falling and DEA rising mark a top");
+assert(Math.abs(topMarks[0].price - 22.16) < 1e-9, "the top is the minute the three-minute rollover completes");
+const topMacd = macdfsSeries(slowTop.map((point) => point.price));
+const topDif = topMacd.map((bar) => bar?.dif ?? Number.NaN);
+const topDea = topMacd.map((bar) => bar?.dea ?? Number.NaN);
+const topHist = topMacd.map((bar) => bar?.hist ?? Number.NaN);
+assert(down3(topDif, topMarks[0].index) && up3(topDea, topMarks[0].index) && down3(topHist, topMarks[0].index), "the top has DIF and the red column shrinking while DEA expands");
+assert(topDif[topMarks[0].index] > topDea[topMarks[0].index], "the top is still before DIF crosses below DEA");
+assert(topDif[topMarks[0].index] > 0 && topDea[topMarks[0].index] > 0, "this top is above the zero axis");
+
+const slowBottom = session(
+  [
+    { n: 40, step: 0 },
+    { n: 10, step: -0.15 },
+    { n: 6, step: 0.04 },
+  ],
+  20,
+);
+const bottomMarks = intradayExtremes(slowBottom);
+assert(
+  bottomMarks.length === 1 && bottomMarks[0].side === "bottom" && bottomMarks[0].time === "10:23",
+  "DEA shrinking for three minutes and DIF turning up mark a bottom",
+);
+assert(Math.abs(bottomMarks[0].price - 18.66) < 1e-9, "the bottom is the minute DIF hooks up");
+const bottomMacd = macdfsSeries(slowBottom.map((point) => point.price));
+const bottomBar = bottomMacd[bottomMarks[0].index];
+const prevBottom = bottomMacd[bottomMarks[0].index - 1];
+assert(bottomBar != null && prevBottom != null && bottomBar.dea > bottomBar.dif, "the bottom is still before DIF crosses above DEA");
+assert(bottomBar.dif < 0 && bottomBar.dea < 0, "a bottom can sit below the zero axis");
+assert(bottomBar.dif > prevBottom.dif && bottomBar.hist > prevBottom.hist, "DIF has turned up and the green column is weakening");
 
 const replaced = intradayExtremes(
-  build(
+  session(
     [
-      ...riseThenDrop.slice(0, -1),
-      { n: 12, step: 0.2, volume: 2500 },
-      { n: 8, step: -0.35, volume: 8000 },
-      { n: 5, step: -0.25, volume: 1500 },
-      { n: 3, step: 0.2, volume: 1100 },
+      { n: 40, step: 0 },
+      { n: 12, step: 0.25 },
+      { n: 10, step: -0.2 },
+      { n: 4, step: 0.03 },
+      { n: 8, step: -0.15 },
+      { n: 6, step: 0.05 },
     ],
     20,
   ),
@@ -56,132 +87,21 @@ assert(
   replaced.length === 2 && replaced[0].side === "top" && replaced[1].side === "bottom",
   "a later lower bottom replaces the earlier bottom",
 );
-assert(Math.abs(replaced[0].price - 23) < 1e-9 && Math.abs(replaced[1].price - 16.7) < 1e-9, "the kept bottom is the lower one");
-assert(replaced[1].price < 18.35, "the replaced bottom is below the first trough");
+assert(Math.abs(replaced[0].price - 22.2) < 1e-9 && Math.abs(replaced[1].price - 20.12) < 1e-9, "the kept bottom is the lower one");
 
-const belowZero = build(
-  [
-    { n: 40, step: 0, volume: 1000 },
-    { n: 12, step: -0.25, volume: 8000 },
-    { n: 5, step: 0.2, volume: 7000 },
-    { n: 5, step: 0.12, volume: 1800 },
-    { n: 3, step: -0.1, volume: 1200 },
-  ],
-  20,
+const quickDrop = intradayExtremes(
+  session(
+    [
+      { n: 40, step: 0 },
+      { n: 6, step: 0.05 },
+      { n: 8, step: -0.08 },
+    ],
+    20,
+  ),
 );
-const belowZeroMarks = intradayExtremes(belowZero);
-assert(belowZeroMarks.length === 1 && belowZeroMarks[0].side === "top", "a red column below zero can still be a top");
-assert(Math.abs(belowZeroMarks[0].price - 18.6) < 1e-9, "the below-zero top is the bounce high");
-const belowZeroColumn = macdfsSeries(belowZero.map((point) => point.price))[belowZeroMarks[0].index];
-assert(belowZeroColumn != null && belowZeroColumn.dif < 0 && belowZeroColumn.dea < 0, "this top is under the zero axis");
-
-const aboveZero = build(
-  [
-    { n: 40, step: 0, volume: 1000 },
-    { n: 8, step: 0.2, volume: 6000 },
-    { n: 4, step: 0.05, volume: 1500 },
-    { n: 6, step: -0.12, volume: 7000 },
-    { n: 4, step: -0.06, volume: 1600 },
-    { n: 3, step: 0.1, volume: 1200 },
-  ],
-  20,
-);
-const aboveZeroMarks = intradayExtremes(aboveZero);
-assert(aboveZeroMarks.length === 1 && aboveZeroMarks[0].side === "bottom", "a green column above zero can still be a bottom");
-assert(Math.abs(aboveZeroMarks[0].price - 20.84) < 1e-9, "the above-zero bottom is the pullback low");
-const aboveZeroColumn = macdfsSeries(aboveZero.map((point) => point.price))[aboveZeroMarks[0].index];
-assert(aboveZeroColumn != null && aboveZeroColumn.dif > 0 && aboveZeroColumn.dea > 0, "this bottom is over the zero axis");
-
-function session(parts: Array<{ n: number; step: number; volume: number }>, origin: number): IntradayMinute[] {
-  const points: IntradayMinute[] = [];
-  let price = origin;
-  for (const part of parts) {
-    for (let i = 0; i < part.n; i += 1) {
-      price = Math.round((price + part.step) * 100) / 100;
-      const minute = 9 * 60 + 30 + points.length;
-      const time = `${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`;
-      points.push({ time, price, volume: part.volume });
-    }
-  }
-  return points;
-}
-
-const heavyUnderHigh = session(
-  [
-    { n: 40, step: 0, volume: 1000 },
-    { n: 8, step: -0.3, volume: 2000 },
-    { n: 8, step: 0.2, volume: 8000 },
-    { n: 1, step: 0.2, volume: 15000 },
-    { n: 3, step: -0.15, volume: 3000 },
-  ],
-  30,
-);
-const heavyTop = intradayExtremes(heavyUnderHigh).find((mark) => mark.side === "top");
-assert(heavyTop != null && Math.abs(heavyTop.price - 29.4) < 1e-9, "heavy volume still marks a top when price stays under the pre-10 high");
-assert((heavyTop?.price ?? 0) <= 30, "that top does not exceed the price before 10:00");
-
-const heavyThroughHigh = session(
-  [
-    { n: 40, step: 0, volume: 1000 },
-    { n: 4, step: -0.1, volume: 2000 },
-    { n: 8, step: 0.25, volume: 8000 },
-    { n: 1, step: 0.25, volume: 15000 },
-    { n: 3, step: -0.15, volume: 3000 },
-  ],
-  30,
-);
-assert(
-  intradayExtremes(heavyThroughHigh).every((mark) => mark.side !== "top"),
-  "heavy volume is not a top after price exceeds the pre-10 high",
-);
-
-const shallowStop = session(
-  [
-    { n: 40, step: 0, volume: 1000 },
-    { n: 8, step: -0.015, volume: 1800 },
-    { n: 1, step: 0.12, volume: 700 },
-    { n: 1, step: 0.08, volume: 900 },
-    { n: 1, step: 0.05, volume: 1400 },
-  ],
-  51,
-);
-const stopMarks = intradayExtremes(shallowStop);
-assert(
-  stopMarks.length === 1 && stopMarks[0].side === "bottom" && stopMarks[0].time === "10:17",
-  "two rising red bars after a green run mark the decline low",
-);
-assert(Math.abs(stopMarks[0].price - 50.92) < 1e-9, "the stop is the lowest price of that green run");
-const stopColumn = macdfsSeries(shallowStop.map((point) => point.price))[stopMarks[0].index];
-assert(
-  stopColumn != null && Math.abs(stopColumn.hist) < stopMarks[0].price * 0.0005,
-  "a short green column can still mark a stop",
-);
-
-const fadedRed = session(
-  [
-    { n: 40, step: 0, volume: 1000 },
-    { n: 8, step: -0.015, volume: 1800 },
-    { n: 1, step: 0.12, volume: 700 },
-    { n: 1, step: 0.08, volume: 1400 },
-    { n: 1, step: 0.05, volume: 900 },
-  ],
-  51,
-);
-assert(intradayExtremes(fadedRed).length === 0, "the second red bar must print more volume than the first");
-
-const shortGreen = session(
-  [
-    { n: 40, step: 0, volume: 1000 },
-    { n: 3, step: -0.015, volume: 1800 },
-    { n: 1, step: 0.12, volume: 700 },
-    { n: 1, step: 0.08, volume: 900 },
-    { n: 1, step: 0.05, volume: 1400 },
-  ],
-  51,
-);
-assert(intradayExtremes(shortGreen).length === 0, "fewer than five green bars does not mark a stop");
+assert(quickDrop.length === 0, "a fast drop does not mark a top unless DEA keeps expanding for three minutes");
 
 console.log(
   "intradayExtreme.check ok",
-  marks.map((mark) => `${mark.side}@${mark.price}`),
+  topMarks.map((mark) => `${mark.side}@${mark.price}`),
 );
