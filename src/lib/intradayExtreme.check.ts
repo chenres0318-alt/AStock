@@ -1,4 +1,4 @@
-import { intradayExtremes, lotSpreadCoversCost, type IntradayMinute } from "./intradayExtreme.ts";
+import { intradayExtremes, lotSpreadCoversCost, macdfsSeries, type IntradayMinute } from "./intradayExtreme.ts";
 
 function assert(cond: unknown, message: string) {
   if (!cond) throw new Error(message);
@@ -58,6 +58,22 @@ assert(
 );
 assert(Math.abs(replaced[0].price - 23) < 1e-9 && Math.abs(replaced[1].price - 16.7) < 1e-9, "the kept bottom is the lower one");
 assert(replaced[1].price < 18.35, "the replaced bottom is below the first trough");
+
+const belowZero = build(
+  [
+    { n: 40, step: 0, volume: 1000 },
+    { n: 12, step: -0.25, volume: 8000 },
+    { n: 5, step: 0.2, volume: 7000 },
+    { n: 5, step: 0.12, volume: 1800 },
+    { n: 3, step: -0.1, volume: 1200 },
+  ],
+  20,
+);
+const belowZeroMarks = intradayExtremes(belowZero);
+assert(belowZeroMarks.length === 1 && belowZeroMarks[0].side === "top", "a red column below zero can still be a top");
+assert(Math.abs(belowZeroMarks[0].price - 18.6) < 1e-9, "the below-zero top is the bounce high");
+const belowZeroColumn = macdfsSeries(belowZero.map((point) => point.price))[belowZeroMarks[0].index];
+assert(belowZeroColumn != null && belowZeroColumn.dif < 0 && belowZeroColumn.dea < 0, "this top is under the zero axis");
 
 console.log(
   "intradayExtreme.check ok",
