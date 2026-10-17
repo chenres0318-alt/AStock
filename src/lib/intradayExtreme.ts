@@ -2,8 +2,8 @@
  * 用分时 MACDFS(12,26,9) 标出 DIF、DEA 连续三分钟的拐头。不是同花顺的公式。
  * 柱 = 2 * (DIF - DEA)。红柱是 DIF > DEA，绿柱是 DEA > DIF。
  *
- * 顶：处在 DIF > DEA。DIF 连续三分钟缩小，DEA 连续三分钟放大，
- *     DIF 在向下靠近 DEA，红柱动能也连续三分钟减弱，这一分钟还没下叉。
+ * 顶：处在 DIF > DEA。DEA 连续三分钟放大，红柱动能连续三分钟减弱，
+ *     DIF 已经拐头向下、靠近 DEA。DIF 不必先缩满三分钟，下叉前这一分钟就算顶。
  * 底：处在 DEA > DIF。DEA 连续三分钟缩小，DIF 这一分钟已经拐头向上、缺口在收，
  *     绿柱动能连续三分钟减弱，这一分钟还没上叉。
  * 同一段连续满足时只标第一分钟。之后顶和底交替。
@@ -108,7 +108,7 @@ function slopeCandidates(points: IntradayMinute[]): Candidate[] {
     const redZone = dif[i] > dea[i] && dif[i - 1] > dea[i - 1] && dif[i - 2] > dea[i - 2];
     const greenZone = dea[i] > dif[i] && dea[i - 1] > dif[i - 1] && dea[i - 2] > dif[i - 2];
     let side: "top" | "bottom" | null = null;
-    if (redZone && strictlyDown(dif, i) && strictlyUp(dea, i) && strictlyDown(hist, i)) {
+    if (redZone && strictlyUp(dea, i) && strictlyDown(hist, i) && dif[i] < dif[i - 1]) {
       side = "top";
     } else if (
       greenZone &&
