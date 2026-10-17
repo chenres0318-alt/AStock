@@ -152,6 +152,13 @@ export function isTonghuashunIndustry(code: string): boolean {
   return /^881\d{3}$/.test(code.trim());
 }
 
+/** 场内 ETF。名称里有 ETF，或代码是沪深 ETF 的常见前缀。 */
+export function isEtf(code: string, name = ""): boolean {
+  if (name.toUpperCase().includes("ETF")) return true;
+  const id = bareCode(code);
+  return /^(159|51[0-8]|56[0-3]|588|589)\d{3}$/.test(id);
+}
+
 export function isIndexCode(code: string): boolean {
   const tx = toTencentCode(code);
   if (INDEX_CODES.has(tx)) return true;

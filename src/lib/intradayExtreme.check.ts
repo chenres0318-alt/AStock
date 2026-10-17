@@ -1,3 +1,4 @@
+import { isEtf } from "./codes.ts";
 import { intradayExtremes, lotSpreadCoversCost, macdfsSeries, type IntradayMinute } from "./intradayExtreme.ts";
 
 function assert(cond: unknown, message: string) {
@@ -28,6 +29,11 @@ function up3(values: number[], index: number) {
 
 assert(lotSpreadCoversCost(10, 10.04) === false, "four cents does not cover a 5 yuan commission plus stamp tax");
 assert(lotSpreadCoversCost(10, 10.06) === true, "six cents on one lot covers the commission and stamp tax");
+assert(lotSpreadCoversCost(0.598, 0.62) === false, "an ETF-sized move still fails when the 5 yuan minimum applies");
+assert(lotSpreadCoversCost(0.598, 0.62, 0) === true, "waiving the 5 yuan minimum lets that ETF move cover the stamp tax");
+assert(isEtf("sz159516", "半导体设备ETF国泰"), "the Guotai semiconductor equipment fund is an ETF");
+assert(isEtf("sh560780") && isEtf("sh588710"), "Shanghai ETF prefixes count without a name");
+assert(!isEtf("sh601138", "工业富联"), "a stock keeps the 5 yuan minimum");
 assert(intradayExtremes(session([{ n: 80, step: 0 }], 20)).length === 0, "a flat session has no top or bottom");
 
 const slowTop = session(
