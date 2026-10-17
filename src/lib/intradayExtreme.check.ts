@@ -135,6 +135,52 @@ assert(
   "heavy volume is not a top after price exceeds the pre-10 high",
 );
 
+const shallowStop = session(
+  [
+    { n: 40, step: 0, volume: 1000 },
+    { n: 8, step: -0.015, volume: 1800 },
+    { n: 1, step: 0.12, volume: 700 },
+    { n: 1, step: 0.08, volume: 900 },
+    { n: 1, step: 0.05, volume: 1400 },
+  ],
+  51,
+);
+const stopMarks = intradayExtremes(shallowStop);
+assert(
+  stopMarks.length === 1 && stopMarks[0].side === "bottom" && stopMarks[0].time === "10:17",
+  "two rising red bars after a green run mark the decline low",
+);
+assert(Math.abs(stopMarks[0].price - 50.92) < 1e-9, "the stop is the lowest price of that green run");
+const stopColumn = macdfsSeries(shallowStop.map((point) => point.price))[stopMarks[0].index];
+assert(
+  stopColumn != null && Math.abs(stopColumn.hist) < stopMarks[0].price * 0.0005,
+  "a short green column can still mark a stop",
+);
+
+const fadedRed = session(
+  [
+    { n: 40, step: 0, volume: 1000 },
+    { n: 8, step: -0.015, volume: 1800 },
+    { n: 1, step: 0.12, volume: 700 },
+    { n: 1, step: 0.08, volume: 1400 },
+    { n: 1, step: 0.05, volume: 900 },
+  ],
+  51,
+);
+assert(intradayExtremes(fadedRed).length === 0, "the second red bar must print more volume than the first");
+
+const shortGreen = session(
+  [
+    { n: 40, step: 0, volume: 1000 },
+    { n: 3, step: -0.015, volume: 1800 },
+    { n: 1, step: 0.12, volume: 700 },
+    { n: 1, step: 0.08, volume: 900 },
+    { n: 1, step: 0.05, volume: 1400 },
+  ],
+  51,
+);
+assert(intradayExtremes(shortGreen).length === 0, "fewer than five green bars does not mark a stop");
+
 console.log(
   "intradayExtreme.check ok",
   marks.map((mark) => `${mark.side}@${mark.price}`),

@@ -7,6 +7,7 @@
  *     成交量小于前 8 分钟的最大量；如果这一分钟放量，但价格没有超过 10 点前的最高价，也算顶。
  * 底：同一段绿柱先拉长，再从最长的绿柱缩短。DEA > DIF，0 轴上下都算。
  *     这一分钟是附近低点，下一分钟不再更低，成交量也小于前 8 分钟里的最大量。
+ *     另一路底：绿柱转成红柱后，红柱还不多，连续两根红柱且第二根量比第一根大，就在这段下跌的最低价标止跌。
  * 同色柱没堆满 3 分钟，或柱高不到股价的万分之五，不算。
  * 顶和底哪一边先出现都可以，之后交替。还没配上对面时，更高的顶要红柱不低于前一个顶的八成才换掉；
  * 更低的底直接换掉前一个底。配成一对时，一手差价要盖过 5 元佣金，再加这一手卖出价的 0.05% 印花税。
@@ -20,6 +21,9 @@ const MIN_COLUMN = 1e-4;
 /** 同色柱至少先走出这么多分钟，极值才算这一波的顶或底。 */
 const BUILD_BARS = 3;
 const VOLUME_LOOKBACK = 8;
+/** 绿柱至少走这么多分钟，后面两根放量红柱才算止跌。 */
+const STOP_GREEN_BARS = 5;
+const STOP_RED_BARS = 2;
 /** 柱高达到这一波极值的九成四以上时，取其中更极端的价格。 */
 const PEAK_BAND = 0.06;
 /** 柱高至少要到股价的这个比例，太短的柱子没有做 T 的空间。 */
@@ -180,6 +184,39 @@ function dropMark(marks: Candidate[], target: Candidate) {
   if (index >= 0) marks.splice(index, 1);
 }
 
+/** 绿柱结束后连续两根红柱，并且第二根放量，把这段绿柱的最低价标成底。 */
+function declineStops(points: IntradayMinute[]): IntradayMark[] {
+  const macd = macdfsSeries(points.map((point) => point.price));
+  const hist = macd.map((bar) => bar?.hist ?? 0);
+  const marks: IntradayMark[] = [];
+  let i = 0;
+  while (i < points.length) {
+    if (!macd[i] || !(hist[i] < -MIN_COLUMN)) {
+      i += 1;
+      continue;
+    }
+    const start = i;
+    while (i < points.length && macd[i] && hist[i] < -MIN_COLUMN) i += 1;
+    const end = i - 1;
+    if (end - start + 1 < STOP_GREEN_BARS) continue;
+    const reds: number[] = [];
+    let cursor = end + 1;
+    while (cursor < points.length && macd[cursor] && hist[cursor] > MIN_COLUMN && reds.length < STOP_RED_BARS) {
+      reds.push(cursor);
+      cursor += 1;
+    }
+    if (reds.length < STOP_RED_BARS) continue;
+    if (!(points[reds[1]].volume > points[reds[0]].volume)) continue;
+    let low = start;
+    for (let j = start + 1; j <= end; j += 1) {
+      if (points[j].price <= points[low].price) low = j;
+    }
+    if (!(points[reds[1]].price > points[low].price)) continue;
+    marks.push({ index: low, time: points[low].time, side: "bottom", price: points[low].price });
+  }
+  return marks;
+}
+
 export function intradayExtremes(points: IntradayMinute[]): IntradayMark[] {
   if (points.length < 3) return [];
   const marks: Candidate[] = [];
@@ -233,5 +270,11 @@ export function intradayExtremes(points: IntradayMinute[]): IntradayMark[] {
     openTop = null;
   }
 
-  return marks.map(({ index, time, side, price }) => ({ index, time, side, price }));
+  const paired = marks.map(({ index, time, side, price }) => ({ index, time, side, price }));
+  for (const stop of declineStops(points)) {
+    const already = paired.some((mark) => mark.side === "bottom" && Math.abs(mark.index - stop.index) <= 3);
+    if (!already) paired.push(stop);
+  }
+  paired.sort((left, right) => left.index - right.index);
+  return paired;
 }
