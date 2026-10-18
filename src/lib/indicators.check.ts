@@ -277,68 +277,6 @@ assert(bounceBar.ma4 > bounceBar.ma7, "the bounce lifts MA4 through MA7");
 assert(buried[buried.length - 1].close < bounceBar.ma20, "the bounce close is still under MA20");
 assert(buriedLines.signals.length === 0, "a 4/7 cross under MA20 is not a buy, and a decline never sells from flat");
 
-const dayCross = buildMaLines(crossBars, "day");
-const dayBuy = dayCross.signals.at(-1);
-assert(dayBuy?.side === "buy" && dayBuy.time === crossBars.at(-1)?.time, "day rule buys the 4/7 cross while the green MACD bar is still shortening");
-assert(dayCross.points.at(-1)?.ma20 != null && crossBars.at(-1)!.close < (dayCross.points.at(-1)?.ma20 ?? 0), "that day buy can sit under MA20");
-assert(!buildMaLines(crossBars).signals.some((item) => item.time === dayBuy?.time), "the weekly rule still skips a 4/7 cross under MA20");
-
-const poppedBars = barsFromCloses(popped);
-const poppedDay = buildMaLines(poppedBars, "day");
-const poppedMacd = macdSeries(popped);
-const poppedHist = poppedMacd.at(-1);
-const poppedHistPrev = poppedMacd.at(-2);
-assert(poppedHistPrev != null && poppedHist != null && poppedHistPrev.hist <= 0 && poppedHist.hist > 0, "the sharp bounce turns the MACD bar from green to red");
-assert(poppedDay.signals.at(-1)?.side === "buy" && poppedDay.signals.at(-1)?.time === poppedBars.at(-1)?.time, "a flat position buys when the MACD bar turns red");
-
-const dayHeldCloses = crossCloses.slice();
-let dayHeldPrice = dayHeldCloses[dayHeldCloses.length - 1];
-for (let i = 0; i < 10; i += 1) {
-  dayHeldPrice *= 1.004;
-  dayHeldCloses.push(Number(dayHeldPrice.toFixed(4)));
-}
-dayHeldCloses.push(Number((dayHeldPrice * 0.96).toFixed(4)));
-const dayHeldBars = barsFromCloses(dayHeldCloses);
-const dayHeld = buildMaLines(dayHeldBars, "day");
-const dayHeldPoint = dayHeld.points.at(-1)!;
-assert(dayHeldBars.at(-1)!.close < dayHeldPoint.ma20!, "the dip closes under MA20");
-assert(dayHeldPoint.ma4! > dayHeldPoint.ma7!, "MA4 is still above MA7 on that dip");
-assert(dayHeld.signals.length === 1 && dayHeld.signals[0].side === "buy", "a close under MA20 does not sell the day trade while MA4 stays above MA7");
-assert(buildMaLines(dayHeldBars).signals.length === 0, "the weekly rule never opens that trade, because the 4/7 cross was under MA20");
-
-const dayDeathCloses = dayHeldCloses.slice(0, -1);
-dayDeathCloses.push(Number((dayHeldPrice * 0.94).toFixed(4)));
-const dayDeathBars = barsFromCloses(dayDeathCloses);
-const dayDeath = buildMaLines(dayDeathBars, "day");
-const dayDeathPoint = dayDeath.points.at(-1)!;
-assert(dayDeathPoint.ma4! < dayDeathPoint.ma7!, "the next drop puts MA4 back under MA7");
-assert(dayDeathPoint.ma4! > dayDeathPoint.ma20!, "MA4 is still above MA20 on that cross");
-assert(dayDeath.signals.length === 1 && dayDeath.signals[0].side === "buy", "a 4/7 cross down does not sell while MA4 stays above MA20");
-
-const dayExitCloses = dayHeldCloses.slice(0, -1);
-dayExitCloses.push(Number((dayHeldPrice * 0.8).toFixed(4)));
-const dayExitBars = barsFromCloses(dayExitCloses);
-const dayExit = buildMaLines(dayExitBars, "day");
-const dayExitPoint = dayExit.points.at(-1)!;
-assert(dayExitPoint.ma4! < dayExitPoint.ma7! && dayExitPoint.ma4! <= dayExitPoint.ma20!, "the deeper drop crosses MA4 under MA7 and MA20");
-assert(dayExit.signals.map((item) => item.side).join(",") === "buy,sell", "day rule sells the cross down once MA4 is no longer above MA20");
-assert(dayExit.signals[1].time === dayExitBars.at(-1)?.time, "that sell is the death-cross bar");
-
-const dayRebuyCloses = dayExitCloses.slice();
-let dayRebuyPrice = dayRebuyCloses[dayRebuyCloses.length - 1];
-for (let i = 0; i < 10; i += 1) {
-  dayRebuyPrice *= 1.01;
-  dayRebuyCloses.push(Number(dayRebuyPrice.toFixed(4)));
-}
-const dayRebuyBars = barsFromCloses(dayRebuyCloses);
-const dayRebuy = buildMaLines(dayRebuyBars, "day");
-const dayRebuyMacd = macdSeries(dayRebuyCloses);
-const rebuyHist = dayRebuyMacd.at(-1);
-const rebuyHistPrev = dayRebuyMacd.at(-2);
-assert(rebuyHistPrev != null && rebuyHist != null && rebuyHistPrev.hist <= 0 && rebuyHist.hist > 0, "the recovery later turns the MACD bar red");
-assert(dayRebuy.signals.map((item) => item.side).join(",") === "buy,sell,buy", "after the sell, the next upswing buys again");
-assert(dayRebuy.signals.at(-1)?.time !== dayRebuyBars.at(-1)?.time, "the red bar does not add another buy while that position is still open");
-
 const chop = Array.from({ length: 160 }, (_, i) => barAt(i, 20 + Math.sin(i / 2) * 0.08));
 assert(adxSeries(chop).every((value) => value == null || value <= 22), "a tight box stays at or below the ADX gate");
 

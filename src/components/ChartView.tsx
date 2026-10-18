@@ -15,6 +15,7 @@ import {
 } from "lightweight-charts";
 import { isEtf, priceDigits } from "@/lib/codes";
 import { formatPrice } from "@/lib/format";
+import { dailyExtremes } from "@/lib/dailyExtreme";
 import { intradayExtremes, macdfsSeries, type MacdfsBar } from "@/lib/intradayExtreme";
 import { buildMaLines, klineRangeChange, maAt } from "@/lib/indicators";
 import type { KBar, Quote, TrendPoint } from "@/lib/types";
@@ -165,8 +166,9 @@ export default function ChartView({
   const dragRef = useRef<BarSpan | null>(null);
   const pickedRef = useRef<BarSpan | null>(null);
   const placeRef = useRef<() => void>(() => {});
-  const trendMarksRef = useRef<Array<{ timestamp: number; price: number; side: "top" | "bottom" }>>([]);
-  const [trendTags, setTrendTags] = useState<Array<{ timestamp: number; price: number; side: "top" | "bottom"; x: number; y: number }>>([]);
+  const trendMarksRef = useRef<Array<{ time: Time; price: number; side: "top" | "bottom" }>>([]);
+  const dayMarksRef = useRef<Array<{ time: Time; price: number; side: "top" | "bottom" }>>([]);
+  const [extremeTags, setExtremeTags] = useState<Array<{ timeKey: string; price: number; side: "top" | "bottom"; x: number; y: number }>>([]);
   const [macdTip, setMacdTip] = useState<MacdfsBar | null>(null);
   const [rangeMode, setRangeMode] = useState(false);
   const [picked, setPicked] = useState<BarSpan | null>(null);
@@ -192,28 +194,30 @@ export default function ChartView({
     if (!chart || !span || modeRef.current === "trend") setHighlight(null);
     else setHighlight(selectionBox(chart, span.from, span.to));
 
-    const line = lineRef.current;
     const box = boxRef.current;
-    if (!chart || !line || !box || modeRef.current !== "trend") {
-      setTrendTags((current) => (current.length === 0 ? current : []));
+    const marking = modeRef.current === "trend" || modeRef.current === "day";
+    const series = modeRef.current === "trend" ? lineRef.current : candleRef.current;
+    const marks = modeRef.current === "trend" ? trendMarksRef.current : dayMarksRef.current;
+    if (!chart || !series || !box || !marking) {
+      setExtremeTags((current) => (current.length === 0 ? current : []));
       return;
     }
     const width = box.clientWidth;
-    const next = trendMarksRef.current.flatMap((mark) => {
-      const x = chart.timeScale().timeToCoordinate(mark.timestamp as UTCTimestamp);
-      const y = line.priceToCoordinate(mark.price);
-      if (x == null || y == null) return [];
+    const next = marks.flatMap((mark) => {
+      const x = chart.timeScale().timeToCoordinate(mark.time);
+      const y = series.priceToCoordinate(mark.price);
+      if (x == null || y == null || x < 0 || x > width) return [];
       const half = 156;
       const left = Math.min(Math.max(x, half), Math.max(half, width - half));
       const top = mark.side === "top" ? Math.max(2, y - 22) : y + 16;
-      return [{ ...mark, x: Math.round(left), y: Math.round(top) }];
+      return [{ timeKey: String(mark.time), price: mark.price, side: mark.side, x: Math.round(left), y: Math.round(top) }];
     });
-    setTrendTags((current) => {
+    setExtremeTags((current) => {
       if (
         current.length === next.length &&
         current.every(
           (item, index) =>
-            item.x === next[index].x && item.y === next[index].y && item.timestamp === next[index].timestamp && item.side === next[index].side,
+            item.x === next[index].x && item.y === next[index].y && item.timeKey === next[index].timeKey && item.side === next[index].side,
         )
       ) {
         return current;
@@ -383,8 +387,8 @@ export default function ChartView({
   }, []);
 
   const ribbonCounts = useMemo(() => {
-    if (mode === "trend") return { buy: 0, sell: 0 };
-    const { signals } = buildMaLines(bars, mode === "day" ? "day" : "ma20");
+    if (mode === "trend" || mode === "day") return { buy: 0, sell: 0 };
+    const { signals } = buildMaLines(bars);
     return {
       buy: signals.filter((item) => item.side === "buy").length,
       sell: signals.filter((item) => item.side === "sell").length,
@@ -500,23 +504,24 @@ export default function ChartView({
         });
       }
       const marks = intradayExtremes(points, etf ? { minCommission: 0 } : undefined).map((mark) => ({
-        timestamp: points[mark.index].timestamp,
+        time: points[mark.index].timestamp as UTCTimestamp,
         price: mark.price,
         side: mark.side,
       }));
       trendMarksRef.current = marks;
+      dayMarksRef.current = [];
       line.setMarkers(
         marks.map((mark) =>
           mark.side === "top"
             ? {
-                time: mark.timestamp as UTCTimestamp,
+                time: mark.time,
                 position: "aboveBar" as const,
                 color: UP,
                 shape: "arrowDown" as const,
                 size: 2,
               }
             : {
-                time: mark.timestamp as UTCTimestamp,
+                time: mark.time,
                 position: "belowBar" as const,
                 color: DOWN,
                 shape: "arrowUp" as const,
@@ -544,7 +549,17 @@ export default function ChartView({
     avg.setData([]);
     ma4.setData(maLine(bars, 4));
     ma7.setData(maLine(bars, 7));
-    const ribbon = buildMaLines(bars, mode === "day" ? "day" : "ma20");
+    const dayMarks =
+      mode === "day"
+        ? dailyExtremes(bars).map((mark) => ({
+            time: mark.time as Time,
+            price: mark.price,
+            side: mark.side,
+          }))
+        : [];
+    dayMarksRef.current = dayMarks;
+    trendMarksRef.current = [];
+    const ribbon = mode === "day" ? null : buildMaLines(bars);
     candle.setData(
       bars.map((bar) => ({
         time: bar.time,
@@ -562,25 +577,43 @@ export default function ChartView({
       })),
     );
     candle.setMarkers(
-      ribbon.signals.map((point) =>
-        point.side === "buy"
-          ? {
-              time: point.time,
-              position: "belowBar" as const,
-              color: UP,
-              shape: "arrowUp" as const,
-              text: "买",
-              size: 1.2,
-            }
-          : {
-              time: point.time,
-              position: "aboveBar" as const,
-              color: DOWN,
-              shape: "arrowDown" as const,
-              text: "卖",
-              size: 1.2,
-            },
-      ),
+      mode === "day"
+        ? dayMarks.map((mark) =>
+            mark.side === "top"
+              ? {
+                  time: mark.time,
+                  position: "aboveBar" as const,
+                  color: UP,
+                  shape: "arrowDown" as const,
+                  size: 2,
+                }
+              : {
+                  time: mark.time,
+                  position: "belowBar" as const,
+                  color: DOWN,
+                  shape: "arrowUp" as const,
+                  size: 2,
+                },
+          )
+        : (ribbon?.signals ?? []).map((point) =>
+            point.side === "buy"
+              ? {
+                  time: point.time,
+                  position: "belowBar" as const,
+                  color: UP,
+                  shape: "arrowUp" as const,
+                  text: "买",
+                  size: 1.2,
+                }
+              : {
+                  time: point.time,
+                  position: "aboveBar" as const,
+                  color: DOWN,
+                  shape: "arrowDown" as const,
+                  text: "卖",
+                  size: 1.2,
+                },
+          ),
     );
     const rangeKey = `${mode}:${bars.length}:${bars[0]?.time ?? ""}:${bars.at(-1)?.time ?? ""}`;
     const resetRange = rangeKeyRef.current !== rangeKey;
@@ -685,16 +718,16 @@ export default function ChartView({
             : mode === "trend"
               ? "黄线现价 · 蓝线均价 · 下图 MACDFS(12,26,9) · 近4分钟斜率仍向上但价格和MACDFS都变弱为顶，仍向下但都变弱为底"
               : mode === "day"
-                ? `红MA4 · 青MA7 · 黄MA20 · 绿柱缩短或转红买 · 4下穿7且4日仍在20上方不卖 · 买 ${ribbonCounts.buy} 卖 ${ribbonCounts.sell}`
+                ? "红MA4 · 青MA7 · 黄MA20 · 近7日高、低、收盘斜率仍向上但变弱为顶，仍向下但变弱为底"
                 : `红MA4 · 青MA7 · 黄MA20 · 4上穿7且站上20买 · 4下穿7或跌破20卖 · 买 ${ribbonCounts.buy} 卖 ${ribbonCounts.sell}`}
         </div>
       </div>
       <div className="relative min-h-0 flex-1">
         <div ref={boxRef} className="absolute inset-0" />
-        {mode === "trend"
-          ? trendTags.map((tag) => (
+        {mode === "trend" || mode === "day"
+          ? extremeTags.map((tag) => (
               <div
-                key={`${tag.side}-${tag.timestamp}`}
+                key={`${tag.side}-${tag.timeKey}`}
                 className="pointer-events-none absolute z-10 whitespace-nowrap rounded bg-[#10151e]/92 px-2 py-1 text-[18px] font-semibold leading-none"
                 style={{
                   left: tag.x,
