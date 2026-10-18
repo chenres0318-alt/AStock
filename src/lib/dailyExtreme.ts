@@ -5,12 +5,22 @@
  *
  * 顶：这 7 天都在 DIF > DEA。斜率仍为正，但比上一天小，收盘 EMA 的抬升也变慢。
  * 底：这 7 天都在 DEA > DIF。斜率仍为负，但比上一天更靠近 0，收盘 EMA 的下跌也变慢。
+ * 20 日线仍在下降，且收盘比它低过 8%，只是下跌中继，不标底。
  * 同一段连续满足时只标第一天。
  */
 
 import type { KBar } from "./types";
 
 const WINDOW = 7;
+/** 收盘低于仍在下降的 20 日线超过这个比例，下跌只是放缓，不当作底。 */
+const FALLING_MA20_GAP = 0.08;
+
+function maAt(values: number[], period: number, index: number): number | null {
+  if (index < period - 1 || index >= values.length) return null;
+  let sum = 0;
+  for (let i = index - period + 1; i <= index; i += 1) sum += values[i];
+  return sum / period;
+}
 
 export type DailyMark = {
   index: number;
@@ -104,7 +114,12 @@ export function dailyExtremes(bars: KBar[]): DailyMark[] {
     const prevPace = emaPrev - emaOlder;
     let side: "top" | "bottom" | null = null;
     if (redZone && slope > 0 && slope < prevSlope && pace < prevPace) side = "top";
-    else if (greenZone && slope < 0 && slope > prevSlope && pace > prevPace) side = "bottom";
+    else if (greenZone && slope < 0 && slope > prevSlope && pace > prevPace) {
+      const ma20 = maAt(closes, 20, i);
+      const ma20Prev = maAt(closes, 20, i - 1);
+      const fallingKnife = ma20 != null && ma20Prev != null && ma20 < ma20Prev && closes[i] < ma20 * (1 - FALLING_MA20_GAP);
+      if (!fallingKnife) side = "bottom";
+    }
     if (!side) {
       lastSide = null;
       continue;

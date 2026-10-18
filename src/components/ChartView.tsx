@@ -718,7 +718,7 @@ export default function ChartView({
             : mode === "trend"
               ? "黄线现价 · 蓝线均价 · 下图 MACDFS(12,26,9) · 近4分钟斜率仍向上但价格和MACDFS都变弱为顶，仍向下但都变弱为底"
               : mode === "day"
-                ? "红MA4 · 青MA7 · 黄MA20 · 近7日高、低、收盘斜率仍向上但变弱为顶，仍向下但变弱为底"
+                ? "红MA4 · 青MA7 · 黄MA20 · 近7日斜率仍向上但变弱为顶，仍向下但变弱为底 · 收盘低于下降的20日线超过8%不算底"
                 : `红MA4 · 青MA7 · 黄MA20 · 4上穿7且站上20买 · 4下穿7或跌破20卖 · 买 ${ribbonCounts.buy} 卖 ${ribbonCounts.sell}`}
         </div>
       </div>

@@ -41,16 +41,29 @@ assert(
   "the top keeps a positive slope of high, low, and close, smaller than the previous day",
 );
 
-const easingDrop = session(
+const crash = session(
   [
     { n: 45, step: 0 },
     { n: 8, step: -0.7 },
-    { n: 10, step: -0.1 },
+    { n: 20, step: -0.1 },
   ],
   20,
 );
-const bottoms = dailyExtremes(easingDrop);
-assert(bottoms[0]?.side === "bottom" && bottoms[0].price === 14.3, "a drop that is still down but slowing is a bottom");
+assert(
+  dailyExtremes(crash).every((mark) => mark.side !== "bottom"),
+  "a crash still more than 8% under a falling 20-day average is not a bottom",
+);
+
+const easingDrop = session(
+  [
+    { n: 40, step: 0 },
+    { n: 30, step: -0.05 },
+    { n: 12, step: -0.01 },
+  ],
+  30,
+);
+const bottoms = dailyExtremes(easingDrop).filter((mark) => mark.side === "bottom");
+assert(bottoms[0]?.price === 28.49, "a milder drop that slows while still near the 20-day average is a bottom");
 const bottomSlope = pooledSlope(easingDrop, bottoms[0].index);
 const prevBottomSlope = pooledSlope(easingDrop, bottoms[0].index - 1);
 assert(
