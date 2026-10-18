@@ -28,12 +28,12 @@ const easingRise = session(
   [
     { n: 45, step: 0 },
     { n: 8, step: 0.8 },
-    { n: 10, step: 0.15 },
+    { n: 12, step: 0.15 },
   ],
   20,
 );
 const tops = dailyExtremes(easingRise);
-assert(tops[0]?.side === "top" && tops[0].price === 26.55, "a rise that is still up but slowing is a top");
+assert(tops[0]?.side === "top" && tops[0].price === 27.3, "a rise that is still up but slowing is a top");
 const topSlope = pooledSlope(easingRise, tops[0].index);
 const prevTopSlope = pooledSlope(easingRise, tops[0].index - 1);
 assert(
