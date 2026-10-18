@@ -1,5 +1,5 @@
 import { isEtf } from "./codes.ts";
-import { intradayExtremes, lotSpreadCoversCost, macdfsSeries, type IntradayMinute } from "./intradayExtreme.ts";
+import { intradayExtremes, linearSlope, lotSpreadCoversCost, macdfsSeries, type IntradayMinute } from "./intradayExtreme.ts";
 
 function assert(cond: unknown, message: string) {
   if (!cond) throw new Error(message);
@@ -19,14 +19,6 @@ function session(parts: Array<{ n: number; step: number }>, origin: number): Int
   return points;
 }
 
-function down3(values: number[], index: number) {
-  return values[index] < values[index - 1] && values[index - 1] < values[index - 2] && values[index - 2] < values[index - 3];
-}
-
-function up3(values: number[], index: number) {
-  return values[index] > values[index - 1] && values[index - 1] > values[index - 2] && values[index - 2] > values[index - 3];
-}
-
 assert(lotSpreadCoversCost(10, 10.04) === false, "four cents does not cover a 5 yuan commission plus stamp tax");
 assert(lotSpreadCoversCost(10, 10.06) === true, "six cents on one lot covers the commission and stamp tax");
 assert(lotSpreadCoversCost(0.598, 0.62) === false, "an ETF-sized move still fails when the 5 yuan minimum applies");
@@ -36,65 +28,124 @@ assert(isEtf("sh560780") && isEtf("sh588710"), "Shanghai ETF prefixes count with
 assert(!isEtf("sh601138", "工业富联"), "a stock keeps the 5 yuan minimum");
 assert(intradayExtremes(session([{ n: 80, step: 0 }], 20)).length === 0, "a flat session has no top or bottom");
 
-const slowTop = session(
+const easingRise = session(
   [
     { n: 40, step: 0 },
-    { n: 12, step: 0.2 },
-    { n: 8, step: -0.04 },
+    { n: 6, step: 0.4 },
+    { n: 6, step: 0.15 },
+    { n: 8, step: -0.2 },
   ],
   20,
 );
-const topMarks = intradayExtremes(slowTop);
-assert(topMarks.length === 1 && topMarks[0].side === "top" && topMarks[0].time === "10:25", "DEA rising and the red column fading mark a top when DIF turns down");
-assert(Math.abs(topMarks[0].price - 22.24) < 1e-9, "the top is the minute DIF turns down, before it has fallen for three minutes");
-const topMacd = macdfsSeries(slowTop.map((point) => point.price));
-const topDif = topMacd.map((bar) => bar?.dif ?? Number.NaN);
-const topDea = topMacd.map((bar) => bar?.dea ?? Number.NaN);
-const topHist = topMacd.map((bar) => bar?.hist ?? Number.NaN);
-assert(!down3(topDif, topMarks[0].index) && topDif[topMarks[0].index] < topDif[topMarks[0].index - 1], "DIF has only just turned down");
-assert(up3(topDea, topMarks[0].index) && down3(topHist, topMarks[0].index), "DEA has expanded for three minutes and the red column has weakened for three minutes");
-assert(topDif[topMarks[0].index] > topDea[topMarks[0].index], "the top is still before DIF crosses below DEA");
-assert(topDif[topMarks[0].index] > 0 && topDea[topMarks[0].index] > 0, "this top is above the zero axis");
-
-const slowBottom = session(
-  [
-    { n: 40, step: 0 },
-    { n: 10, step: -0.15 },
-    { n: 6, step: 0.04 },
-  ],
-  20,
-);
-const bottomMarks = intradayExtremes(slowBottom);
+const topMarks = intradayExtremes(easingRise);
+assert(topMarks.length === 1 && topMarks[0].side === "top" && topMarks[0].time === "10:16", "a rise that is still up but slowing is a top");
+assert(Math.abs(topMarks[0].price - 22.55) < 1e-9, "the top is the minute both slopes and both short EMAs weaken");
+const topPrices = easingRise.map((point) => point.price);
+const topHist = macdfsSeries(topPrices).map((bar) => bar?.hist ?? Number.NaN);
+const topPriceSlope = linearSlope(topPrices, topMarks[0].index);
+const prevTopPriceSlope = linearSlope(topPrices, topMarks[0].index - 1);
+const topHistSlope = linearSlope(topHist, topMarks[0].index);
+const prevTopHistSlope = linearSlope(topHist, topMarks[0].index - 1);
 assert(
-  bottomMarks.length === 1 && bottomMarks[0].side === "bottom" && bottomMarks[0].time === "10:23",
-  "DEA shrinking for three minutes and DIF turning up mark a bottom",
+  topPriceSlope != null &&
+    prevTopPriceSlope != null &&
+    topHistSlope != null &&
+    prevTopHistSlope != null &&
+    topPriceSlope > 0 &&
+    topHistSlope > 0 &&
+    topPriceSlope < prevTopPriceSlope &&
+    topHistSlope < prevTopHistSlope,
+  "the top keeps a positive slope on price and MACDFS, both smaller than the previous minute",
 );
-assert(Math.abs(bottomMarks[0].price - 18.66) < 1e-9, "the bottom is the minute DIF hooks up");
-const bottomMacd = macdfsSeries(slowBottom.map((point) => point.price));
-const bottomBar = bottomMacd[bottomMarks[0].index];
-const prevBottom = bottomMacd[bottomMarks[0].index - 1];
-assert(bottomBar != null && prevBottom != null && bottomBar.dea > bottomBar.dif, "the bottom is still before DIF crosses above DEA");
-assert(bottomBar.dif < 0 && bottomBar.dea < 0, "a bottom can sit below the zero axis");
-assert(bottomBar.dif > prevBottom.dif && bottomBar.hist > prevBottom.hist, "DIF has turned up and the green column is weakening");
+const topBar = macdfsSeries(topPrices)[topMarks[0].index];
+assert(topBar != null && topBar.dif > topBar.dea, "the top is still inside DIF above DEA");
 
-const replaced = intradayExtremes(
+const easingDrop = session(
+  [
+    { n: 40, step: 0 },
+    { n: 8, step: -0.35 },
+    { n: 6, step: -0.08 },
+    { n: 8, step: 0.2 },
+  ],
+  20,
+);
+const bottomMarks = intradayExtremes(easingDrop);
+assert(
+  bottomMarks.length === 1 && bottomMarks[0].side === "bottom" && bottomMarks[0].time === "10:18",
+  "a drop that is still down but slowing is a bottom",
+);
+assert(Math.abs(bottomMarks[0].price - 17.12) < 1e-9, "the bottom is the minute the decline weakens");
+const bottomPrices = easingDrop.map((point) => point.price);
+const bottomHist = macdfsSeries(bottomPrices).map((bar) => bar?.hist ?? Number.NaN);
+const bottomPriceSlope = linearSlope(bottomPrices, bottomMarks[0].index);
+const prevBottomPriceSlope = linearSlope(bottomPrices, bottomMarks[0].index - 1);
+const bottomHistSlope = linearSlope(bottomHist, bottomMarks[0].index);
+const prevBottomHistSlope = linearSlope(bottomHist, bottomMarks[0].index - 1);
+assert(
+  bottomPriceSlope != null &&
+    prevBottomPriceSlope != null &&
+    bottomHistSlope != null &&
+    prevBottomHistSlope != null &&
+    bottomPriceSlope < 0 &&
+    bottomHistSlope < 0 &&
+    bottomPriceSlope > prevBottomPriceSlope &&
+    bottomHistSlope > prevBottomHistSlope,
+  "the bottom keeps a negative slope, both closer to zero than the previous minute",
+);
+const bottomBar = macdfsSeries(bottomPrices)[bottomMarks[0].index];
+assert(bottomBar != null && bottomBar.dea > bottomBar.dif, "the bottom is still inside DEA above DIF");
+
+const higherTop = intradayExtremes(
   session(
     [
       { n: 40, step: 0 },
-      { n: 12, step: 0.25 },
-      { n: 10, step: -0.2 },
-      { n: 4, step: 0.03 },
-      { n: 8, step: -0.15 },
-      { n: 6, step: 0.05 },
+      { n: 6, step: 0.4 },
+      { n: 4, step: 0.1 },
+      { n: 6, step: 0.45 },
+      { n: 4, step: 0.12 },
+    ],
+    20,
+  ),
+);
+assert(higherTop.length === 1 && higherTop[0].side === "top" && higherTop[0].time === "10:26", "a later higher top replaces the earlier top");
+assert(Math.abs(higherTop[0].price - 25.62) < 1e-9, "the kept top is the higher one");
+
+const lowerBottom = intradayExtremes(
+  session(
+    [
+      { n: 40, step: 0 },
+      { n: 8, step: -0.35 },
+      { n: 4, step: -0.05 },
+      { n: 4, step: 0.01 },
+      { n: 8, step: -0.3 },
+      { n: 4, step: -0.04 },
     ],
     20,
   ),
 );
 assert(
-  replaced.length === 2 && replaced[0].side === "top" && replaced[1].side === "bottom",
+  lowerBottom.length === 1 && lowerBottom[0].side === "bottom" && lowerBottom[0].time === "10:34",
   "a later lower bottom replaces the earlier bottom",
 );
-assert(Math.abs(replaced[0].price - 22.4) < 1e-9 && Math.abs(replaced[1].price - 20.12) < 1e-9, "the kept bottom is the lower one");
+assert(Math.abs(lowerBottom[0].price - 14.6) < 1e-9, "the kept bottom is the lower one");
+
+const paired = intradayExtremes(
+  session(
+    [
+      { n: 40, step: 0 },
+      { n: 6, step: 0.4 },
+      { n: 4, step: 0.1 },
+      { n: 8, step: -0.3 },
+      { n: 4, step: -0.05 },
+    ],
+    20,
+  ),
+);
+assert(
+  paired.length === 2 && paired[0].side === "top" && paired[1].side === "bottom",
+  "a weakening drop after a top closes the pair when one lot covers the cost",
+);
+assert(Math.abs(paired[0].price - 22.5) < 1e-9 && Math.abs(paired[1].price - 20.35) < 1e-9, "the pair keeps that top and that bottom");
 
 const steadyRise = intradayExtremes(
   session(
@@ -105,7 +156,7 @@ const steadyRise = intradayExtremes(
     20,
   ),
 );
-assert(steadyRise.length === 0, "a rise where DIF has not turned down has no top");
+assert(steadyRise.length === 0, "a steady rise whose slope is not shrinking has no top");
 
 console.log(
   "intradayExtreme.check ok",

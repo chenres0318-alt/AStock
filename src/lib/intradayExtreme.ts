@@ -1,11 +1,11 @@
 /**
- * 用分时 MACDFS(12,26,9) 标出 DIF、DEA 连续三分钟的拐头。不是同花顺的公式。
+ * 用分时 MACDFS(12,26,9) 标出趋势变弱的顶和底。不是同花顺的公式。
  * 柱 = 2 * (DIF - DEA)。红柱是 DIF > DEA，绿柱是 DEA > DIF。
  *
- * 顶：处在 DIF > DEA。DEA 连续三分钟放大，红柱动能连续三分钟减弱，
- *     DIF 已经拐头向下、靠近 DEA。DIF 不必先缩满三分钟，下叉前这一分钟就算顶。
- * 底：处在 DEA > DIF。DEA 连续三分钟缩小，DIF 这一分钟已经拐头向上、缺口在收，
- *     绿柱动能连续三分钟减弱，这一分钟还没上叉。
+ * 最近 4 分钟的价格、MACDFS 柱各做一次一元线性回归。斜率为正是向上，越大涨得越快；
+ * 斜率为负是向下，越负跌得越快。再用 4 周期 EMA 看这 4 分钟里的短期步伐。
+ * 顶：这 4 分钟都在 DIF > DEA。两条斜率仍为正，但都比上一分钟小，两条 EMA 的抬升也变慢。
+ * 底：这 4 分钟都在 DEA > DIF。两条斜率仍为负，但都比上一分钟更靠近 0，两条 EMA 的下跌也变慢。
  * 同一段连续满足时只标第一分钟。之后顶和底交替。
  * 还没配上对面时，更高的顶要红柱不低于前一个顶的八成才换掉；更低的底直接换掉前一个底。
  * 配成一对时，股票一手差价要盖过 5 元最低佣金，再加卖出一手的 0.05% 印花税。
@@ -15,8 +15,8 @@
 const LOT = 100;
 const COMMISSION = 5;
 const STAMP_RATE = 0.0005;
-/** 缩小或放大要连续这么多分钟。 */
-const SLOPE_BARS = 3;
+/** 回归和短期 EMA 都看这么多分钟。 */
+const WINDOW = 4;
 /** 更高的价格要配上差不多高的红柱，才换掉已经标出的顶。 */
 const REPLACE_HIST_RATIO = 0.8;
 
@@ -81,42 +81,96 @@ export function lotSpreadCoversCost(low: number, high: number, minCommission = C
   return spread > minCommission + stamp;
 }
 
-function strictlyDown(values: number[], index: number): boolean {
-  for (let step = 0; step < SLOPE_BARS; step += 1) {
-    if (!(values[index - step] < values[index - step - 1])) return false;
+/** 最近 WINDOW 根对时间 0..WINDOW-1 的一元回归斜率。 */
+export function linearSlope(values: number[], index: number): number | null {
+  if (index < WINDOW - 1) return null;
+  let sumY = 0;
+  let sumXY = 0;
+  for (let step = 0; step < WINDOW; step += 1) {
+    const value = values[index - (WINDOW - 1) + step];
+    if (!Number.isFinite(value)) return null;
+    sumY += value;
+    sumXY += step * value;
   }
-  return true;
+  const sumX = (WINDOW * (WINDOW - 1)) / 2;
+  const sumX2 = (WINDOW * (WINDOW - 1) * (2 * WINDOW - 1)) / 6;
+  const denom = WINDOW * sumX2 - sumX * sumX;
+  return (WINDOW * sumXY - sumX * sumY) / denom;
 }
 
-function strictlyUp(values: number[], index: number): boolean {
-  for (let step = 0; step < SLOPE_BARS; step += 1) {
-    if (!(values[index - step] > values[index - step - 1])) return false;
-  }
-  return true;
+function emaOnSeries(values: number[], period: number): Array<number | null> {
+  const start = values.findIndex((value) => Number.isFinite(value));
+  if (start < 0) return Array(values.length).fill(null);
+  const tail = values.slice(start);
+  if (tail.some((value) => !Number.isFinite(value))) return Array(values.length).fill(null);
+  return [...Array(start).fill(null), ...emaSeries(tail, period)];
 }
 
 function slopeCandidates(points: IntradayMinute[]): Candidate[] {
-  const macd = macdfsSeries(points.map((point) => point.price));
-  const dif = macd.map((bar) => bar?.dif ?? Number.NaN);
-  const dea = macd.map((bar) => bar?.dea ?? Number.NaN);
+  const prices = points.map((point) => point.price);
+  const macd = macdfsSeries(prices);
   const hist = macd.map((bar) => bar?.hist ?? Number.NaN);
+  const priceEma = emaSeries(prices, WINDOW);
+  const histEma = emaOnSeries(hist, WINDOW);
   const candidates: Candidate[] = [];
   let lastSide: "top" | "bottom" | null = null;
   let lastIndex = -1;
 
-  for (let i = SLOPE_BARS; i < points.length; i += 1) {
-    if (!macd[i] || !macd[i - SLOPE_BARS]) continue;
-    const redZone = dif[i] > dea[i] && dif[i - 1] > dea[i - 1] && dif[i - 2] > dea[i - 2];
-    const greenZone = dea[i] > dif[i] && dea[i - 1] > dif[i - 1] && dea[i - 2] > dif[i - 2];
+  for (let i = WINDOW + 1; i < points.length; i += 1) {
+    const priceSlope = linearSlope(prices, i);
+    const prevPriceSlope = linearSlope(prices, i - 1);
+    const histSlope = linearSlope(hist, i);
+    const prevHistSlope = linearSlope(hist, i - 1);
+    const priceNow = priceEma[i];
+    const pricePrev = priceEma[i - 1];
+    const priceOlder = priceEma[i - 2];
+    const histNow = histEma[i];
+    const histPrev = histEma[i - 1];
+    const histOlder = histEma[i - 2];
+    if (
+      priceSlope == null ||
+      prevPriceSlope == null ||
+      histSlope == null ||
+      prevHistSlope == null ||
+      priceNow == null ||
+      pricePrev == null ||
+      priceOlder == null ||
+      histNow == null ||
+      histPrev == null ||
+      histOlder == null
+    ) {
+      continue;
+    }
+    let redZone = true;
+    let greenZone = true;
+    for (let step = 0; step < WINDOW; step += 1) {
+      const bar = macd[i - step];
+      if (!bar || !(bar.dif > bar.dea)) redZone = false;
+      if (!bar || !(bar.dea > bar.dif)) greenZone = false;
+    }
+    const pricePace = priceNow - pricePrev;
+    const prevPricePace = pricePrev - priceOlder;
+    const histPace = histNow - histPrev;
+    const prevHistPace = histPrev - histOlder;
     let side: "top" | "bottom" | null = null;
-    if (redZone && strictlyUp(dea, i) && strictlyDown(hist, i) && dif[i] < dif[i - 1]) {
+    if (
+      redZone &&
+      priceSlope > 0 &&
+      histSlope > 0 &&
+      priceSlope < prevPriceSlope &&
+      histSlope < prevHistSlope &&
+      pricePace < prevPricePace &&
+      histPace < prevHistPace
+    ) {
       side = "top";
     } else if (
       greenZone &&
-      strictlyDown(dea, i) &&
-      dif[i] > dif[i - 1] &&
-      dea[i] - dif[i] < dea[i - 1] - dif[i - 1] &&
-      strictlyUp(hist, i)
+      priceSlope < 0 &&
+      histSlope < 0 &&
+      priceSlope > prevPriceSlope &&
+      histSlope > prevHistSlope &&
+      pricePace > prevPricePace &&
+      histPace > prevHistPace
     ) {
       side = "bottom";
     }
@@ -147,7 +201,7 @@ function dropMark(marks: Candidate[], target: Candidate) {
 }
 
 export function intradayExtremes(points: IntradayMinute[], options?: { minCommission?: number }): IntradayMark[] {
-  if (points.length < SLOPE_BARS + 1) return [];
+  if (points.length < WINDOW + 2) return [];
   const minCommission = options?.minCommission ?? COMMISSION;
   const marks: Candidate[] = [];
   let seek: "either" | "bottom" | "top" = "either";
