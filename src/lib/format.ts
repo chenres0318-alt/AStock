@@ -6,9 +6,7 @@ export function toNumber(value: unknown): number | null {
 
 export function formatPrice(value: number | null | undefined, digits = 2): string {
   if (value == null || Number.isNaN(value)) return "--";
-  const abs = Math.abs(value);
-  const d = abs >= 1000 ? 2 : abs >= 100 ? 2 : digits;
-  return value.toFixed(d);
+  return value.toFixed(digits);
 }
 
 export function formatSigned(value: number | null | undefined, digits = 2): string {

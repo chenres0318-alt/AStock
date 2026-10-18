@@ -1,4 +1,5 @@
-import { isEtf } from "./codes.ts";
+import { isEtf, priceDigits } from "./codes.ts";
+import { formatPrice } from "./format.ts";
 import { intradayExtremes, linearSlope, lotSpreadCoversCost, macdfsSeries, type IntradayMinute } from "./intradayExtreme.ts";
 
 function assert(cond: unknown, message: string) {
@@ -26,6 +27,10 @@ assert(lotSpreadCoversCost(0.598, 0.62, 0) === true, "waiving the 5 yuan minimum
 assert(isEtf("sz159516", "半导体设备ETF国泰"), "the Guotai semiconductor equipment fund is an ETF");
 assert(isEtf("sh560780") && isEtf("sh588710"), "Shanghai ETF prefixes count without a name");
 assert(!isEtf("sh601138", "工业富联"), "a stock keeps the 5 yuan minimum");
+assert(priceDigits("sz159516", "半导体设备ETF国泰") === 3 && formatPrice(0.598, 3) === "0.598", "an ETF price keeps the 0.001 place");
+assert(formatPrice(100.123, 3) === "100.123", "three decimals stay on an ETF price above 100");
+assert(priceDigits("sh601138", "工业富联") === 2 && formatPrice(48.31) === "48.31", "a stock price stays at two decimals");
+assert(formatPrice(0.598) === "0.60", "two decimals still round a third digit");
 assert(intradayExtremes(session([{ n: 80, step: 0 }], 20)).length === 0, "a flat session has no top or bottom");
 
 const easingRise = session(
