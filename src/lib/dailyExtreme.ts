@@ -1,17 +1,17 @@
 /**
- * 日线顶和底。最近 7 根的最高价、最低价、收盘价放进同一次一元回归，得到一条斜率。
+ * 日线顶和底。最近 5 根的最高价、最低价、收盘价放进同一次一元回归，得到一条斜率。
  * 斜率为正是向上，越大涨得越强；斜率为负是向下，越负跌得越强。
- * 再用 7 日 EMA 看短期步伐。不是同花顺的公式。
+ * 再用 5 日 EMA 看短期步伐。不是同花顺的公式。
  *
- * 顶：这 7 天都在 DIF > DEA。斜率仍为正，但比上一天小，收盘 EMA 的抬升也变慢。
- * 底：这 7 天都在 DEA > DIF。斜率仍为负，但比上一天更靠近 0，收盘 EMA 的下跌也变慢。
+ * 顶：这 5 天都在 DIF > DEA。斜率仍为正，但比上一天小，收盘 EMA 的抬升也变慢。
+ * 底：这 5 天都在 DEA > DIF。斜率仍为负，但比上一天更靠近 0，收盘 EMA 的下跌也变慢。
  * 20 日线仍在下降，且收盘比它低过 8%，只是下跌中继，不标底。
  * 同一段连续满足时只标第一天。
  */
 
 import type { KBar } from "./types";
 
-const WINDOW = 7;
+const WINDOW = 5;
 /** 收盘低于仍在下降的 20 日线超过这个比例，下跌只是放缓，不当作底。 */
 const FALLING_MA20_GAP = 0.08;
 
@@ -67,7 +67,7 @@ function macdSeries(closes: number[]): Array<MacdBar | null> {
   return out;
 }
 
-/** 最近 7 天的高、低、收盘放在同一条时间轴上，做一次一元回归。 */
+/** 最近 5 天的高、低、收盘放在同一条时间轴上，做一次一元回归。 */
 export function pooledSlope(bars: KBar[], index: number): number | null {
   if (index < WINDOW - 1) return null;
   let sumY = 0;
