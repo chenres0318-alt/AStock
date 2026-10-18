@@ -1,6 +1,6 @@
 "use client";
 
-import { displaySymbol } from "@/lib/codes";
+import { displaySymbol, priceDigits } from "@/lib/codes";
 import { formatAmount, formatPct, formatPrice, toneClass } from "@/lib/format";
 import type { RankItem } from "@/lib/types";
 import { EmptyHint, PanelTitle } from "./ui";
@@ -66,7 +66,7 @@ export default function RankBoard({
               <span className="block truncate text-sm">{item.name}</span>
               <span className="text-[10px] text-mute">{displaySymbol(item.code)}</span>
             </span>
-            <span className={`num text-right text-sm ${toneClass(item.pct)}`}>{formatPrice(item.price)}</span>
+            <span className={`num text-right text-sm ${toneClass(item.pct)}`}>{formatPrice(item.price, priceDigits(item.code, item.name))}</span>
             <span className={`num text-right text-sm ${toneClass(item.pct)}`}>{formatPct(item.pct)}</span>
             <span className="num text-right text-xs text-mute">{formatAmount(item.amount)}</span>
           </button>

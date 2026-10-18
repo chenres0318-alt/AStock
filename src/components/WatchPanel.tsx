@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { displaySymbol, marketLabel } from "@/lib/codes";
+import { displaySymbol, marketLabel, priceDigits } from "@/lib/codes";
 import { formatPct, formatPrice, toneClass } from "@/lib/format";
 import type { Quote, SearchItem, WatchItem } from "@/lib/types";
 import { EmptyHint, PanelTitle } from "./ui";
@@ -137,7 +137,7 @@ export default function WatchPanel({
                 <div className="text-[11px] text-mute">{displaySymbol(row.code)}</div>
               </button>
               <div className="text-right">
-                <div className={`num text-sm ${toneClass(pct)}`}>{formatPrice(row.quote?.price)}</div>
+                <div className={`num text-sm ${toneClass(pct)}`}>{formatPrice(row.quote?.price, priceDigits(row.code, row.name))}</div>
                 <div className={`num text-[11px] ${toneClass(pct)}`}>{formatPct(pct)}</div>
               </div>
               <button

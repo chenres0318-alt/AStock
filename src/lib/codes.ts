@@ -169,6 +169,11 @@ export function isEtf(code: string, name = ""): boolean {
   return /^(159|51[0-8]|56[0-3]|588|589)\d{3}$/.test(id);
 }
 
+/** 场内 ETF 报价最小变动 0.001，股票仍是 0.01。 */
+export function priceDigits(code: string, name = ""): number {
+  return isEtf(code, name) ? 3 : 2;
+}
+
 export function isIndexCode(code: string): boolean {
   const tx = toTencentCode(code);
   if (INDEX_CODES.has(tx)) return true;

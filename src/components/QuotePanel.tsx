@@ -1,6 +1,6 @@
 "use client";
 
-import { displaySymbol, marketLabel } from "@/lib/codes";
+import { displaySymbol, marketLabel, priceDigits } from "@/lib/codes";
 import {
   formatAmount,
   formatHands,
@@ -33,11 +33,12 @@ export default function QuotePanel({ quote }: { quote: Quote | undefined }) {
     ...quote.asks.map((item) => item.volume ?? 0),
   );
 
+  const digits = priceDigits(quote.code, quote.name);
   const stats = [
-    { label: "今开", value: formatPrice(quote.open), tone: quote.preClose != null && quote.open != null ? quote.open - quote.preClose : 0 },
-    { label: "最高", value: formatPrice(quote.high), tone: quote.preClose != null && quote.high != null ? quote.high - quote.preClose : 0 },
-    { label: "最低", value: formatPrice(quote.low), tone: quote.preClose != null && quote.low != null ? quote.low - quote.preClose : 0 },
-    { label: "昨收", value: formatPrice(quote.preClose) },
+    { label: "今开", value: formatPrice(quote.open, digits), tone: quote.preClose != null && quote.open != null ? quote.open - quote.preClose : 0 },
+    { label: "最高", value: formatPrice(quote.high, digits), tone: quote.preClose != null && quote.high != null ? quote.high - quote.preClose : 0 },
+    { label: "最低", value: formatPrice(quote.low, digits), tone: quote.preClose != null && quote.low != null ? quote.low - quote.preClose : 0 },
+    { label: "昨收", value: formatPrice(quote.preClose, digits) },
     { label: "成交量", value: formatHands(quote.volume) },
     { label: "成交额", value: formatAmount(quote.amount) },
     { label: "换手", value: quote.turnover == null ? "--" : `${quote.turnover.toFixed(2)}%` },
@@ -62,9 +63,9 @@ export default function QuotePanel({ quote }: { quote: Quote | undefined }) {
           <div className="mt-0.5 text-xs text-mute">{displaySymbol(quote.code)}</div>
         </div>
         <div className="text-right">
-          <div className={`num text-3xl leading-none ${toneClass(quote.pct)}`}>{formatPrice(quote.price)}</div>
+          <div className={`num text-3xl leading-none ${toneClass(quote.pct)}`}>{formatPrice(quote.price, digits)}</div>
           <div className={`num mt-1 text-sm ${toneClass(quote.pct)}`}>
-            {formatSigned(quote.change)}　{formatPct(quote.pct)}
+            {formatSigned(quote.change, digits)}　{formatPct(quote.pct)}
           </div>
         </div>
       </div>
@@ -91,7 +92,7 @@ export default function QuotePanel({ quote }: { quote: Quote | undefined }) {
             {[...quote.asks].reverse().map((level, index) => (
               <div key={`a-${index}`} className="flex items-center gap-2 py-0.5">
                 <span className="w-8 text-mute">卖{5 - index}</span>
-                <span className={`num w-16 ${toneClass(1)}`}>{formatPrice(level.price)}</span>
+                <span className={`num w-16 ${toneClass(1)}`}>{formatPrice(level.price, digits)}</span>
                 <div className="h-1.5 flex-1 overflow-hidden rounded bg-bg">
                   <div
                     className="h-full bg-up/40"
@@ -107,7 +108,7 @@ export default function QuotePanel({ quote }: { quote: Quote | undefined }) {
             {quote.bids.map((level, index) => (
               <div key={`b-${index}`} className="flex items-center gap-2 py-0.5">
                 <span className="w-8 text-mute">买{index + 1}</span>
-                <span className={`num w-16 ${toneClass(-1)}`}>{formatPrice(level.price)}</span>
+                <span className={`num w-16 ${toneClass(-1)}`}>{formatPrice(level.price, digits)}</span>
                 <div className="h-1.5 flex-1 overflow-hidden rounded bg-bg">
                   <div
                     className="h-full bg-down/40"
@@ -137,11 +138,11 @@ export default function QuotePanel({ quote }: { quote: Quote | undefined }) {
           <div className="mt-3 grid grid-cols-2 gap-2">
             <div>
               <div className="text-mute">涨停</div>
-              <div className="num text-up">{formatPrice(quote.limitUp)}</div>
+              <div className="num text-up">{formatPrice(quote.limitUp, digits)}</div>
             </div>
             <div>
               <div className="text-mute">跌停</div>
-              <div className="num text-down">{formatPrice(quote.limitDown)}</div>
+              <div className="num text-down">{formatPrice(quote.limitDown, digits)}</div>
             </div>
           </div>
         </div>

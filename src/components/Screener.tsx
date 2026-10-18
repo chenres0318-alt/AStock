@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { isListedStockCode } from "@/lib/codes";
+import { isListedStockCode, priceDigits } from "@/lib/codes";
 import { formatPct, formatPrice, toneClass } from "@/lib/format";
 import { loadWatchlist, saveWatchlist } from "@/lib/storage";
 import type { ScreenerHit } from "@/lib/types";
@@ -57,9 +57,9 @@ function HitTable({
                 </button>
               </td>
               <td className="px-3 py-2 text-right">
-                <div className={`num ${toneClass(item.pct)}`}>{formatPrice(item.price)}</div>
+                <div className={`num ${toneClass(item.pct)}`}>{formatPrice(item.price, priceDigits(item.code, item.name))}</div>
                 <div className="num text-[11px] text-mute">
-                  {formatPrice(item.ma4)} / {formatPrice(item.ma7)}
+                  {formatPrice(item.ma4, priceDigits(item.code, item.name))} / {formatPrice(item.ma7, priceDigits(item.code, item.name))}
                 </div>
               </td>
               <td className={`num px-3 py-2 text-right ${toneClass(item.pct)}`}>{formatPct(item.pct)}</td>

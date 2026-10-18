@@ -13,7 +13,7 @@ import {
   type Time,
   type UTCTimestamp,
 } from "lightweight-charts";
-import { isEtf } from "@/lib/codes";
+import { isEtf, priceDigits } from "@/lib/codes";
 import { formatPrice } from "@/lib/format";
 import { intradayExtremes, macdfsSeries, type MacdfsBar } from "@/lib/intradayExtreme";
 import { buildMaLines, klineRangeChange, maAt } from "@/lib/indicators";
@@ -172,6 +172,7 @@ export default function ChartView({
   const [picked, setPicked] = useState<BarSpan | null>(null);
   const [highlight, setHighlight] = useState<{ left: number; width: number } | null>(null);
   const etf = quote ? isEtf(quote.code, quote.name) : false;
+  const digits = quote ? priceDigits(quote.code, quote.name) : 2;
   const seriesKey = `${mode}:${bars[0]?.time ?? ""}:${bars.at(-1)?.time ?? ""}`;
   const [trackedKey, setTrackedKey] = useState(seriesKey);
   if (trackedKey !== seriesKey) {
@@ -411,6 +412,14 @@ export default function ChartView({
       macdZeroRef.current = null;
     }
 
+    const priceFormat = etf
+      ? { type: "price" as const, precision: 3, minMove: 0.001 }
+      : { type: "price" as const, precision: 2, minMove: 0.01 };
+    candle.applyOptions({ priceFormat });
+    line.applyOptions({ priceFormat });
+    avg.applyOptions({ priceFormat });
+    ma4.applyOptions({ priceFormat });
+    ma7.applyOptions({ priceFormat });
     chart.priceScale("right").applyOptions({
       scaleMargins: { top: 0.06, bottom: mode === "trend" ? 0.32 : mode === "day" ? 0.28 : 0.22 },
     });
@@ -694,7 +703,7 @@ export default function ChartView({
                   transform: tag.side === "top" ? "translate(-50%, -100%)" : "translate(-50%, 0)",
                 }}
               >
-                {tag.side === "top" ? `顶部(股价:${formatPrice(tag.price)})，卖` : `底部(股价:${formatPrice(tag.price)})，买`}
+                {tag.side === "top" ? `顶部(股价:${formatPrice(tag.price, digits)})，卖` : `底部(股价:${formatPrice(tag.price, digits)})，买`}
               </div>
             ))
           : null}
@@ -718,7 +727,14 @@ export default function ChartView({
             }}
           />
         ) : null}
-        {stats && highlight ? <RangeChip stats={stats} highlight={highlight} plotWidth={boxRef.current?.clientWidth ?? 0} /> : null}
+        {stats && highlight ? (
+          <RangeChip
+            stats={stats}
+            highlight={highlight}
+            plotWidth={boxRef.current?.clientWidth ?? 0}
+            digits={digits}
+          />
+        ) : null}
         {rangeMode && mode !== "trend" && !stats ? (
           <div className="pointer-events-none absolute left-3 top-2 z-30 rounded bg-panel/80 px-2 py-1 text-[11px] text-mute">
             拖拽选择 K 线区间
@@ -745,10 +761,12 @@ function RangeChip({
   stats,
   highlight,
   plotWidth,
+  digits,
 }: {
   stats: NonNullable<ReturnType<typeof klineRangeChange>>;
   highlight: { left: number; width: number };
   plotWidth: number;
+  digits: number;
 }) {
   const sameYear = stats.from.slice(0, 4) === stats.to.slice(0, 4);
   const dates = sameYear
@@ -769,7 +787,7 @@ function RangeChip({
         {dates} · {stats.count}根
       </div>
       <div>
-        {formatPrice(stats.start)} → {formatPrice(stats.end)} <span className={tone}>{pct}</span>
+        {formatPrice(stats.start, digits)} → {formatPrice(stats.end, digits)} <span className={tone}>{pct}</span>
       </div>
     </div>
   );

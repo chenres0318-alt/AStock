@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
-import { displaySymbol, isListedStockCode, isTonghuashunBoard } from "@/lib/codes";
+import { displaySymbol, isListedStockCode, isTonghuashunBoard, priceDigits } from "@/lib/codes";
 import { formatPct, formatPrice, toneClass } from "@/lib/format";
 import type { SectorItem } from "@/lib/types";
 import { EmptyHint, PanelTitle } from "./ui";
@@ -73,7 +73,7 @@ export default function SectorList({
                   {item.upCount}涨 {item.downCount ?? 0}跌
                 </div>
               ) : (
-                <div className={`num text-[11px] ${toneClass(item.pct)}`}>{formatPrice(item.price)}</div>
+                <div className={`num text-[11px] ${toneClass(item.pct)}`}>{formatPrice(item.price, priceDigits(item.code, item.name))}</div>
               )}
             </div>
           </div>

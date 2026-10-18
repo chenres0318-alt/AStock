@@ -11,7 +11,7 @@ import {
   type ISeriesApi,
   type Time,
 } from "lightweight-charts";
-import { displaySymbol, isTonghuashunBoard, isTonghuashunConcept, toTencentCode } from "@/lib/codes";
+import { displaySymbol, isTonghuashunBoard, isTonghuashunConcept, priceDigits, toTencentCode } from "@/lib/codes";
 import { formatPct, formatPrice, toneClass } from "@/lib/format";
 import type { KBar, SectorItem } from "@/lib/types";
 import type { SectorTrendView as TrendBox } from "@/lib/sectorTrendData";
@@ -342,7 +342,7 @@ function MemberTable({ rows }: { rows: TrendBox["roster"] }) {
                 <div>{item.name}</div>
                 <div className="text-[11px] text-mute">{displaySymbol(item.code)}</div>
               </td>
-              <td className="num px-3 py-2 text-right">{formatPrice(item.price)}</td>
+              <td className="num px-3 py-2 text-right">{formatPrice(item.price, priceDigits(item.code, item.name))}</td>
               <td className={`num px-3 py-2 text-right ${toneClass(item.pct)}`}>{formatPct(item.pct)}</td>
               <td className={`num px-3 py-2 text-right ${toneClass(item.gain)}`}>
                 {item.gain == null ? "--" : gainText(item.gain)}
