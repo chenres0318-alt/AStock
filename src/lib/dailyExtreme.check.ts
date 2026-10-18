@@ -1,4 +1,4 @@
-import { dailyExtremes, pooledSlope } from "./dailyExtreme.ts";
+import { closeSlope, dailyExtremes } from "./dailyExtreme.ts";
 import type { KBar } from "./types.ts";
 
 function assert(cond: unknown, message: string) {
@@ -34,12 +34,19 @@ const easingRise = session(
 );
 const tops = dailyExtremes(easingRise);
 assert(tops[0]?.side === "top" && tops[0].price === 26.55, "a rise that is still up but slowing is a top");
-const topSlope = pooledSlope(easingRise, tops[0].index);
-const prevTopSlope = pooledSlope(easingRise, tops[0].index - 1);
+const topSlope = closeSlope(easingRise, tops[0].index);
+const prevTopSlope = closeSlope(easingRise, tops[0].index - 1);
 assert(
   topSlope != null && prevTopSlope != null && topSlope > 0 && topSlope < prevTopSlope,
-  "the top keeps a positive slope of high, low, and close, smaller than the previous day",
+  "the top keeps a positive close slope, smaller than the previous day",
 );
+const twisted = easingRise.map((bar, index) => ({ ...bar, high: bar.close + 20 + index * 3, low: bar.close - index }));
+const twistedTop = dailyExtremes(twisted)[0];
+assert(
+  twistedTop?.side === "top" && twistedTop.time === tops[0].time && twistedTop.price === tops[0].price,
+  "high and low do not move a top that is decided by the close slope",
+);
+assert(closeSlope(twisted, tops[0].index) === topSlope, "the slope ignores high and low");
 
 const crash = session(
   [
@@ -64,8 +71,8 @@ const easingDrop = session(
 );
 const bottoms = dailyExtremes(easingDrop).filter((mark) => mark.side === "bottom");
 assert(bottoms[0]?.price === 28.49, "a milder drop that slows while still near the 20-day average is a bottom");
-const bottomSlope = pooledSlope(easingDrop, bottoms[0].index);
-const prevBottomSlope = pooledSlope(easingDrop, bottoms[0].index - 1);
+const bottomSlope = closeSlope(easingDrop, bottoms[0].index);
+const prevBottomSlope = closeSlope(easingDrop, bottoms[0].index - 1);
 assert(
   bottomSlope != null && prevBottomSlope != null && bottomSlope < 0 && bottomSlope > prevBottomSlope,
   "the bottom keeps a negative slope, closer to zero than the previous day",

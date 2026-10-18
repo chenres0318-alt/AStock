@@ -1,5 +1,5 @@
 /**
- * 日线顶和底。最近 5 根的最高价、最低价、收盘价放进同一次一元回归，得到一条斜率。
+ * 日线顶和底。最近 5 根收盘价做一元回归，得到一条斜率。
  * 斜率为正是向上，越大涨得越强；斜率为负是向下，越负跌得越强。
  * 再用 5 日 EMA 看短期步伐。不是同花顺的公式。
  *
@@ -67,24 +67,21 @@ function macdSeries(closes: number[]): Array<MacdBar | null> {
   return out;
 }
 
-/** 最近 5 天的高、低、收盘放在同一条时间轴上，做一次一元回归。 */
-export function pooledSlope(bars: KBar[], index: number): number | null {
+/** 最近 5 天收盘价对时间的一元回归斜率。 */
+export function closeSlope(bars: KBar[], index: number): number | null {
   if (index < WINDOW - 1) return null;
   let sumY = 0;
   let sumXY = 0;
   for (let step = 0; step < WINDOW; step += 1) {
-    const bar = bars[index - (WINDOW - 1) + step];
-    for (const value of [bar.high, bar.low, bar.close]) {
-      if (!Number.isFinite(value)) return null;
-      sumY += value;
-      sumXY += step * value;
-    }
+    const value = bars[index - (WINDOW - 1) + step].close;
+    if (!Number.isFinite(value)) return null;
+    sumY += value;
+    sumXY += step * value;
   }
-  const n = WINDOW * 3;
-  const sumX = (3 * WINDOW * (WINDOW - 1)) / 2;
-  const sumX2 = (3 * WINDOW * (WINDOW - 1) * (2 * WINDOW - 1)) / 6;
-  const denom = n * sumX2 - sumX * sumX;
-  return (n * sumXY - sumX * sumY) / denom;
+  const sumX = (WINDOW * (WINDOW - 1)) / 2;
+  const sumX2 = (WINDOW * (WINDOW - 1) * (2 * WINDOW - 1)) / 6;
+  const denom = WINDOW * sumX2 - sumX * sumX;
+  return (WINDOW * sumXY - sumX * sumY) / denom;
 }
 
 export function dailyExtremes(bars: KBar[]): DailyMark[] {
@@ -97,8 +94,8 @@ export function dailyExtremes(bars: KBar[]): DailyMark[] {
   let lastIndex = -1;
 
   for (let i = WINDOW + 1; i < bars.length; i += 1) {
-    const slope = pooledSlope(bars, i);
-    const prevSlope = pooledSlope(bars, i - 1);
+    const slope = closeSlope(bars, i);
+    const prevSlope = closeSlope(bars, i - 1);
     const emaNow = ema[i];
     const emaPrev = ema[i - 1];
     const emaOlder = ema[i - 2];
