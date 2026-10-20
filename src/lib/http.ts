@@ -25,6 +25,7 @@ export async function fetchBuffer(
       headers: {
         "User-Agent": UA,
         Accept: "*/*",
+        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
         Referer: referer ?? "https://finance.qq.com/",
         ...(rest.headers ?? {}),
       },
@@ -38,7 +39,9 @@ export async function fetchBuffer(
     if (error instanceof Error && error.name === "AbortError") {
       throw new UpstreamError("上游超时");
     }
-    throw new UpstreamError(error instanceof Error ? error.message : "上游请求失败");
+    const cause = error instanceof Error ? (error as Error & { cause?: { message?: string } }).cause : null;
+    const detail = [error instanceof Error ? error.message : "上游请求失败", cause?.message].filter(Boolean).join(": ");
+    throw new UpstreamError(detail);
   } finally {
     clearTimeout(timer);
   }
