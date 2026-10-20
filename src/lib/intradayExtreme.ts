@@ -1,11 +1,11 @@
 /**
- * 用分时 MACDFS(12,26,9) 标出趋势变弱的顶和底。不是同花顺的公式。
+ * 用分时均价线和 MACDFS(12,26,9) 标出趋势变弱的顶和底。不是同花顺的公式。
  * 柱 = 2 * (DIF - DEA)。红柱是 DIF > DEA，绿柱是 DEA > DIF。
  *
  * 最近 4 分钟的价格、MACDFS 柱各做一次一元线性回归。斜率为正是向上，越大涨得越快；
  * 斜率为负是向下，越负跌得越快。再用 4 周期 EMA 看这 4 分钟里的短期步伐。
- * 顶：这 4 分钟都在 DIF > DEA。两条斜率仍为正，但都比上一分钟小，两条 EMA 的抬升也变慢。
- * 底：这 4 分钟都在 DEA > DIF。两条斜率仍为负，但都比上一分钟更靠近 0，两条 EMA 的下跌也变慢。
+ * 顶：现价在均价线上方或下方，并且 DIF > DEA。两条斜率仍为正，但都比上一分钟小，两条 EMA 的抬升也变慢。
+ * 底：现价在均价线下方，并且 DEA > DIF。两条斜率仍为负，但都比上一分钟更靠近 0，两条 EMA 的下跌也变慢。
  * 同一段连续满足时只标第一分钟。之后顶和底交替。
  * 还没配上对面时，更高的顶要红柱不低于前一个顶的八成才换掉；更低的底直接换掉前一个底。
  * 配成一对时，股票一手差价要盖过 5 元最低佣金，再加卖出一手的 0.05% 印花税。
@@ -24,6 +24,7 @@ export type IntradayMinute = {
   time: string;
   price: number;
   volume: number;
+  avg: number | null;
 };
 
 export type IntradayMark = {
@@ -141,39 +142,32 @@ function slopeCandidates(points: IntradayMinute[]): Candidate[] {
     ) {
       continue;
     }
-    let redZone = true;
-    let greenZone = true;
-    for (let step = 0; step < WINDOW; step += 1) {
-      const bar = macd[i - step];
-      if (!bar || !(bar.dif > bar.dea)) redZone = false;
-      if (!bar || !(bar.dea > bar.dif)) greenZone = false;
-    }
+    const bar = macd[i];
+    const aboveAvg = points[i].avg != null && points[i].price > (points[i].avg as number);
+    const belowAvg = points[i].avg != null && points[i].price < (points[i].avg as number);
+    const difAbove = Boolean(bar && bar.dif > bar.dea);
+    const deaAbove = Boolean(bar && bar.dea > bar.dif);
     const pricePace = priceNow - pricePrev;
     const prevPricePace = pricePrev - priceOlder;
     const histPace = histNow - histPrev;
     const prevHistPace = histPrev - histOlder;
-    let side: "top" | "bottom" | null = null;
-    if (
-      redZone &&
+    const riseWeakening =
       priceSlope > 0 &&
       histSlope > 0 &&
       priceSlope < prevPriceSlope &&
       histSlope < prevHistSlope &&
       pricePace < prevPricePace &&
-      histPace < prevHistPace
-    ) {
-      side = "top";
-    } else if (
-      greenZone &&
+      histPace < prevHistPace;
+    const dropWeakening =
       priceSlope < 0 &&
       histSlope < 0 &&
       priceSlope > prevPriceSlope &&
       histSlope > prevHistSlope &&
       pricePace > prevPricePace &&
-      histPace > prevHistPace
-    ) {
-      side = "bottom";
-    }
+      histPace > prevHistPace;
+    let side: "top" | "bottom" | null = null;
+    if ((aboveAvg || belowAvg) && difAbove && riseWeakening) side = "top";
+    else if (belowAvg && deaAbove && dropWeakening) side = "bottom";
     if (!side) {
       lastSide = null;
       continue;

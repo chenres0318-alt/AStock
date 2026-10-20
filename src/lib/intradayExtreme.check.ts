@@ -6,15 +6,18 @@ function assert(cond: unknown, message: string) {
   if (!cond) throw new Error(message);
 }
 
-function session(parts: Array<{ n: number; step: number }>, origin: number): IntradayMinute[] {
+function session(parts: Array<{ n: number; step: number }>, origin: number, avgAt?: (price: number, index: number) => number): IntradayMinute[] {
   const points: IntradayMinute[] = [];
   let price = origin;
+  let sum = 0;
   for (const part of parts) {
     for (let i = 0; i < part.n; i += 1) {
       price = Math.round((price + part.step) * 100) / 100;
+      sum += price;
       const minute = 9 * 60 + 30 + points.length;
       const time = `${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`;
-      points.push({ time, price, volume: 1000 });
+      const avg = avgAt ? avgAt(price, points.length) : sum / (points.length + 1);
+      points.push({ time, price, volume: 1000, avg });
     }
   }
   return points;
@@ -162,6 +165,35 @@ const steadyRise = intradayExtremes(
   ),
 );
 assert(steadyRise.length === 0, "a steady rise whose slope is not shrinking has no top");
+
+const belowAvgTop = intradayExtremes(
+  session(
+    [
+      { n: 40, step: 0 },
+      { n: 6, step: 0.4 },
+      { n: 6, step: 0.15 },
+    ],
+    20,
+    () => 40,
+  ),
+);
+assert(
+  belowAvgTop.length === 1 && belowAvgTop[0].side === "top" && belowAvgTop[0].price < 40,
+  "a weakening rise below the average line is still a top while DIF stays above DEA",
+);
+
+const dropAboveAvg = intradayExtremes(
+  session(
+    [
+      { n: 40, step: 0 },
+      { n: 8, step: -0.35 },
+      { n: 6, step: -0.08 },
+    ],
+    20,
+    () => 10,
+  ),
+);
+assert(dropAboveAvg.every((mark) => mark.side !== "bottom"), "a weakening drop above the average line is not a bottom");
 
 console.log(
   "intradayExtreme.check ok",
