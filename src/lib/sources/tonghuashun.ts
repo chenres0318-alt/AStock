@@ -1,7 +1,7 @@
 import { cached } from "../cache";
 import { isTonghuashunBoard, isTonghuashunConcept, isTonghuashunIndustry } from "../codes";
 import { toNumber } from "../format";
-import { fetchGbk, fetchUtf, UpstreamError } from "../http";
+import { fetchGbk, fetchUtf, firstOk, retryOk, UpstreamError } from "../http";
 import { mapPool } from "../pool";
 import type { BoardMember, KBar, SectorItem } from "../types";
 
@@ -64,25 +64,52 @@ function directoryNames(html: string): Map<string, string> {
   return names;
 }
 
+export function parseTonghuashunIndustryHtml(html: string): SectorItem[] {
+  return parseBoardRows(html);
+}
+
 function parseBoardRows(html: string): SectorItem[] {
   const items: SectorItem[] = [];
   for (const row of tableRows(html)) {
     const cells = cellHtmls(row);
-    if (cells.length < 10) continue;
-    const board = firstLink(cells[1] ?? "");
-    const code = board?.href.match(/\/(881\d{3})\/?/)?.[1];
+    if (cells.length < 8) continue;
+    let board: { href: string; text: string } | null = null;
+    let code: string | undefined;
+    let leader: { href: string; text: string } | null = null;
+    for (const cell of cells) {
+      const link = firstLink(cell);
+      if (!link) continue;
+      const found = link.href.match(/\/(881\d{3})\/?/)?.[1];
+      if (found) {
+        board = link;
+        code = found;
+        continue;
+      }
+      if (!leader) leader = link;
+    }
     if (!code || !board) continue;
-    const leader = firstLink(cells[9] ?? "");
+    let pct = toNumber(decodeText(cells[2] ?? ""));
+    if (pct != null && Math.abs(pct) > 40) pct = null;
+    if (pct == null) {
+      for (const cell of cells) {
+        const text = decodeText(cell);
+        if (/%$/.test(text)) {
+          pct = toNumber(text.replace(/%$/, ""));
+          break;
+        }
+      }
+    }
+    const quoteLayout = Boolean(firstLink(cells[1] ?? "")?.href.match(/\/(881\d{3})\/?/) && firstLink(cells[9] ?? ""));
     const leaderCode = leader?.href.match(/\/(\d{6})\/?/)?.[1] ?? null;
     items.push({
       code,
       name: board.text,
-      pct: toNumber(decodeText(cells[2] ?? "")),
+      pct,
       price: null,
       leader: leader?.text ?? null,
       leaderCode,
-      upCount: toNumber(decodeText(cells[6] ?? "")),
-      downCount: toNumber(decodeText(cells[7] ?? "")),
+      upCount: quoteLayout ? toNumber(decodeText(cells[6] ?? "")) : null,
+      downCount: quoteLayout ? toNumber(decodeText(cells[7] ?? "")) : null,
       source: "ths",
     });
   }
@@ -110,20 +137,24 @@ function parseMemberRows(html: string): BoardMember[] {
 }
 
 async function readHtml(url: string, referer: string): Promise<string> {
-  return fetchGbk(url, { referer, timeoutMs: 12_000 });
+  return retryOk(2, () => fetchGbk(url, { referer, timeoutMs: 12_000 }));
 }
 
 export async function fetchTonghuashunIndustries(): Promise<SectorItem[]> {
   let pageOne = "";
   try {
-    pageOne = await readHtml("https://q.10jqka.com.cn/thshy/", LIST_REFERER);
+    pageOne = await firstOk([
+      () => readHtml("https://q.10jqka.com.cn/thshy/", LIST_REFERER),
+      () => readHtml("https://data.10jqka.com.cn/funds/hyzjl/", "https://data.10jqka.com.cn/funds/hyzjl/"),
+    ]);
   } catch {
     throw new UpstreamError("同花顺行业名单暂时读不到");
   }
-  const pageTwo = await readHtml(
-    "https://q.10jqka.com.cn/thshy/index/field/199112/order/desc/page/2/",
-    LIST_REFERER,
-  ).catch(() => "");
+  const pageTwo = pageOne.includes("q.10jqka.com.cn/thshy/")
+    ? await readHtml("https://q.10jqka.com.cn/thshy/index/field/199112/order/desc/page/2/", LIST_REFERER).catch(
+        () => "",
+      )
+    : "";
 
   const quoted: SectorItem[] = [];
   const seen = new Set<string>();
@@ -231,7 +262,10 @@ async function conceptPlateCode(cid: string): Promise<string | null> {
 async function loadConceptCatalog(): Promise<ConceptCatalog> {
   let html = "";
   try {
-    html = await readHtml("https://q.10jqka.com.cn/gn/", CONCEPT_REFERER);
+    html = await firstOk([
+      () => readHtml("https://q.10jqka.com.cn/gn/", CONCEPT_REFERER),
+      () => readHtml("https://data.10jqka.com.cn/funds/gnzjl/", "https://data.10jqka.com.cn/funds/gnzjl/"),
+    ]);
   } catch {
     throw new UpstreamError("同花顺概念名单暂时读不到");
   }
