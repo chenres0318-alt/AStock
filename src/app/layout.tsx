@@ -20,8 +20,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh-CN">
-      <body className={`${plex.variable} antialiased bg-bg text-ink`}>{children}</body>
+    <html lang="zh-CN" suppressHydrationWarning>
+      <body className={`${plex.variable} antialiased bg-bg text-ink`} suppressHydrationWarning>
+        {children}
+      </body>
     </html>
   );
 }

@@ -35,6 +35,7 @@ export type SectorTrendReport = {
   board: SectorItem;
   bars: KBar[];
   trends: SectorTrendView[];
+  roster: SectorTrendMember[];
   pct5: number | null;
   memberCount: number;
 };
@@ -92,15 +93,18 @@ export async function getSectorTrend(code: string): Promise<SectorTrendReport> {
   };
   const stocks = await memberSeries(members);
   const paths = toMemberPaths(stocks);
+  const roster = [...members]
+    .map((item) => ({ ...item, gain: null as number | null }))
+    .sort((a, b) => (b.amount ?? -1) - (a.amount ?? -1));
   const trends = captureSectorTrends(bars, paths).map((segment) => {
     const gains = new Map(
       memberGainsInWindow(bars, paths, segment.start, segment.end).map((item) => [item.code, item.gain]),
     );
-    const roster = members
+    const trendRoster = members
       .map((item) => ({ ...item, gain: gains.get(item.code) ?? null }))
       .sort((a, b) => (b.gain ?? -999) - (a.gain ?? -999));
     const maCrosses = listMa4CrossStocks(segment, stocks);
-    return { ...segment, roster, maCrosses };
+    return { ...segment, roster: trendRoster, maCrosses };
   });
   const base = bars.length >= 6 ? bars[bars.length - 6] : null;
   const pct5 = last && base && base.close > 0 ? (last.close / base.close - 1) * 100 : null;
@@ -108,6 +112,7 @@ export async function getSectorTrend(code: string): Promise<SectorTrendReport> {
     board,
     bars,
     trends,
+    roster,
     pct5,
     memberCount: members.length,
   };

@@ -22,6 +22,7 @@ type Report = {
   board: SectorItem;
   bars: KBar[];
   trends: TrendBox[];
+  roster?: TrendBox["roster"];
   pct5: number | null;
   memberCount: number;
 };
@@ -216,7 +217,7 @@ export default function SectorTrendView() {
         </section>
         <section className="panel overflow-hidden">
           <div className="border-b border-line px-3 py-2 text-sm">成分股</div>
-          <MemberTable rows={selected?.roster ?? []} />
+          <MemberTable rows={selected?.roster ?? report?.roster ?? []} loading={loading && !report} />
         </section>
       </div>
     </div>
@@ -322,8 +323,8 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: num
   );
 }
 
-function MemberTable({ rows }: { rows: TrendBox["roster"] }) {
-  if (!rows.length) return <EmptyHint text="成分股还在加载" />;
+function MemberTable({ rows, loading }: { rows: TrendBox["roster"]; loading: boolean }) {
+  if (!rows.length) return <EmptyHint text={loading ? "成分股还在加载" : "没有成分股"} />;
   return (
     <div className="max-h-[420px] overflow-auto scroll-thin">
       <table className="w-full text-left text-sm">
