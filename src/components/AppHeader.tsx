@@ -7,6 +7,7 @@ const LINKS = [
   { href: "/", label: "看盘" },
   { href: "/sector", label: "板块" },
   { href: "/screener", label: "选股" },
+  { href: "/analyze", label: "分析" },
 ];
 
 export default function AppHeader({

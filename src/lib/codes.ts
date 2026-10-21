@@ -102,6 +102,14 @@ export function toEastMoneySecId(input: string): string {
   return `${num}.${bareCode(code)}`;
 }
 
+/** 东财 F10 用 SH600519 / SZ002475 / BJ920096。 */
+export function toEastMoneyF10Code(input: string): string {
+  const code = toTencentCode(input);
+  const market = marketOf(code);
+  const prefix = market === "SH" ? "SH" : market === "BJ" ? "BJ" : "SZ";
+  return `${prefix}${bareCode(code)}`;
+}
+
 export function marketLabel(code: string): string {
   const tx = toTencentCode(code);
   const id = bareCode(tx);

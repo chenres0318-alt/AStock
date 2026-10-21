@@ -1,4 +1,4 @@
-import { marketOf, toEastMoneySecId, toTencentCode } from "../codes";
+import { bareCode, marketOf, toEastMoneyF10Code, toEastMoneySecId, toTencentCode } from "../codes";
 import { toNumber } from "../format";
 import { fetchJson, fetchUtf } from "../http";
 import type { BoardMember, KBar, RankItem, SearchItem, SectorItem } from "../types";
@@ -287,4 +287,55 @@ export async function fetchEastMoneyKline(secid: string, count = 80): Promise<KB
     }
   }
   throw lastError instanceof Error ? lastError : new Error("板块K线不可用");
+}
+
+type DatacenterResponse = {
+  success?: boolean;
+  result?: { data?: Array<Record<string, unknown>> };
+};
+
+async function datacenterRows(reportName: string, filter: string, extra = ""): Promise<Array<Record<string, unknown>>> {
+  const url =
+    `https://datacenter-web.eastmoney.com/api/data/v1/get?reportName=${reportName}` +
+    `&columns=ALL&pageNumber=1&pageSize=30&filter=${encodeURIComponent(filter)}${extra}`;
+  const json = await fetchJson<DatacenterResponse>(url, {
+    referer: "https://data.eastmoney.com/",
+    timeoutMs: 10_000,
+  });
+  return json.result?.data ?? [];
+}
+
+export async function fetchEastMoneyF10Ops(code: string): Promise<Record<string, unknown>> {
+  const f10 = toEastMoneyF10Code(code);
+  return fetchJson<Record<string, unknown>>(
+    `https://emweb.securities.eastmoney.com/PC_HSF10/OperationsRequired/PageAjax?code=${f10}`,
+    { referer: "https://emweb.securities.eastmoney.com/", timeoutMs: 12_000 },
+  );
+}
+
+export async function fetchEastMoneyCompanySurvey(code: string): Promise<Record<string, unknown>> {
+  const f10 = toEastMoneyF10Code(code);
+  return fetchJson<Record<string, unknown>>(
+    `https://emweb.securities.eastmoney.com/PC_HSF10/CompanySurvey/CompanySurveyAjax?code=${f10}`,
+    { referer: "https://emweb.securities.eastmoney.com/", timeoutMs: 10_000 },
+  );
+}
+
+export async function fetchEastMoneyHoldChanges(code: string): Promise<Array<Record<string, unknown>>> {
+  const id = bareCode(code);
+  return datacenterRows(
+    "RPT_EXECUTIVE_HOLD_CHANGE",
+    `(SECURITY_CODE="${id}")`,
+    "&sortColumns=CHANGE_DATE&sortTypes=-1",
+  );
+}
+
+export async function fetchEastMoneyShareLifts(code: string): Promise<Array<Record<string, unknown>>> {
+  const id = bareCode(code);
+  return datacenterRows("RPT_LIFT_STAGE", `(SECURITY_CODE="${id}")`, "&sortColumns=FREE_DATE&sortTypes=-1");
+}
+
+export async function fetchEastMoneySeos(code: string): Promise<Array<Record<string, unknown>>> {
+  const id = bareCode(code);
+  return datacenterRows("RPT_SEO_DETAIL", `(SECURITY_CODE="${id}")`);
 }
