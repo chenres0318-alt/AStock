@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { displaySymbol, priceDigits, toTencentCode } from "@/lib/codes";
-import type { CompanyAnalysis } from "@/lib/companyAnalysis";
+import type { CompanyAnalysis, SentimentItem } from "@/lib/companyAnalysis";
 import { formatAmount, formatPct, formatPrice, toneClass } from "@/lib/format";
 import type { SearchItem } from "@/lib/types";
 import AppHeader from "./AppHeader";
@@ -36,6 +36,50 @@ function Metric({ label, value, tone }: { label: string; value: string; tone?: n
       <div className="text-[11px] text-mute">{label}</div>
       <div className={`mt-1 num text-sm ${toneClass(tone)}`}>{value}</div>
     </div>
+  );
+}
+
+function sentimentSource(source: SentimentItem["source"]): string {
+  if (source === "event") return "大事提醒";
+  if (source === "notice") return "公告";
+  if (source === "news") return "资讯";
+  if (source === "hold") return "股东变动";
+  if (source === "lift") return "解禁";
+  return "";
+}
+
+function SentimentList({
+  title,
+  tone,
+  items,
+  empty,
+}: {
+  title: string;
+  tone: "bull" | "bear";
+  items: SentimentItem[];
+  empty: string;
+}) {
+  return (
+    <section className="panel px-4 py-4">
+      <div className="text-sm">
+        {title}
+        <span className={`ml-2 text-xs ${tone === "bull" ? "text-down" : "text-up"}`}>{items.length}</span>
+      </div>
+      {items.length ? (
+        <ul className="mt-2 space-y-2 text-sm">
+          {items.map((item, index) => (
+            <li key={`${item.date}-${item.title}-${index}`}>
+              <div>{item.title}</div>
+              <div className="text-[11px] leading-5 text-mute">
+                {[item.date, sentimentSource(item.source), item.summary].filter(Boolean).join(" · ")}
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <EmptyHint text={empty} />
+      )}
+    </section>
   );
 }
 
@@ -118,7 +162,7 @@ export default function CompanyAnalysisView() {
       <section className="panel px-4 py-4">
         <div className="text-sm">公司分析</div>
         <div className="mt-1 max-w-3xl text-xs leading-5 text-mute">
-          输入股票公司名称或代码。看基本面、估值、买入风险，以及股东减持、限售解禁、定向增发和经营是否异常。数据来自公开行情和东财 F10，只供学习，不构成投资建议。
+          输入股票公司名称或代码。看基本面、估值、买入风险、最近利好和利空，以及股东减持、限售解禁、定向增发和经营是否异常。数据来自公开行情和东财 F10，只供学习，不构成投资建议。
         </div>
         <form className="relative mt-3 max-w-xl" onSubmit={onSubmit}>
           <input
@@ -178,6 +222,12 @@ export default function CompanyAnalysisView() {
               <span className={`rounded-full bg-panel-2 px-2 py-1 ${riskTone(report.operation.level)}`}>
                 经营 {riskLabel(report.operation.level)}
               </span>
+              {report.bullish.length ? (
+                <span className="rounded-full bg-panel-2 px-2 py-1 text-down">利好 {report.bullish.length}</span>
+              ) : null}
+              {report.bearish.length ? (
+                <span className="rounded-full bg-panel-2 px-2 py-1 text-up">利空 {report.bearish.length}</span>
+              ) : null}
               <Link href={`/?code=${toTencentCode(report.search.code)}`} className="rounded-full bg-gold px-2 py-1 text-bg">
                 打开看盘
               </Link>
@@ -251,6 +301,11 @@ export default function CompanyAnalysisView() {
               </div>
             ) : null}
           </section>
+
+          <div className="grid gap-3 lg:grid-cols-2">
+            <SentimentList title="最近利好" tone="bull" items={report.bullish} empty="近几个月公开信息里没有明确利好" />
+            <SentimentList title="最近利空" tone="bear" items={report.bearish} empty="近几个月公开信息里没有明确利空" />
+          </div>
 
           <div className="grid gap-3 lg:grid-cols-3">
             <section className="panel px-4 py-4">
