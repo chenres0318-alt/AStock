@@ -1,8 +1,9 @@
-import { isEtf, isIndexCode, isStName, marketLabel, toTencentCode } from "./codes";
-import { shanghaiParts, toNumber } from "./format";
+import { isEtf, isIndexCode, marketLabel, toTencentCode } from "./codes";
+import { toNumber } from "./format";
 import { cached } from "./cache";
 import { getSearch } from "./market";
 import {
+  fetchEastMoneyCompanyNews,
   fetchEastMoneyCompanySurvey,
   fetchEastMoneyF10Ops,
   fetchEastMoneyHoldChanges,
@@ -11,11 +12,32 @@ import {
 } from "./sources/eastmoney";
 import { fetchTencentQuotes } from "./sources/tencent";
 import type { Quote, SearchItem } from "./types";
+import {
+  fromMillis,
+  holdSide,
+  judgeBuyRisk,
+  judgeOperation,
+  pickSentiment,
+  shanghaiToday,
+  shiftYmd,
+  stripHtml,
+  ymd,
+} from "./companyAnalysisLogic";
+import type { AnalysisFlag, SentimentItem } from "./companyAnalysisLogic";
 
-export type AnalysisFlag = {
-  level: "low" | "mid" | "high";
-  text: string;
-};
+export type { AnalysisFlag, SentimentItem };
+export {
+  aboutCompany,
+  classifySentiment,
+  holdSide,
+  judgeBuyRisk,
+  judgeOperation,
+  pickSentiment,
+  shanghaiToday,
+  shiftYmd,
+  stripHtml,
+  ymd,
+} from "./companyAnalysisLogic";
 
 export type HoldChangeRow = {
   date: string | null;
@@ -86,6 +108,8 @@ export type CompanyAnalysis = {
   holdChanges: HoldChangeRow[];
   lifts: LiftRow[];
   seos: SeoRow[];
+  bullish: SentimentItem[];
+  bearish: SentimentItem[];
   buyRisk: { level: "low" | "mid" | "high"; flags: AnalysisFlag[] };
   operation: { level: "ok" | "watch" | "bad"; flags: AnalysisFlag[] };
 };
@@ -96,26 +120,6 @@ function asRecord(value: unknown): Record<string, unknown> {
 
 function asList(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
-}
-
-export function ymd(value: unknown): string | null {
-  const text = String(value ?? "");
-  const match = text.match(/^(\d{4}-\d{2}-\d{2})/);
-  return match ? match[1] : null;
-}
-
-export function shanghaiToday(): string {
-  const parts = shanghaiParts();
-  return `${parts.year}-${parts.month}-${parts.day}`;
-}
-
-export function shiftYmd(value: string, months: number): string {
-  const date = new Date(`${value}T12:00:00+08:00`);
-  date.setUTCMonth(date.getUTCMonth() + months);
-  const year = date.getUTCFullYear();
-  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(date.getUTCDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
 }
 
 function firstRow(value: unknown): Record<string, unknown> {
@@ -130,62 +134,6 @@ function textOf(value: unknown, fallback = "--"): string {
 
 function num(row: Record<string, unknown>, key: string): number | null {
   return toNumber(row[key]);
-}
-
-export function holdSide(reason: string, shares: number | null): HoldChangeRow["side"] {
-  if (/减持|竞价|大宗/.test(reason) || (shares != null && shares < 0)) return "reduce";
-  if (/增持|股权激励|买入/.test(reason) || (shares != null && shares > 0)) return "increase";
-  return "other";
-}
-
-export function judgeBuyRisk(input: {
-  name: string;
-  profitYoy: number | null;
-  debt: number | null;
-  peTtm: number | null;
-  recentReduce: boolean;
-  upcomingLift: boolean;
-  pendingSeo: boolean;
-  eventHits: string[];
-}): { level: "low" | "mid" | "high"; flags: AnalysisFlag[] } {
-  const flags: AnalysisFlag[] = [];
-  if (isStName(input.name) || input.name.includes("退")) {
-    flags.push({ level: "high", text: "名称带 ST 或退市提示，买入风险高" });
-  }
-  if (input.eventHits.some((item) => /立案|退市|风险警示|处罚/.test(item))) {
-    flags.push({ level: "high", text: "大事提醒里有立案、处罚或退市相关事项" });
-  }
-  if (input.recentReduce) flags.push({ level: "mid", text: "近半年有董监高或股东减持" });
-  if (input.upcomingLift) flags.push({ level: "mid", text: "未来三个月有限售解禁" });
-  if (input.pendingSeo) flags.push({ level: "mid", text: "有尚未完成或较新的定向增发" });
-  if (input.profitYoy != null && input.profitYoy < -30) {
-    flags.push({ level: "mid", text: "归属净利润同比下滑超过 30%" });
-  }
-  if (input.debt != null && input.debt >= 70) flags.push({ level: "mid", text: "资产负债率在 70% 及以上" });
-  if (input.peTtm != null && input.peTtm > 80) flags.push({ level: "mid", text: "滚动市盈率偏高" });
-  if (!flags.length) flags.push({ level: "low", text: "公开数据里没有明显的买入阻断项" });
-  const level = flags.some((item) => item.level === "high") ? "high" : flags.some((item) => item.level === "mid") ? "mid" : "low";
-  return { level, flags };
-}
-
-export function judgeOperation(input: {
-  name: string;
-  profitYoy: number | null;
-  eventHits: string[];
-}): { level: "ok" | "watch" | "bad"; flags: AnalysisFlag[] } {
-  const flags: AnalysisFlag[] = [];
-  if (isStName(input.name) || /退市|立案调查/.test(input.eventHits.join(" "))) {
-    flags.push({ level: "high", text: "经营或监管状态异常" });
-  }
-  if (input.eventHits.some((item) => /亏损|预减|下滑/.test(item))) {
-    flags.push({ level: "mid", text: "业绩预告偏弱" });
-  }
-  if (input.profitYoy != null && input.profitYoy < 0) {
-    flags.push({ level: "mid", text: "最新报告期净利润同比下降" });
-  }
-  if (!flags.length) flags.push({ level: "low", text: "最新报告期和大事提醒里未见明显经营异常" });
-  const level = flags.some((item) => item.level === "high") ? "bad" : flags.some((item) => item.level === "mid") ? "watch" : "ok";
-  return { level, flags };
 }
 
 function settled<T>(value: PromiseSettledResult<T>, fallback: T): T {
@@ -204,16 +152,18 @@ export async function getCompanyAnalysis(keyword: string): Promise<CompanyAnalys
   const code = toTencentCode(picked.code);
   if (isIndexCode(code) || isEtf(code, picked.name)) throw new Error("请选择股票公司，而不是指数或 ETF");
 
-  return cached(`analyze:${code}`, 5 * 60_000, async () => {
-    const [quoteRes, opsRes, surveyRes, holdsRes, liftsRes, seosRes] = await Promise.allSettled([
+  return cached(`analyze:${code}:v4`, 5 * 60_000, async () => {
+    const [quoteRes, opsRes, surveyRes, holdsRes, liftsRes, seosRes, newsRes] = await Promise.allSettled([
       fetchTencentQuotes([code]),
       fetchEastMoneyF10Ops(code),
       fetchEastMoneyCompanySurvey(code),
       fetchEastMoneyHoldChanges(code),
       fetchEastMoneyShareLifts(code),
       fetchEastMoneySeos(code),
+      fetchEastMoneyCompanyNews(picked.name),
     ]);
     const quote = settled(quoteRes, [] as Quote[])[0] ?? null;
+    const name = quote?.name || picked.name;
     const ops = settled(opsRes, {} as Record<string, unknown>);
     const survey = asRecord(settled(surveyRes, {} as Record<string, unknown>).jbzl);
     const zxzb = firstRow(ops.zxzb);
@@ -279,7 +229,57 @@ export async function getCompanyAnalysis(keyword: string): Promise<CompanyAnalys
       (item) => item.upcoming && item.date != null && item.date <= shiftYmd(today, 3),
     );
     const pendingSeo = seos.some((item) => !item.date || item.date >= shiftYmd(today, -12));
-    const name = quote?.name || picked.name;
+    const { bullish, bearish } = pickSentiment(
+      [
+        ...events.map((item) => ({
+          date: item.date,
+          title: item.title,
+          summary: item.type,
+          source: "event" as const,
+        })),
+        ...notices.map((item) => ({
+          date: item.date,
+          title: item.title,
+          summary: "公司公告",
+          source: "notice" as const,
+        })),
+        ...settled(newsRes, [] as Array<Record<string, unknown>>).map((row) => ({
+          date: ymd(row.date),
+          title: stripHtml(row.title),
+          summary: stripHtml(row.content).slice(0, 90),
+          source: "news" as const,
+        })),
+        ...asList(asRecord(asRecord(ops.zxzx).data).items).map((item) => {
+          const row = asRecord(item);
+          return {
+            date: fromMillis(row.showDateTime),
+            title: stripHtml(row.title),
+            summary: stripHtml(row.summary).slice(0, 90),
+            source: "news" as const,
+          };
+        }),
+        ...holdChanges
+          .filter((item) => item.side !== "other" && item.date != null && item.date >= shiftYmd(today, -6))
+          .map((item) => ({
+            date: item.date,
+            title: `${item.holder}${item.side === "reduce" ? "减持" : "增持"}${
+              item.shares == null ? "" : ` ${item.shares.toLocaleString("zh-CN")}股`
+            }`,
+            summary: item.reason,
+            source: "hold" as const,
+          })),
+        ...lifts
+          .filter((item) => item.upcoming && item.date != null && item.date <= shiftYmd(today, 3))
+          .map((item) => ({
+            date: item.date,
+            title: `${item.type || "限售股"}解禁${item.sharesWan == null ? "" : ` ${item.sharesWan.toFixed(2)}万股`}`,
+            summary: "未来三个月限售解禁",
+            source: "lift" as const,
+          })),
+      ],
+      name,
+      code,
+    );
     return {
       quote,
       search: { ...picked, code },
@@ -323,6 +323,8 @@ export async function getCompanyAnalysis(keyword: string): Promise<CompanyAnalys
       holdChanges,
       lifts,
       seos,
+      bullish,
+      bearish,
       buyRisk: judgeBuyRisk({
         name,
         profitYoy,

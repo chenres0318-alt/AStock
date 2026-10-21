@@ -231,11 +231,13 @@ function parseEmKlines(rows: string[] | undefined): KBar[] {
 }
 
 function parseMaybeJsonp(text: string): KlineResponse {
+  return parseJsonp<KlineResponse>(text);
+}
+
+function parseJsonp<T>(text: string): T {
   const trimmed = text.trim();
-  const jsonText = trimmed.startsWith("j(")
-    ? trimmed.replace(/^j\(/, "").replace(/\);?$/, "")
-    : trimmed;
-  return JSON.parse(jsonText) as KlineResponse;
+  const wrapped = trimmed.match(/^[a-zA-Z_$][\w$]*\(([\s\S]*)\)\s*;?$/);
+  return JSON.parse(wrapped ? wrapped[1] : trimmed) as T;
 }
 
 /** 日线主力净流入，按日期。正数为净流入。 */
@@ -338,4 +340,38 @@ export async function fetchEastMoneyShareLifts(code: string): Promise<Array<Reco
 export async function fetchEastMoneySeos(code: string): Promise<Array<Record<string, unknown>>> {
   const id = bareCode(code);
   return datacenterRows("RPT_SEO_DETAIL", `(SECURITY_CODE="${id}")`);
+}
+
+type NewsSearchResponse = {
+  result?: {
+    cmsArticleWebOld?: Array<Record<string, unknown>>;
+  };
+};
+
+/** 东财资讯搜索，按公司名取最近报道。 */
+export async function fetchEastMoneyCompanyNews(keyword: string): Promise<Array<Record<string, unknown>>> {
+  const param = JSON.stringify({
+    uid: "",
+    keyword,
+    type: ["cmsArticleWebOld"],
+    client: "web",
+    clientType: "web",
+    clientVersion: "curr",
+    param: {
+      cmsArticleWebOld: {
+        searchScope: "default",
+        sort: "default",
+        pageIndex: 1,
+        pageSize: 20,
+        preTag: "",
+        postTag: "",
+      },
+    },
+  });
+  const text = await fetchUtf(
+    `https://search-api-web.eastmoney.com/search/jsonp?cb=j&param=${encodeURIComponent(param)}`,
+    { referer: "https://so.eastmoney.com/", timeoutMs: 10_000 },
+  );
+  const json = parseJsonp<NewsSearchResponse>(text);
+  return json.result?.cmsArticleWebOld ?? [];
 }
