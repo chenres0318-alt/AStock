@@ -514,7 +514,7 @@ export default function ChartView({
           title: "昨收",
         });
       }
-      const marks = intradayExtremes(points, etf ? { minCommission: 0 } : undefined).map((mark) => ({
+      const marks = intradayExtremes(points, { etf }).map((mark) => ({
         time: points[mark.index].timestamp as UTCTimestamp,
         price: mark.price,
         side: mark.side,
@@ -728,7 +728,7 @@ export default function ChartView({
           {loading
             ? "加载中…"
             : mode === "trend"
-              ? "黄线现价 · 蓝线均价 · 下图 MACDFS(12,26,9) · 顶：均价附近、DIF>DEA、斜率变弱、KDJ超买、有量滞涨 · 底：均价下、DEA>DIF、斜率变弱、KDJ超卖、非天量杀跌"
+              ? "黄线现价 · 蓝线均价 · 下图 MACDFS(12,26,9) · 顶底须偏离均价线盖过佣金和税 · 个股5元+印花税0.05%+0.05元 · ETF佣金0.005%免5元"
               : mode === "day"
                 ? "红MA4 · 青MA7 · 黄MA20 · 近5日收盘斜率仍向上但变弱为顶，仍向下但变弱为底 · 收盘低于下降的20日线超过8%不算底"
                 : `红MA4 · 青MA7 · 黄MA20 · 4上穿7且站上20买 · 4下穿7或跌破20卖 · 买 ${ribbonCounts.buy} 卖 ${ribbonCounts.sell}`}
