@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { isListedStockCode, priceDigits } from "@/lib/codes";
 import { formatPct, formatPrice, toneClass } from "@/lib/format";
@@ -35,10 +36,11 @@ function HitTable({
   if (!items.length) return <EmptyHint text="没有符合条件的结果" />;
   return (
     <div className="overflow-auto scroll-thin">
-      <table className="w-full min-w-[760px] text-left text-sm">
+      <table className="w-full min-w-[960px] text-left text-sm">
         <thead className="text-[11px] text-mute">
           <tr className="border-b border-line">
             <th className="px-3 py-2 font-normal">股票</th>
+            <th className="px-3 py-2 font-normal">所属板块</th>
             <th className="px-3 py-2 font-normal text-right">现价 / MA4·MA7</th>
             <th className="px-3 py-2 font-normal text-right">涨跌幅</th>
             <th className="px-3 py-2 font-normal text-right">DIF</th>
@@ -55,6 +57,15 @@ function HitTable({
                   <div>{item.name}</div>
                   <div className="text-[11px] text-mute">{item.code}</div>
                 </button>
+              </td>
+              <td className="px-3 py-2">
+                {item.sectorCode ? (
+                  <Link href={`/sector?code=${item.sectorCode}`} className="text-gold hover:underline" onClick={(event) => event.stopPropagation()}>
+                    {item.sector}
+                  </Link>
+                ) : (
+                  <span className="text-mute">{item.sector ?? "--"}</span>
+                )}
               </td>
               <td className="px-3 py-2 text-right">
                 <div className={`num ${toneClass(item.pct)}`}>{formatPrice(item.price, priceDigits(item.code, item.name))}</div>
@@ -138,10 +149,10 @@ export default function Screener() {
       <AppHeader />
 
       <section className="panel px-4 py-3">
-        <div className="text-sm">选股：当天 4 日均线上穿 7 日均线，MACD 空头势力减弱</div>
+        <div className="text-sm">选股：当天 4 日均线上穿 7 日均线，且 4 日、7 日均线都拐头向上</div>
         <div className="mt-2 max-w-4xl text-xs leading-5 text-mute">
-          用当日收盘计算均线。4 日均线前一日还不高于 7 日均线，当天收到 7 日均线上方。MACD 柱仍为负，但比前一日更接近 0，也就是绿柱缩短。两条同时成立才入选。扫描成交额靠前的沪深
-          A 股，不含 ST / 北交所。日 K 卖点：4 日下穿 7 日时，若 4 日均线仍在 20 日均线上方则不卖。空仓后 MACD 绿柱转成红柱再买。20 日均线画在图上。
+          用当日收盘计算均线。4 日均线前一日还不高于 7 日均线，当天收到 7 日均线上方；同时 4 日、7 日均线都比前一日高。三条同时成立才入选。结果里带这只股票的所属板块。扫描成交额靠前的沪深
+          A 股，不含 ST / 北交所。
         </div>
       </section>
 
@@ -174,7 +185,7 @@ export default function Screener() {
         />
         {loading ? (
           <div className="px-4 py-8 text-center text-sm text-mute">
-            正在拉取沪深 A 股日线，匹配 4 日均线上穿 7 日均线、且 MACD 绿柱缩短的股票，大约需要一分钟。
+            正在拉取沪深 A 股日线，匹配当天 4 日均线上穿 7 日均线、且 4 日和 7 日均线都拐头向上的股票，大约需要一分钟。
           </div>
         ) : (
           <HitTable items={hits} onOpen={openStock} />

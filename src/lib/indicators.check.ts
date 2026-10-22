@@ -96,7 +96,7 @@ const bounceBars = barsFromCloses(bearBounceStand());
 const bounce = analyzeBars(bounceBars)!;
 assert(bounce.firstStandMa5, "bounce from a decline should first stand on MA5");
 assert(bounce.strongReclaim, "8% bounce should count as a strong reclaim");
-assert(!passesScreen(bounce), "a one-day MA5 reclaim is not the 4/7 cross with a still-negative MACD bar");
+assert(!passesScreen(bounce), "a one-day MA5 reclaim is not a same-day 4/7 cross");
 
 const weaveBars = barsFromCloses(weakWeaveStand());
 const weave = analyzeBars(weaveBars)!;
@@ -130,26 +130,27 @@ const crossBars = barsFromCloses(crossCloses);
 const cross = analyzeBars(crossBars)!;
 assert(cross.ma4CrossUpMa7, "last bar should cross MA4 up through MA7");
 assert(cross.ma4 > cross.ma7, "MA4 should finish above MA7");
-assert(cross.macdBearWeak, "MACD histogram should still be negative and shorter than yesterday");
-assert(cross.hist < 0, "bearish force stays below zero");
-assert(passesScreen(cross), "MA4 cross plus weakening bearish MACD should pass");
+assert(cross.ma4TurnUp && cross.ma7TurnUp, "both averages should be turning up on the cross day");
+assert(passesScreen(cross), "MA4 cross with both averages turning up should pass");
 assert(screenReasons(cross).includes("4日均线上穿7日均线"), "reasons should name the 4/7 cross");
-assert(screenReasons(cross).includes("MACD空头势力减弱"), "reasons should name weakening bearish MACD");
+assert(screenReasons(cross).includes("4日均线拐头向上"), "reasons should name MA4 turning up");
+assert(screenReasons(cross).includes("7日均线拐头向上"), "reasons should name MA7 turning up");
+assert(!passesScreen({ ...cross, ma7TurnUp: false }), "a golden cross with MA7 still down should not pass");
+assert(!passesScreen({ ...cross, ma4TurnUp: false }), "a golden cross with MA4 still down should not pass");
 const crossHits = findBuyPoints(crossBars);
 assert(crossHits.at(-1)?.time === crossBars[crossBars.length - 1].time, "the cross day is the latest screen hit");
 
 const beforeCross = analyzeBars(barsFromCloses(crossCloses.slice(0, -1)))!;
-assert(beforeCross.macdBearWeak, "the day before can already show a shorter green bar");
 assert(beforeCross.ma4CrossUpMa7 === false, "the day before has not crossed MA4 over MA7");
-assert(!passesScreen(beforeCross), "bearish MACD alone should not pass");
+assert(!passesScreen(beforeCross), "turning averages without a same-day cross should not pass");
 
 const popped = crossCloses.slice(0, -2);
 const poppedPrice = popped[popped.length - 1] * 1.06;
 popped.push(Number(poppedPrice.toFixed(4)));
 const poppedTech = analyzeBars(barsFromCloses(popped))!;
 assert(poppedTech.ma4CrossUpMa7, "a sharp bounce can still cross MA4 over MA7");
-assert(poppedTech.macdBearWeak === false, "a bar that has already turned positive is not weakening bearish force");
-assert(!passesScreen(poppedTech), "a positive MACD bar should not pass the bearish-weakening rule");
+assert(poppedTech.ma4TurnUp && poppedTech.ma7TurnUp, "the sharp bounce also turns both averages up");
+assert(passesScreen(poppedTech), "MACD sign no longer blocks a same-day 4/7 cross with both averages up");
 
 const risingTd = tdSequential(risingCloses(20, 10, 1).map((close, i) => ({ time: `u${i}`, close })));
 assert(risingTd[0]?.side === "up" && risingTd[0].count === 1, "first bar above close[i-4] starts up count at 1");

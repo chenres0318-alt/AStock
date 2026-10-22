@@ -1,11 +1,13 @@
+import { listAllIndustryBoards } from "./boards";
 import { cached } from "./cache";
 import { isHsAShare } from "./codes";
 import { analyzeBars, passesScreen, screenReasons, type ScreenFlags } from "./indicators";
 import { mapPool } from "./pool";
-import { fetchEastMoneyAmountRank } from "./sources/eastmoney";
+import { fetchEastMoneyAmountRank, fetchEastMoneyIndustry } from "./sources/eastmoney";
 import { fetchSinaHsAByAmount, fetchSinaKline } from "./sources/sina";
 import { fetchTencentKline } from "./sources/tencent";
-import type { KBar, RankItem, ScreenerHit } from "./types";
+import { matchIndustryBoard } from "./screenerLogic";
+import type { KBar, RankItem, ScreenerHit, SectorItem } from "./types";
 
 const SCAN_DEADLINE_MS = 95_000;
 const UNIVERSE_SIZE = 360;
@@ -64,7 +66,25 @@ function toHit(
     dea: tech.dea,
     hist: tech.hist,
     reasons: screenReasons(tech),
+    sector: null,
+    sectorCode: null,
   };
+}
+
+async function attachSectors(items: ScreenerHit[]): Promise<void> {
+  if (!items.length) return;
+  const boards = await listAllIndustryBoards().catch(() => [] as SectorItem[]);
+  await mapPool(items, 5, async (item) => {
+    try {
+      const industry = await cached(`screener-industry:${item.code}`, 6 * 60_000, () => fetchEastMoneyIndustry(item.code));
+      if (!industry) return;
+      const board = matchIndustryBoard(industry, boards);
+      item.sector = board?.name ?? industry;
+      item.sectorCode = board?.code ?? null;
+    } catch {
+      // keep the hit even if the board name is missing
+    }
+  });
 }
 
 export async function screenStocks(): Promise<{
@@ -113,5 +133,6 @@ export async function screenStocks(): Promise<{
   }
 
   items.sort((a, b) => (b.hist ?? -Infinity) - (a.hist ?? -Infinity));
+  await attachSectors(items);
   return { scanned, universe: candidates.length, items, source };
 }

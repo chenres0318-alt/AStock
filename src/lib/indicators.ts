@@ -22,6 +22,10 @@ export type ScreenFlags = {
   aboveMa5: boolean;
   firstStandMa5: boolean;
   ma4CrossUpMa7: boolean;
+  /** 4 日均线当日高于前一日，视为拐头向上。 */
+  ma4TurnUp: boolean;
+  /** 7 日均线当日高于前一日，视为拐头向上。 */
+  ma7TurnUp: boolean;
   macdBull: boolean;
   /** MACD 柱仍为负，且比前一日更接近 0，绿柱缩短。 */
   macdBearWeak: boolean;
@@ -106,6 +110,8 @@ export function analyzeBarsAt(
   const aboveMa5 = closes[i] > ma5;
   const firstStandMa5 = firstStandAboveMa5(closes, i);
   const ma4CrossUpMa7 = ma4Prev <= ma7Prev && ma4 > ma7;
+  const ma4TurnUp = ma4 > ma4Prev;
+  const ma7TurnUp = ma7 > ma7Prev;
 
   const cur = macd[i];
   const prev = macd[i - 1];
@@ -139,6 +145,8 @@ export function analyzeBarsAt(
     aboveMa5,
     firstStandMa5,
     ma4CrossUpMa7,
+    ma4TurnUp,
+    ma7TurnUp,
     macdBull,
     macdBearWeak,
     belowMa20,
@@ -271,13 +279,14 @@ export function findBuyPoints(bars: KBar[]): BuyPoint[] {
 export function screenReasons(tech: ScreenFlags): string[] {
   const rows: string[] = [];
   if (tech.ma4CrossUpMa7) rows.push("4日均线上穿7日均线");
-  if (tech.macdBearWeak) rows.push("MACD空头势力减弱");
+  if (tech.ma4TurnUp) rows.push("4日均线拐头向上");
+  if (tech.ma7TurnUp) rows.push("7日均线拐头向上");
   return rows;
 }
 
-/** 当天收盘：4 日均线上穿 7 日均线，且 MACD 绿柱缩短但仍为负。 */
+/** 当天收盘：4 日均线上穿 7 日均线，且 4 日、7 日均线都拐头向上。 */
 export function passesScreen(tech: ScreenFlags): boolean {
-  return tech.ma4CrossUpMa7 && tech.macdBearWeak;
+  return tech.ma4CrossUpMa7 && tech.ma4TurnUp && tech.ma7TurnUp;
 }
 
 const ADX_PERIOD = 14;
