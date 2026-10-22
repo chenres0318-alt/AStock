@@ -4,6 +4,7 @@ import {
   intradayExtremes,
   kdjSeries,
   linearSlope,
+  avgDeviationCoversCost,
   lotSpreadCoversCost,
   macdfsSeries,
   recentVolumeAvg,
@@ -35,6 +36,11 @@ assert(lotSpreadCoversCost(10, 10.04) === false, "four cents does not cover a 5 
 assert(lotSpreadCoversCost(10, 10.06) === true, "six cents on one lot covers the commission and stamp tax");
 assert(lotSpreadCoversCost(0.598, 0.62) === false, "an ETF-sized move still fails when the 5 yuan minimum applies");
 assert(lotSpreadCoversCost(0.598, 0.62, 0) === true, "waiving the 5 yuan minimum lets that ETF move cover the stamp tax");
+assert(avgDeviationCoversCost(47, 47) === false, "sitting on the average line is too close");
+assert(avgDeviationCoversCost(47, 46.9) === true, "ten cents off a 47 yuan stock covers 5 yuan, stamp tax, and 0.05");
+assert(avgDeviationCoversCost(47, 46.93) === false, "seven cents off a 47 yuan stock does not cover the stock cost");
+assert(avgDeviationCoversCost(0.598, 0.598, true) === false, "an ETF sitting on the average line is still too close");
+assert(avgDeviationCoversCost(0.598, 0.597, true) === true, "an ETF only needs 0.005% commission, with no 5 yuan floor");
 assert(isEtf("sz159516", "半导体设备ETF国泰"), "the Guotai semiconductor equipment fund is an ETF");
 assert(isEtf("sh560780") && isEtf("sh588710"), "Shanghai ETF prefixes count without a name");
 assert(!isEtf("sh601138", "工业富联"), "a stock keeps the 5 yuan minimum");
@@ -202,6 +208,19 @@ const dropAboveAvg = intradayExtremes(
   ),
 );
 assert(dropAboveAvg.every((mark) => mark.side !== "bottom"), "a weakening drop above the average line is not a bottom");
+
+const huggingAvg = intradayExtremes(
+  session(
+    [
+      { n: 40, step: 0 },
+      { n: 6, step: 0.4 },
+      { n: 6, step: 0.15 },
+    ],
+    20,
+    (price) => price - 0.02,
+  ),
+);
+assert(huggingAvg.length === 0, "a weakening rise two cents off the average line is not a top");
 
 const climb = Array.from({ length: 20 }, (_, i) => 10 + i);
 const climbKdj = kdjSeries(climb);
