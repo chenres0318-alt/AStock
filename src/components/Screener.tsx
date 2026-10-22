@@ -149,9 +149,9 @@ export default function Screener() {
       <AppHeader />
 
       <section className="panel px-4 py-3">
-        <div className="text-sm">选股：当天收盘站上 4 日均线和 7 日均线，且 4 日、7 日均线都拐头向上</div>
+        <div className="text-sm">选股：当天收盘站上 4 日均线和 7 日均线，且 4 日、7 日均线都拐头向上，并且这套条件连续成立不超过 2 日</div>
         <div className="mt-2 max-w-4xl text-xs leading-5 text-mute">
-          用当日收盘计算均线。收盘价高于 4 日均线和 7 日均线，同时 4 日、7 日均线都比前一日高。四条同时成立才入选。结果里带这只股票的所属板块。扫描成交额靠前的沪深
+          用当日收盘计算均线。收盘价高于 4 日均线和 7 日均线，同时 4 日、7 日均线都比前一日高。从当天往前数，这四条连续成立只能是第 1 日或第 2 日，第 3 日起排除。结果里带这只股票的所属板块。扫描成交额靠前的沪深
           A 股，不含 ST / 北交所。
         </div>
       </section>
@@ -185,7 +185,7 @@ export default function Screener() {
         />
         {loading ? (
           <div className="px-4 py-8 text-center text-sm text-mute">
-            正在拉取沪深 A 股日线，匹配当天收盘站上 4 日、7 日均线、且两条均线都拐头向上的股票，大约需要一分钟。
+            正在拉取沪深 A 股日线，匹配收盘站上 4 日、7 日均线、两条均线都拐头向上、且连续成立不超过 2 日的股票，大约需要一分钟。
           </div>
         ) : (
           <HitTable items={hits} onOpen={openStock} />

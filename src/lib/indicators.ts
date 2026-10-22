@@ -30,6 +30,8 @@ export type ScreenFlags = {
   ma4TurnUp: boolean;
   /** 7 日均线当日高于前一日，视为拐头向上。 */
   ma7TurnUp: boolean;
+  /** 收盘站上拐头向上的 4/7 日均线，已连续成立的交易日数（含当天）。 */
+  standDays: number;
   macdBull: boolean;
   /** MACD 柱仍为负，且比前一日更接近 0，绿柱缩短。 */
   macdBearWeak: boolean;
@@ -85,6 +87,26 @@ const FIRST_STAND_LOOK = 5;
 const STRONG_RECLAIM_DAY_PCT = 5;
 const STRONG_RECLAIM_AMP_PCT = 8;
 
+/** 收盘高于 4 日、7 日均线，且两条均线都比前一日高。 */
+export function standSetupAt(closes: number[], i: number): boolean {
+  const ma4 = maAt(closes, 4, i);
+  const ma4Prev = maAt(closes, 4, i - 1);
+  const ma7 = maAt(closes, 7, i);
+  const ma7Prev = maAt(closes, 7, i - 1);
+  if (ma4 == null || ma4Prev == null || ma7 == null || ma7Prev == null) return false;
+  return closes[i] > ma4 && closes[i] > ma7 && ma4 > ma4Prev && ma7 > ma7Prev;
+}
+
+/** 从当天往前数，站上拐头向上 4/7 日均线连续成立的天数。 */
+export function countStandDays(closes: number[], i: number): number {
+  let n = 0;
+  for (let j = i; j >= 0; j -= 1) {
+    if (!standSetupAt(closes, j)) break;
+    n += 1;
+  }
+  return n;
+}
+
 /** 收盘站上五日线，且向前 look-1 根都没有站上。 */
 export function firstStandAboveMa5(closes: number[], i: number, look = FIRST_STAND_LOOK): boolean {
   const ma5 = maAt(closes, 5, i);
@@ -118,6 +140,7 @@ export function analyzeBarsAt(
   const ma4CrossUpMa7 = ma4Prev <= ma7Prev && ma4 > ma7;
   const ma4TurnUp = ma4 > ma4Prev;
   const ma7TurnUp = ma7 > ma7Prev;
+  const standDays = countStandDays(closes, i);
 
   const cur = macd[i];
   const prev = macd[i - 1];
@@ -155,6 +178,7 @@ export function analyzeBarsAt(
     ma4CrossUpMa7,
     ma4TurnUp,
     ma7TurnUp,
+    standDays,
     macdBull,
     macdBearWeak,
     belowMa20,
@@ -284,6 +308,8 @@ export function findBuyPoints(bars: KBar[]): BuyPoint[] {
   return points;
 }
 
+const MAX_STAND_DAYS = 2;
+
 export function screenReasons(tech: ScreenFlags): string[] {
   const rows: string[] = [];
   if (tech.aboveMa4 && tech.aboveMa7) rows.push("收盘站上4日、7日均线");
@@ -293,12 +319,22 @@ export function screenReasons(tech: ScreenFlags): string[] {
   }
   if (tech.ma4TurnUp) rows.push("4日均线拐头向上");
   if (tech.ma7TurnUp) rows.push("7日均线拐头向上");
+  if (tech.standDays >= 1 && tech.standDays <= MAX_STAND_DAYS) {
+    rows.push(`条件成立第${tech.standDays}日`);
+  }
   return rows;
 }
 
-/** 当天收盘站上 4 日、7 日均线，且两条均线都拐头向上。 */
+/** 当天收盘站上 4 日、7 日均线，两条均线都拐头向上，且这套条件连续成立不超过 2 日。 */
 export function passesScreen(tech: ScreenFlags): boolean {
-  return tech.aboveMa4 && tech.aboveMa7 && tech.ma4TurnUp && tech.ma7TurnUp;
+  return (
+    tech.aboveMa4 &&
+    tech.aboveMa7 &&
+    tech.ma4TurnUp &&
+    tech.ma7TurnUp &&
+    tech.standDays >= 1 &&
+    tech.standDays <= MAX_STAND_DAYS
+  );
 }
 
 const ADX_PERIOD = 14;
