@@ -71,39 +71,54 @@ almost(macd.hist, 2 * (macd.dif - macd.dea));
 
 const rising = analyzeBars(barsFromCloses(risingCloses(80)))!;
 assert(rising.aboveMa5, "steady uptrend close should sit above MA5");
+assert(rising.aboveMa4 && rising.aboveMa7, "steady uptrend close should sit above MA4 and MA7");
+assert(rising.ma4TurnUp && rising.ma7TurnUp, "steady uptrend averages should be turning up");
 assert(rising.firstStandMa5 === false, "already-above MA5 is not a first stand in 5 days");
 assert(rising.macdBull, "steady uptrend should have bullish MACD stack");
-assert(!passesScreen(rising), "trend already on MA5 should not pass");
+assert(passesScreen(rising), "close above MA4/MA7 with both averages turning up should pass");
+assert(screenReasons(rising).includes("收盘站上4日、7日均线"), "reasons should name standing above both averages");
+assert(screenReasons(rising).includes("4日均线拐头向上"), "reasons should name MA4 turning up");
+assert(screenReasons(rising).includes("7日均线拐头向上"), "reasons should name MA7 turning up");
+assert(!passesScreen({ ...rising, aboveMa4: false }), "close still under MA4 should not pass");
+assert(!passesScreen({ ...rising, aboveMa7: false }), "close still under MA7 should not pass");
+assert(!passesScreen({ ...rising, ma4TurnUp: false }), "MA4 still turning down should not pass");
+assert(!passesScreen({ ...rising, ma7TurnUp: false }), "MA7 still turning down should not pass");
 
 const down = analyzeBars(falling)!;
 assert(down.aboveMa5 === false, "persistent decline should sit below MA5");
+assert(down.aboveMa4 === false && down.aboveMa7 === false, "persistent decline should sit below MA4 and MA7");
 assert(down.firstStandMa5 === false, "close below MA5 is not a stand");
 assert(!passesScreen(down), "pure downtrend should not pass");
 
 const bullBars = barsFromCloses(bullFirstStand());
 const bull = analyzeBars(bullBars)!;
 assert(bull.firstStandMa5, "pullback then reclaim should be first MA5 stand in 5 days");
+assert(bull.aboveMa4 && bull.aboveMa7, "the reclaim close can sit above MA4 and MA7");
+assert(bull.ma4TurnUp === false && bull.ma7TurnUp === false, "one reclaim day is not enough to turn both averages up");
 assert(bull.macdBull || bull.macdBearWeak, "reclaim after uptrend should keep MACD usable");
-assert(!passesScreen(bull), "an MA5 reclaim is not a 4-day over 7-day cross");
+assert(!passesScreen(bull), "standing above without turning averages should not pass");
 
 const follow = barsFromCloses([...bullFirstStand(), Number((bull.close * 1.02).toFixed(4))]);
 const late = analyzeBars(follow)!;
 assert(late.aboveMa5, "next day can stay above MA5");
 assert(late.firstStandMa5 === false, "second day above MA5 is not first stand in 5 days");
-assert(!passesScreen(late), "follow-through above MA5 should fail");
+assert(late.aboveMa4 && late.aboveMa7 && late.ma4TurnUp && late.ma7TurnUp, "follow-through should stand above turning averages");
+assert(passesScreen(late), "a second day that stands above turning MA4/MA7 should pass");
 
 const bounceBars = barsFromCloses(bearBounceStand());
 const bounce = analyzeBars(bounceBars)!;
 assert(bounce.firstStandMa5, "bounce from a decline should first stand on MA5");
 assert(bounce.strongReclaim, "8% bounce should count as a strong reclaim");
-assert(!passesScreen(bounce), "a one-day MA5 reclaim is not a same-day 4/7 cross");
+assert(bounce.aboveMa4 && bounce.aboveMa7 && bounce.ma4TurnUp && bounce.ma7TurnUp, "an 8% bounce can stand above turning MA4/MA7");
+assert(passesScreen(bounce), "an 8% bounce that stands above turning averages should pass");
 
 const weaveBars = barsFromCloses(weakWeaveStand());
 const weave = analyzeBars(weaveBars)!;
 assert(weave.firstStandMa5, "tiny poke can still first-stand MA5");
 assert(weave.belowMa20, "slow decline weave should remain below MA20");
 assert(weave.strongReclaim === false, "1.8% poke is not a strong reclaim");
-assert(!passesScreen(weave), "downtrend weave below MA20 should not be a buy");
+assert(weave.aboveMa4 && weave.aboveMa7 === false, "a tiny poke may clear MA4 but not MA7");
+assert(!passesScreen(weave), "a poke that is not above MA7 should not pass");
 assert(!findBuyPoints(weaveBars).some((point) => point.time === weaveBars[weaveBars.length - 1].time));
 
 /** Drift, then a decline, then two modest up days: MA4 crosses above MA7 while the MACD bar is still negative but shorter. */
@@ -130,27 +145,31 @@ const crossBars = barsFromCloses(crossCloses);
 const cross = analyzeBars(crossBars)!;
 assert(cross.ma4CrossUpMa7, "last bar should cross MA4 up through MA7");
 assert(cross.ma4 > cross.ma7, "MA4 should finish above MA7");
+assert(cross.aboveMa4 && cross.aboveMa7, "the cross-day close should sit above both averages");
 assert(cross.ma4TurnUp && cross.ma7TurnUp, "both averages should be turning up on the cross day");
-assert(passesScreen(cross), "MA4 cross with both averages turning up should pass");
-assert(screenReasons(cross).includes("4日均线上穿7日均线"), "reasons should name the 4/7 cross");
+assert(passesScreen(cross), "close above turning MA4/MA7 should pass even on a golden-cross day");
+assert(screenReasons(cross).includes("收盘站上4日、7日均线"), "reasons should name standing above both averages");
 assert(screenReasons(cross).includes("4日均线拐头向上"), "reasons should name MA4 turning up");
 assert(screenReasons(cross).includes("7日均线拐头向上"), "reasons should name MA7 turning up");
-assert(!passesScreen({ ...cross, ma7TurnUp: false }), "a golden cross with MA7 still down should not pass");
-assert(!passesScreen({ ...cross, ma4TurnUp: false }), "a golden cross with MA4 still down should not pass");
+assert(!passesScreen({ ...cross, ma7TurnUp: false }), "standing above with MA7 still down should not pass");
+assert(!passesScreen({ ...cross, ma4TurnUp: false }), "standing above with MA4 still down should not pass");
 const crossHits = findBuyPoints(crossBars);
 assert(crossHits.at(-1)?.time === crossBars[crossBars.length - 1].time, "the cross day is the latest screen hit");
 
 const beforeCross = analyzeBars(barsFromCloses(crossCloses.slice(0, -1)))!;
 assert(beforeCross.ma4CrossUpMa7 === false, "the day before has not crossed MA4 over MA7");
-assert(!passesScreen(beforeCross), "turning averages without a same-day cross should not pass");
+assert(beforeCross.aboveMa4 && beforeCross.aboveMa7, "the day before can already sit above both averages");
+assert(beforeCross.ma7TurnUp === false, "MA7 has not turned up yet on the day before the cross");
+assert(!passesScreen(beforeCross), "standing above without MA7 turning up should not pass");
 
 const popped = crossCloses.slice(0, -2);
 const poppedPrice = popped[popped.length - 1] * 1.06;
 popped.push(Number(poppedPrice.toFixed(4)));
 const poppedTech = analyzeBars(barsFromCloses(popped))!;
 assert(poppedTech.ma4CrossUpMa7, "a sharp bounce can still cross MA4 over MA7");
+assert(poppedTech.aboveMa4 && poppedTech.aboveMa7, "the sharp bounce close sits above both averages");
 assert(poppedTech.ma4TurnUp && poppedTech.ma7TurnUp, "the sharp bounce also turns both averages up");
-assert(passesScreen(poppedTech), "MACD sign no longer blocks a same-day 4/7 cross with both averages up");
+assert(passesScreen(poppedTech), "a bounce that stands above turning MA4/MA7 should pass");
 
 const risingTd = tdSequential(risingCloses(20, 10, 1).map((close, i) => ({ time: `u${i}`, close })));
 assert(risingTd[0]?.side === "up" && risingTd[0].count === 1, "first bar above close[i-4] starts up count at 1");

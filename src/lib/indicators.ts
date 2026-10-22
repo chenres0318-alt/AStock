@@ -20,6 +20,10 @@ export type ScreenFlags = {
   dayPct: number | null;
   amplitudePct: number | null;
   aboveMa5: boolean;
+  /** 收盘高于 4 日均线。 */
+  aboveMa4: boolean;
+  /** 收盘高于 7 日均线。 */
+  aboveMa7: boolean;
   firstStandMa5: boolean;
   ma4CrossUpMa7: boolean;
   /** 4 日均线当日高于前一日，视为拐头向上。 */
@@ -108,6 +112,8 @@ export function analyzeBarsAt(
   if (ma4 == null || ma4Prev == null || ma7 == null || ma7Prev == null || ma5 == null || ma5Prev == null) return null;
 
   const aboveMa5 = closes[i] > ma5;
+  const aboveMa4 = closes[i] > ma4;
+  const aboveMa7 = closes[i] > ma7;
   const firstStandMa5 = firstStandAboveMa5(closes, i);
   const ma4CrossUpMa7 = ma4Prev <= ma7Prev && ma4 > ma7;
   const ma4TurnUp = ma4 > ma4Prev;
@@ -143,6 +149,8 @@ export function analyzeBarsAt(
     dayPct,
     amplitudePct,
     aboveMa5,
+    aboveMa4,
+    aboveMa7,
     firstStandMa5,
     ma4CrossUpMa7,
     ma4TurnUp,
@@ -278,15 +286,19 @@ export function findBuyPoints(bars: KBar[]): BuyPoint[] {
 
 export function screenReasons(tech: ScreenFlags): string[] {
   const rows: string[] = [];
-  if (tech.ma4CrossUpMa7) rows.push("4日均线上穿7日均线");
+  if (tech.aboveMa4 && tech.aboveMa7) rows.push("收盘站上4日、7日均线");
+  else {
+    if (tech.aboveMa4) rows.push("收盘站上4日均线");
+    if (tech.aboveMa7) rows.push("收盘站上7日均线");
+  }
   if (tech.ma4TurnUp) rows.push("4日均线拐头向上");
   if (tech.ma7TurnUp) rows.push("7日均线拐头向上");
   return rows;
 }
 
-/** 当天收盘：4 日均线上穿 7 日均线，且 4 日、7 日均线都拐头向上。 */
+/** 当天收盘站上 4 日、7 日均线，且两条均线都拐头向上。 */
 export function passesScreen(tech: ScreenFlags): boolean {
-  return tech.ma4CrossUpMa7 && tech.ma4TurnUp && tech.ma7TurnUp;
+  return tech.aboveMa4 && tech.aboveMa7 && tech.ma4TurnUp && tech.ma7TurnUp;
 }
 
 const ADX_PERIOD = 14;
