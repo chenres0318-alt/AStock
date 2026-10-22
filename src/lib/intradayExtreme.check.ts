@@ -4,7 +4,10 @@ import {
   intradayExtremes,
   kdjSeries,
   linearSlope,
+  markConfidence,
   pairSwingCovers,
+  positionIndex,
+  sessionRangeAfter,
   macdfsSeries,
   recentVolumeAvg,
   type IntradayMinute,
@@ -38,6 +41,24 @@ assert(pairSwingCovers(0.598, 0.604, true) === true, "the same 1 percent move co
 assert(pairSwingCovers(0.598, 0.6009, true) === false, "0.48 percent on an ETF pair is below the 0.5 percent swing");
 assert(pairSwingCovers(0.598, 0.601, true) === true, "just over 0.5 percent on an ETF pair meets the swing floor");
 assert(pairSwingCovers(0.598, 0.59801, true) === false, "a 0.001 fen ETF pair is not a 0.5 percent swing");
+assert(sessionRangeAfter([{ time: "09:30", price: 30, volume: 1, avg: 30 }]) == null, "the open auction window alone has no 9:45 range");
+const afterOpen = sessionRangeAfter([
+  { time: "09:30", price: 30, volume: 1, avg: 30 },
+  { time: "09:44", price: 28, volume: 1, avg: 29 },
+  { time: "09:45", price: 12, volume: 1, avg: 20 },
+  { time: "10:00", price: 18, volume: 1, avg: 19 },
+  { time: "15:01", price: 40, volume: 1, avg: 20 },
+]);
+assert(afterOpen != null && afterOpen.low === 12 && afterOpen.high === 18, "the 9:45 range ignores the open spike and the after-close print");
+assert(positionIndex(12, afterOpen) === 0, "the session low is position 0");
+assert(positionIndex(18, afterOpen) === 100, "the session high is position 100");
+assert(positionIndex(15, afterOpen) === 50, "the midpoint of the 9:45 range is position 50");
+assert(positionIndex(10, afterOpen) === 0, "a price below the 9:45 low clamps to 0");
+assert(positionIndex(20, afterOpen) === 100, "a price above the 9:45 high clamps to 100");
+assert(markConfidence("top", 82) === 82, "a top is more believable near the high");
+assert(markConfidence("bottom", 82) === 18, "a bottom is less believable near the high");
+assert(markConfidence("bottom", 8) === 92, "a bottom is more believable near the low");
+assert(positionIndex(12, { high: 12, low: 12 }) == null, "a flat 9:45 range has no position index");
 assert(isEtf("sz159516", "半导体设备ETF国泰"), "the Guotai semiconductor equipment fund is an ETF");
 assert(isEtf("sh560780") && isEtf("sh588710"), "Shanghai ETF prefixes count without a name");
 assert(!isEtf("sh601138", "工业富联"), "a stock is not scored as an ETF");
@@ -166,6 +187,10 @@ assert(
 );
 assert(Math.abs(paired[0].price - 22.5) < 1e-9 && Math.abs(paired[1].price - 20.35) < 1e-9, "the pair keeps that top and that bottom");
 assert(pairSwingCovers(paired[1].price, paired[0].price), "the kept stock pair has at least a 1.5 percent swing");
+assert(paired[0].position != null && paired[0].position >= 80, "the kept top sits in the upper part of the 9:45 range");
+assert(paired[1].position != null && paired[1].position <= 20, "the kept bottom sits in the lower part of the 9:45 range");
+assert(paired[0].confidence === paired[0].position, "top confidence equals the position index");
+assert(paired[1].confidence != null && paired[1].confidence === 100 - (paired[1].position as number), "bottom confidence is 100 minus the position index");
 
 const steadyRise = intradayExtremes(
   session(
