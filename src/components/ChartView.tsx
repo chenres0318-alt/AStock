@@ -16,7 +16,7 @@ import {
 import { isEtf, priceDigits } from "@/lib/codes";
 import { formatPrice } from "@/lib/format";
 import { dailyExtremes } from "@/lib/dailyExtreme";
-import { intradayExtremes, macdfsSeries, type MacdfsBar } from "@/lib/intradayExtreme";
+import { intradayExtremes, kdjSeries, macdfsSeries, type KdjBar, type MacdfsBar } from "@/lib/intradayExtreme";
 import { buildMaLines, klineRangeChange, maAt } from "@/lib/indicators";
 import type { KBar, Quote, TrendPoint } from "@/lib/types";
 
@@ -121,6 +121,12 @@ function formatMacd(value: number) {
   return value > 0 ? `+${text}` : value < 0 ? `-${text}` : "0.000";
 }
 
+function formatKdj(value: number) {
+  return value.toFixed(1);
+}
+
+type TrendTip = { macd: MacdfsBar | null; kdj: KdjBar | null };
+
 function barTimeAt(chart: IChartApi, bars: KBar[], x: number): string | null {
   if (bars.length === 0) return null;
   const time = chart.timeScale().coordinateToTime(x);
@@ -154,6 +160,7 @@ export default function ChartView({
   const deaRef = useRef<ISeriesApi<"Line"> | null>(null);
   const macdZeroRef = useRef<IPriceLine | null>(null);
   const macdPointsRef = useRef<Array<MacdfsBar | null>>([]);
+  const kdjPointsRef = useRef<Array<KdjBar | null>>([]);
   const lineRef = useRef<ISeriesApi<"Line"> | null>(null);
   const ma4Ref = useRef<ISeriesApi<"Line"> | null>(null);
   const ma7Ref = useRef<ISeriesApi<"Line"> | null>(null);
@@ -169,7 +176,7 @@ export default function ChartView({
   const trendMarksRef = useRef<Array<{ time: Time; price: number; side: "top" | "bottom" }>>([]);
   const dayMarksRef = useRef<Array<{ time: Time; price: number; side: "top" | "bottom" }>>([]);
   const [extremeTags, setExtremeTags] = useState<Array<{ timeKey: string; price: number; side: "top" | "bottom"; x: number; y: number }>>([]);
-  const [macdTip, setMacdTip] = useState<MacdfsBar | null>(null);
+  const [macdTip, setMacdTip] = useState<TrendTip | null>(null);
   const [rangeMode, setRangeMode] = useState(false);
   const [picked, setPicked] = useState<BarSpan | null>(null);
   const [highlight, setHighlight] = useState<{ left: number; width: number } | null>(null);
@@ -276,19 +283,17 @@ export default function ChartView({
     const onCrosshair = (param: { time?: Time; logical?: number }) => {
       if (modeRef.current !== "trend") return;
       const list = macdPointsRef.current;
+      const kdjList = kdjPointsRef.current;
       if (list.length === 0) return;
       let index = list.length - 1;
       if (param.time != null && param.logical != null) index = Math.min(list.length - 1, Math.max(0, Math.round(param.logical)));
-      let tip = list[index];
-      if (!tip) {
-        for (let j = index; j >= 0; j -= 1) {
-          if (list[j]) {
-            tip = list[j];
-            break;
-          }
+      const pickLast = <T,>(rows: Array<T | null>, from: number): T | null => {
+        for (let j = from; j >= 0; j -= 1) {
+          if (rows[j]) return rows[j];
         }
-      }
-      setMacdTip(tip);
+        return null;
+      };
+      setMacdTip({ macd: pickLast(list, index), kdj: pickLast(kdjList, index) });
     };
     chart.subscribeCrosshairMove(onCrosshair);
     const autoscaleInfoProvider = (original: () => AutoscaleInfo | null) => {
@@ -456,9 +461,15 @@ export default function ChartView({
             value: item.avg as number,
           })),
       );
-      const macd = macdfsSeries(points.map((item) => item.price));
+      const prices = points.map((item) => item.price);
+      const macd = macdfsSeries(prices);
+      const kdj = kdjSeries(prices);
       macdPointsRef.current = macd;
-      setMacdTip(macd.findLast((item) => item != null) ?? null);
+      kdjPointsRef.current = kdj;
+      setMacdTip({
+        macd: macd.findLast((item) => item != null) ?? null,
+        kdj: kdj.findLast((item) => item != null) ?? null,
+      });
       vol.applyOptions({ priceFormat: { type: "price", precision: 3, minMove: 0.001 } });
       vol.setData(
         points.flatMap((item, index) => {
@@ -538,6 +549,7 @@ export default function ChartView({
     }
 
     macdPointsRef.current = [];
+    kdjPointsRef.current = [];
     setMacdTip(null);
     vol.applyOptions({ priceFormat: { type: "volume" } });
     dif.setData([]);
@@ -716,7 +728,7 @@ export default function ChartView({
           {loading
             ? "加载中…"
             : mode === "trend"
-              ? "黄线现价 · 蓝线均价 · 下图 MACDFS(12,26,9) · 均价上或下且DIF>DEA、近4分钟斜率仍向上但变弱为顶 · 均价下且DEA>DIF、斜率仍向下但变弱为底"
+              ? "黄线现价 · 蓝线均价 · 下图 MACDFS(12,26,9) · 顶：均价附近、DIF>DEA、斜率变弱、KDJ超买、有量滞涨 · 底：均价下、DEA>DIF、斜率变弱、KDJ超卖、非天量杀跌"
               : mode === "day"
                 ? "红MA4 · 青MA7 · 黄MA20 · 近5日收盘斜率仍向上但变弱为顶，仍向下但变弱为底 · 收盘低于下降的20日线超过8%不算底"
                 : `红MA4 · 青MA7 · 黄MA20 · 4上穿7且站上20买 · 4下穿7或跌破20卖 · 买 ${ribbonCounts.buy} 卖 ${ribbonCounts.sell}`}
@@ -743,11 +755,23 @@ export default function ChartView({
         {mode === "trend" && macdTip ? (
           <div className="pointer-events-none absolute bottom-[22%] left-2 z-10 flex flex-wrap gap-x-2 text-[11px] leading-4">
             <span className="text-mute">MACDFS(12,26,9)</span>
-            <span className={macdTip.hist > 0 ? "text-up" : macdTip.hist < 0 ? "text-down" : "text-mute"}>
-              MACDFS {formatMacd(macdTip.hist)}
-            </span>
-            <span style={{ color: DIFF_COLOR }}>DIFF {formatMacd(macdTip.dif)}</span>
-            <span className="text-gold">DEA {formatMacd(macdTip.dea)}</span>
+            {macdTip.macd ? (
+              <>
+                <span className={macdTip.macd.hist > 0 ? "text-up" : macdTip.macd.hist < 0 ? "text-down" : "text-mute"}>
+                  MACDFS {formatMacd(macdTip.macd.hist)}
+                </span>
+                <span style={{ color: DIFF_COLOR }}>DIFF {formatMacd(macdTip.macd.dif)}</span>
+                <span className="text-gold">DEA {formatMacd(macdTip.macd.dea)}</span>
+              </>
+            ) : null}
+            {macdTip.kdj ? (
+              <>
+                <span className="text-mute">KDJ(9,3,3)</span>
+                <span className={macdTip.kdj.j >= 70 ? "text-up" : macdTip.kdj.j <= 30 ? "text-down" : "text-mute"}>
+                  K {formatKdj(macdTip.kdj.k)} D {formatKdj(macdTip.kdj.d)} J {formatKdj(macdTip.kdj.j)}
+                </span>
+              </>
+            ) : null}
           </div>
         ) : null}
         {highlight && mode !== "trend" ? (

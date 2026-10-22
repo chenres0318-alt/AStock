@@ -1,6 +1,14 @@
 import { isEtf, priceDigits } from "./codes.ts";
 import { formatPrice } from "./format.ts";
-import { intradayExtremes, linearSlope, lotSpreadCoversCost, macdfsSeries, type IntradayMinute } from "./intradayExtreme.ts";
+import {
+  intradayExtremes,
+  kdjSeries,
+  linearSlope,
+  lotSpreadCoversCost,
+  macdfsSeries,
+  recentVolumeAvg,
+  type IntradayMinute,
+} from "./intradayExtreme.ts";
 
 function assert(cond: unknown, message: string) {
   if (!cond) throw new Error(message);
@@ -194,6 +202,23 @@ const dropAboveAvg = intradayExtremes(
   ),
 );
 assert(dropAboveAvg.every((mark) => mark.side !== "bottom"), "a weakening drop above the average line is not a bottom");
+
+const climb = Array.from({ length: 20 }, (_, i) => 10 + i);
+const climbKdj = kdjSeries(climb);
+assert(climbKdj[8] != null && Math.abs(climbKdj[8].j - 50) > 1, "KDJ starts moving once the 9-bar window fills");
+assert(climbKdj.at(-1) != null && (climbKdj.at(-1) as { j: number }).j > 70, "a straight climb puts J in the overbought zone");
+const dump = Array.from({ length: 20 }, (_, i) => 30 - i);
+assert(kdjSeries(dump).at(-1) != null && (kdjSeries(dump).at(-1) as { j: number }).j < 30, "a straight dump puts J in the oversold zone");
+const flatKdj = kdjSeries(Array.from({ length: 12 }, () => 10));
+assert(flatKdj[8] != null && Math.abs(flatKdj[8].k - 50) < 1e-9 && Math.abs(flatKdj[8].j - 50) < 1e-9, "a flat tape keeps KDJ at 50");
+
+assert(recentVolumeAvg(easingRise, 10) === 1000, "a flat tape keeps the recent volume average at 1000");
+const dryRise = easingRise.map((point, index) => ({ ...point, volume: index >= topMarks[0].index ? 50 : 1000 }));
+assert(intradayExtremes(dryRise).every((mark) => mark.side !== "top"), "a weakening rise on a dry tape is not a top");
+const dumpBottom = easingDrop.map((point, index) => ({ ...point, volume: index >= bottomMarks[0].index ? 5000 : 1000 }));
+assert(intradayExtremes(dumpBottom).every((mark) => mark.side !== "bottom"), "a weakening drop on a blow-off tape is not a bottom");
+const silentDrop = easingDrop.map((point, index) => ({ ...point, volume: index >= bottomMarks[0].index ? 0 : 1000 }));
+assert(intradayExtremes(silentDrop).every((mark) => mark.side !== "bottom"), "a minute with no volume is not a bottom");
 
 console.log(
   "intradayExtreme.check ok",

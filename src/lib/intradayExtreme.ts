@@ -1,11 +1,14 @@
 /**
- * 用分时均价线和 MACDFS(12,26,9) 标出趋势变弱的顶和底。不是同花顺的公式。
+ * 用分时均价线、MACDFS(12,26,9)、KDJ(9,3,3) 和成交量标出趋势变弱的顶和底。不是同花顺的公式。
  * 柱 = 2 * (DIF - DEA)。红柱是 DIF > DEA，绿柱是 DEA > DIF。
+ * KDJ 用最近 9 分钟分时价的最高最低算 RSV，K/D 按 1/3、2/3 递推，J = 3K - 2D。
  *
  * 最近 4 分钟的价格、MACDFS 柱各做一次一元线性回归。斜率为正是向上，越大涨得越快；
  * 斜率为负是向下，越负跌得越快。再用 4 周期 EMA 看这 4 分钟里的短期步伐。
- * 顶：现价在均价线上方或下方，并且 DIF > DEA。两条斜率仍为正，但都比上一分钟小，两条 EMA 的抬升也变慢。
- * 底：现价在均价线下方，并且 DEA > DIF。两条斜率仍为负，但都比上一分钟更靠近 0，两条 EMA 的下跌也变慢。
+ * 顶：现价在均价线上方或下方，DIF > DEA，两条斜率仍为正但变弱，两条 EMA 抬升变慢，
+ *     并且 KDJ 的 J 在超买区，这一分钟量不低于近 5 分钟均量的六成（有量滞涨，滤掉无量虚顶）。
+ * 底：现价在均价线下方，DEA > DIF，两条斜率仍为负但变弱，两条 EMA 下跌变慢，
+ *     并且 KDJ 的 J 在超卖区，这一分钟有成交且量不超过近 5 分钟均量的 1.5 倍（滤掉无量和天量杀跌）。
  * 同一段连续满足时只标第一分钟。之后顶和底交替。
  * 还没配上对面时，更高的顶要红柱不低于前一个顶的八成才换掉；更低的底直接换掉前一个底。
  * 配成一对时，股票一手差价要盖过 5 元最低佣金，再加卖出一手的 0.05% 印花税。
@@ -19,6 +22,16 @@ const STAMP_RATE = 0.0005;
 const WINDOW = 4;
 /** 更高的价格要配上差不多高的红柱，才换掉已经标出的顶。 */
 const REPLACE_HIST_RATIO = 0.8;
+const KDJ_PERIOD = 9;
+/** J 到这里才算超买，配合 MACD 变弱才标顶。 */
+const KDJ_OVERBOUGHT = 70;
+/** J 到这里才算超卖，配合 MACD 变弱才标底。 */
+const KDJ_OVERSOLD = 30;
+const VOLUME_LOOKBACK = 5;
+/** 顶这一分钟至少要有近 5 分钟均量的六成，否则只是无量抖动。 */
+const TOP_MIN_VOLUME_RATIO = 0.6;
+/** 底这一分钟超过近 5 分钟均量的 1.5 倍，当作天量续跌，不标底。 */
+const BOTTOM_MAX_VOLUME_RATIO = 1.5;
 
 export type IntradayMinute = {
   time: string;
@@ -35,6 +48,8 @@ export type IntradayMark = {
 };
 
 export type MacdfsBar = { dif: number; dea: number; hist: number };
+
+export type KdjBar = { k: number; d: number; j: number };
 
 type Candidate = IntradayMark & { hist: number };
 
@@ -74,6 +89,36 @@ export function macdfsSeries(prices: number[]): Array<MacdfsBar | null> {
   return out;
 }
 
+/** 分时价的 KDJ(9,3,3)。没有高低开，就用这 9 分钟现价的最高最低。 */
+export function kdjSeries(prices: number[], period = KDJ_PERIOD): Array<KdjBar | null> {
+  const out: Array<KdjBar | null> = Array(prices.length).fill(null);
+  if (prices.length < period) return out;
+  let k = 50;
+  let d = 50;
+  for (let i = period - 1; i < prices.length; i += 1) {
+    let high = -Infinity;
+    let low = Infinity;
+    for (let j = i - period + 1; j <= i; j += 1) {
+      high = Math.max(high, prices[j]);
+      low = Math.min(low, prices[j]);
+    }
+    const rsv = high === low ? 50 : ((prices[i] - low) / (high - low)) * 100;
+    k = (2 / 3) * k + (1 / 3) * rsv;
+    d = (2 / 3) * d + (1 / 3) * k;
+    out[i] = { k, d, j: 3 * k - 2 * d };
+  }
+  return out;
+}
+
+export function recentVolumeAvg(points: IntradayMinute[], index: number, lookback = VOLUME_LOOKBACK): number | null {
+  const from = Math.max(0, index - lookback);
+  const count = index - from;
+  if (count <= 0) return null;
+  let sum = 0;
+  for (let i = from; i < index; i += 1) sum += points[i].volume;
+  return sum / count;
+}
+
 /** 一手买卖的差价，要多于最低佣金加卖出一手的印花税。ETF 把最低佣金传 0。 */
 export function lotSpreadCoversCost(low: number, high: number, minCommission = COMMISSION): boolean {
   if (!(high > low)) return false;
@@ -110,6 +155,7 @@ function emaOnSeries(values: number[], period: number): Array<number | null> {
 function slopeCandidates(points: IntradayMinute[]): Candidate[] {
   const prices = points.map((point) => point.price);
   const macd = macdfsSeries(prices);
+  const kdj = kdjSeries(prices);
   const hist = macd.map((bar) => bar?.hist ?? Number.NaN);
   const priceEma = emaSeries(prices, WINDOW);
   const histEma = emaOnSeries(hist, WINDOW);
@@ -143,10 +189,17 @@ function slopeCandidates(points: IntradayMinute[]): Candidate[] {
       continue;
     }
     const bar = macd[i];
+    const oscillator = kdj[i];
+    const avgVol = recentVolumeAvg(points, i);
+    const volRatio = avgVol != null && avgVol > 0 ? points[i].volume / avgVol : null;
     const aboveAvg = points[i].avg != null && points[i].price > (points[i].avg as number);
     const belowAvg = points[i].avg != null && points[i].price < (points[i].avg as number);
     const difAbove = Boolean(bar && bar.dif > bar.dea);
     const deaAbove = Boolean(bar && bar.dea > bar.dif);
+    const kdjOverbought = Boolean(oscillator && oscillator.j >= KDJ_OVERBOUGHT);
+    const kdjOversold = Boolean(oscillator && oscillator.j <= KDJ_OVERSOLD);
+    const volumeOkForTop = points[i].volume > 0 && (volRatio == null || volRatio >= TOP_MIN_VOLUME_RATIO);
+    const volumeOkForBottom = points[i].volume > 0 && (volRatio == null || volRatio <= BOTTOM_MAX_VOLUME_RATIO);
     const pricePace = priceNow - pricePrev;
     const prevPricePace = pricePrev - priceOlder;
     const histPace = histNow - histPrev;
@@ -166,8 +219,8 @@ function slopeCandidates(points: IntradayMinute[]): Candidate[] {
       pricePace > prevPricePace &&
       histPace > prevHistPace;
     let side: "top" | "bottom" | null = null;
-    if ((aboveAvg || belowAvg) && difAbove && riseWeakening) side = "top";
-    else if (belowAvg && deaAbove && dropWeakening) side = "bottom";
+    if ((aboveAvg || belowAvg) && difAbove && riseWeakening && kdjOverbought && volumeOkForTop) side = "top";
+    else if (belowAvg && deaAbove && dropWeakening && kdjOversold && volumeOkForBottom) side = "bottom";
     if (!side) {
       lastSide = null;
       continue;
