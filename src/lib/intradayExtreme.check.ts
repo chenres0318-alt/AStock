@@ -78,7 +78,11 @@ const easingRise = session(
   20,
 );
 const topMarks = intradayExtremes(easingRise);
-assert(topMarks.length === 1 && topMarks[0].side === "top" && topMarks[0].time === "10:16", "a rise that is still up but slowing is a top");
+assert(topMarks[0]?.side === "top" && topMarks[0].time === "10:16", "a rise that is still up but slowing is a top");
+assert(
+  topMarks.length === 2 && topMarks[1].side === "bottom" && pairSwingCovers(topMarks[1].price, topMarks[0].price),
+  "after that top, a 1.5 percent drop can mark the opposite bottom without a weakening-slope shape",
+);
 assert(Math.abs(topMarks[0].price - 22.55) < 1e-9, "the top is the minute both slopes and both short EMAs weaken");
 const topPrices = easingRise.map((point) => point.price);
 const topHist = macdfsSeries(topPrices).map((bar) => bar?.hist ?? Number.NaN);
@@ -110,9 +114,10 @@ const easingDrop = session(
   20,
 );
 const bottomMarks = intradayExtremes(easingDrop);
+assert(bottomMarks[0]?.side === "bottom" && bottomMarks[0].time === "10:18", "a drop that is still down but slowing is a bottom");
 assert(
-  bottomMarks.length === 1 && bottomMarks[0].side === "bottom" && bottomMarks[0].time === "10:18",
-  "a drop that is still down but slowing is a bottom",
+  bottomMarks.length === 2 && bottomMarks[1].side === "top" && pairSwingCovers(bottomMarks[0].price, bottomMarks[1].price),
+  "after that bottom, a 1.5 percent bounce can mark the opposite top without a weakening-slope shape",
 );
 assert(Math.abs(bottomMarks[0].price - 17.12) < 1e-9, "the bottom is the minute the decline weakens");
 const bottomPrices = easingDrop.map((point) => point.price);
@@ -191,6 +196,25 @@ assert(paired[0].position != null && paired[0].position >= 80, "the kept top sit
 assert(paired[1].position != null && paired[1].position <= 20, "the kept bottom sits in the lower part of the 9:45 range");
 assert(paired[0].confidence === paired[0].position, "top confidence equals the position index");
 assert(paired[1].confidence != null && paired[1].confidence === 100 - (paired[1].position as number), "bottom confidence is 100 minus the position index");
+
+const dropThenBounce = [
+  { n: 40, step: 0 },
+  { n: 8, step: -0.35 },
+  { n: 6, step: -0.08 },
+];
+const swingFromBottom = intradayExtremes(session([...dropThenBounce, { n: 1, step: 0.8 }], 20));
+assert(
+  swingFromBottom.length === 2 && swingFromBottom[0].side === "bottom" && swingFromBottom[1].side === "top",
+  "a 1.5 percent bounce after a morphological bottom marks a top even if the slope is not weakening",
+);
+assert(pairSwingCovers(swingFromBottom[0].price, swingFromBottom[1].price), "that bounce covers the stock 1.5 percent floor");
+const shyBounce = intradayExtremes(session([...dropThenBounce, { n: 1, step: 0.5 }], 20));
+assert(shyBounce.length === 1 && shyBounce[0].side === "bottom", "a bounce under 1.5 percent does not mint a stock top");
+const etfBounce = intradayExtremes(session([...dropThenBounce, { n: 1, step: 0.5 }], 20), { etf: true });
+assert(
+  etfBounce.length === 2 && etfBounce[0].side === "bottom" && etfBounce[1].side === "top",
+  "the same 0.5 yuan bounce is enough to pair an ETF top at the 0.5 percent floor",
+);
 
 const steadyRise = intradayExtremes(
   session(
