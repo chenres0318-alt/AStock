@@ -4,7 +4,7 @@ import {
   intradayExtremes,
   kdjSeries,
   linearSlope,
-  lotSpreadCoversCost,
+  pairSwingCovers,
   macdfsSeries,
   recentVolumeAvg,
   type IntradayMinute,
@@ -31,15 +31,16 @@ function session(parts: Array<{ n: number; step: number }>, origin: number, avgA
   return points;
 }
 
-assert(lotSpreadCoversCost(10, 10.04) === false, "four cents does not cover 5 yuan, stamp tax, and 0.05");
-assert(lotSpreadCoversCost(10, 10.055) === false, "5.5 yuan on one lot still falls short of 5 plus stamp plus 0.05");
-assert(lotSpreadCoversCost(10, 10.06) === true, "six cents on one lot covers 5 yuan, stamp tax, and 0.05");
-assert(lotSpreadCoversCost(0.598, 0.62) === false, "an ETF-sized move still fails when the stock 5 yuan minimum applies");
-assert(lotSpreadCoversCost(0.598, 0.62, true) === true, "an ETF pair only needs 0.005% commission, with no 5 yuan floor");
-assert(lotSpreadCoversCost(0.598, 0.59801, true) === false, "a 0.001 fen ETF pair does not cover 0.005% commission");
+assert(pairSwingCovers(10, 10.14) === false, "1.4 percent on a stock pair is below the 1.5 percent swing");
+assert(pairSwingCovers(10, 10.15) === true, "1.5 percent on a stock pair meets the swing floor");
+assert(pairSwingCovers(0.598, 0.604) === false, "a 1 percent ETF-sized move still fails the stock 1.5 percent floor");
+assert(pairSwingCovers(0.598, 0.604, true) === true, "the same 1 percent move covers the ETF 0.5 percent floor");
+assert(pairSwingCovers(0.598, 0.6009, true) === false, "0.48 percent on an ETF pair is below the 0.5 percent swing");
+assert(pairSwingCovers(0.598, 0.601, true) === true, "just over 0.5 percent on an ETF pair meets the swing floor");
+assert(pairSwingCovers(0.598, 0.59801, true) === false, "a 0.001 fen ETF pair is not a 0.5 percent swing");
 assert(isEtf("sz159516", "半导体设备ETF国泰"), "the Guotai semiconductor equipment fund is an ETF");
 assert(isEtf("sh560780") && isEtf("sh588710"), "Shanghai ETF prefixes count without a name");
-assert(!isEtf("sh601138", "工业富联"), "a stock keeps the 5 yuan minimum");
+assert(!isEtf("sh601138", "工业富联"), "a stock is not scored as an ETF");
 assert(priceDigits("sz159516", "半导体设备ETF国泰") === 3 && formatPrice(0.598, 3) === "0.598", "an ETF price keeps the 0.001 place");
 assert(formatPrice(100.123, 3) === "100.123", "three decimals stay on an ETF price above 100");
 assert(priceDigits("sh601138", "工业富联") === 2 && formatPrice(48.31) === "48.31", "a stock price stays at two decimals");
@@ -161,10 +162,10 @@ const paired = intradayExtremes(
 );
 assert(
   paired.length === 2 && paired[0].side === "top" && paired[1].side === "bottom",
-  "a weakening drop after a top closes the pair when one lot covers the T cost",
+  "a weakening drop after a top closes the pair when the swing is at least 1.5 percent",
 );
 assert(Math.abs(paired[0].price - 22.5) < 1e-9 && Math.abs(paired[1].price - 20.35) < 1e-9, "the pair keeps that top and that bottom");
-assert(lotSpreadCoversCost(paired[1].price, paired[0].price), "the kept stock pair covers 5 yuan, stamp tax, and 0.05");
+assert(pairSwingCovers(paired[1].price, paired[0].price), "the kept stock pair has at least a 1.5 percent swing");
 
 const steadyRise = intradayExtremes(
   session(

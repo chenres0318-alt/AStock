@@ -728,7 +728,7 @@ export default function ChartView({
           {loading
             ? "加载中…"
             : mode === "trend"
-              ? "黄线现价 · 蓝线均价 · 下图 MACDFS(12,26,9) · 一对顶底做T须盖过佣金和税 · 个股5元+印花税0.05%+0.05元 · ETF佣金0.005%免5元"
+              ? "黄线现价 · 蓝线均价 · 下图 MACDFS(12,26,9) · 一对顶底须有1.5%以上波动 · ETF须有0.5%波动差距"
               : mode === "day"
                 ? "红MA4 · 青MA7 · 黄MA20 · 近5日收盘斜率仍向上但变弱为顶，仍向下但变弱为底 · 收盘低于下降的20日线超过8%不算底"
                 : `红MA4 · 青MA7 · 黄MA20 · 4上穿7且站上20买 · 4下穿7或跌破20卖 · 买 ${ribbonCounts.buy} 卖 ${ribbonCounts.sell}`}

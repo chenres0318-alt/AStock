@@ -11,16 +11,14 @@
  *     并且 KDJ 的 J 在超卖区，这一分钟有成交且量不超过近 5 分钟均量的 1.5 倍（滤掉无量和天量杀跌）。
  * 同一段连续满足时只标第一分钟。之后顶和底交替。
  * 还没配上对面时，更高的顶要红柱不低于前一个顶的八成才换掉；更低的底直接换掉前一个底。
- * 贴着均价线也可以标。配成一对做 T 时，个股一手差价要盖过 5 元佣金、卖出一手的 0.05% 印花税，再加 0.05 元。
- * ETF 按成交额 0.005% 佣金、免 5 元，不算印花税。差价盖不过成本的对面丢掉。
+ * 贴着均价线也可以标。配成一对时，个股顶底波动至少 1.5%，ETF 至少 0.5%。
+ * 波动按 (高 - 低) / 低。不够的对面丢掉。
  */
 
-const LOT = 100;
-const COMMISSION = 5;
-const STAMP_RATE = 0.0005;
-const EXTRA = 0.05;
-/** ETF 免 5 元，佣金按成交额万 0.5。 */
-const ETF_COMMISSION_RATE = 0.00005;
+/** 个股一对顶底至少要有这么多相对波动。 */
+const STOCK_SWING = 0.015;
+/** ETF 一对顶底至少要有这么多相对波动。 */
+const ETF_SWING = 0.005;
 /** 回归和短期 EMA 都看这么多分钟。 */
 const WINDOW = 4;
 /** 更高的价格要配上差不多高的红柱，才换掉已经标出的顶。 */
@@ -122,13 +120,10 @@ export function recentVolumeAvg(points: IntradayMinute[], index: number, lookbac
   return sum / count;
 }
 
-/** 一对顶底一手差价，要盖过做 T 成本。个股是 5 元佣金加印花税再加 0.05 元；ETF 只按成交额 0.005% 佣金。 */
-export function lotSpreadCoversCost(low: number, high: number, etf = false): boolean {
-  if (!(high > low)) return false;
-  const spread = (high - low) * LOT;
-  const turnover = high * LOT;
-  if (etf) return spread > turnover * ETF_COMMISSION_RATE;
-  return spread > COMMISSION + turnover * STAMP_RATE + EXTRA;
+/** 一对顶底的相对波动 (高 - 低) / 低。个股至少 1.5%，ETF 至少 0.5%。 */
+export function pairSwingCovers(low: number, high: number, etf = false): boolean {
+  if (!(high > low) || !(low > 0)) return false;
+  return (high - low) / low >= (etf ? ETF_SWING : STOCK_SWING);
 }
 
 /** 最近 WINDOW 根对时间 0..WINDOW-1 的一元回归斜率。 */
@@ -278,7 +273,7 @@ export function intradayExtremes(points: IntradayMinute[], options?: { etf?: boo
         seek = "bottom";
         continue;
       }
-      if (seek !== "top" || !openBottom || !lotSpreadCoversCost(openBottom.price, candidate.price, etf)) continue;
+      if (seek !== "top" || !openBottom || !pairSwingCovers(openBottom.price, candidate.price, etf)) continue;
       openTop = candidate;
       marks.push(candidate);
       seek = "bottom";
@@ -298,7 +293,7 @@ export function intradayExtremes(points: IntradayMinute[], options?: { etf?: boo
       seek = "top";
       continue;
     }
-    if (seek !== "bottom" || !openTop || !lotSpreadCoversCost(candidate.price, openTop.price, etf)) continue;
+    if (seek !== "bottom" || !openTop || !pairSwingCovers(candidate.price, openTop.price, etf)) continue;
     openBottom = candidate;
     marks.push(candidate);
     seek = "top";
