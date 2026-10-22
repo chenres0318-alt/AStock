@@ -13,6 +13,8 @@
  * 还没配上对面时，更高的顶要红柱不低于前一个顶的八成才换掉；更低的底直接换掉前一个底。
  * 贴着均价线也可以标。配成一对时，个股顶底波动至少 1.5%，ETF 至少 0.5%。
  * 波动按 (高 - 低) / 低。不够的对面丢掉。
+ * 价位指数看 9:45 之后的日内高低：(现价 - 最低) / (最高 - 最低) × 100。越高越靠近高位，越低越靠近低位。
+ * 顶的可信度等于价位指数，底的可信度等于 100 减去价位指数。
  */
 
 /** 个股一对顶底至少要有这么多相对波动。 */
@@ -33,6 +35,9 @@ const VOLUME_LOOKBACK = 5;
 const TOP_MIN_VOLUME_RATIO = 0.6;
 /** 底这一分钟超过近 5 分钟均量的 1.5 倍，当作天量续跌，不标底。 */
 const BOTTOM_MAX_VOLUME_RATIO = 1.5;
+/** 价位指数从这一分钟起算当日高低，避开开盘前 15 分钟。 */
+const RANGE_START = "09:45";
+const RANGE_END = "15:00";
 
 export type IntradayMinute = {
   time: string;
@@ -46,13 +51,23 @@ export type IntradayMark = {
   time: string;
   side: "bottom" | "top";
   price: number;
+  /** 9:45 后日内位置，0 是最低，100 是最高。 */
+  position: number | null;
+  /** 顶看高位、底看低位，0 到 100。 */
+  confidence: number | null;
 };
 
 export type MacdfsBar = { dif: number; dea: number; hist: number };
 
 export type KdjBar = { k: number; d: number; j: number };
 
-type Candidate = IntradayMark & { hist: number };
+type Candidate = {
+  index: number;
+  time: string;
+  side: "bottom" | "top";
+  price: number;
+  hist: number;
+};
 
 function emaSeries(values: number[], period: number): Array<number | null> {
   const out: Array<number | null> = Array(values.length).fill(null);
@@ -124,6 +139,39 @@ export function recentVolumeAvg(points: IntradayMinute[], index: number, lookbac
 export function pairSwingCovers(low: number, high: number, etf = false): boolean {
   if (!(high > low) || !(low > 0)) return false;
   return (high - low) / low >= (etf ? ETF_SWING : STOCK_SWING);
+}
+
+/** 9:45 到 15:00 的最高最低。开盘前 15 分钟不进区间。 */
+export function sessionRangeAfter(
+  points: IntradayMinute[],
+  start = RANGE_START,
+  end = RANGE_END,
+): { high: number; low: number } | null {
+  let high = -Infinity;
+  let low = Infinity;
+  for (const point of points) {
+    if (point.time < start || point.time > end) continue;
+    if (!Number.isFinite(point.price)) continue;
+    high = Math.max(high, point.price);
+    low = Math.min(low, point.price);
+  }
+  if (!Number.isFinite(high) || !Number.isFinite(low) || high < low) return null;
+  return { high, low };
+}
+
+/** (现价 - 最低) / (最高 - 最低) × 100。贴在区间外就夹到 0 或 100。 */
+export function positionIndex(price: number, range: { high: number; low: number } | null): number | null {
+  if (!range || !Number.isFinite(price)) return null;
+  const span = range.high - range.low;
+  if (!(span > 0)) return null;
+  const raw = ((price - range.low) / span) * 100;
+  return Math.min(100, Math.max(0, Math.round(raw)));
+}
+
+/** 顶要在高位才像样，底要在低位才像样。 */
+export function markConfidence(side: "top" | "bottom", position: number | null): number | null {
+  if (position == null) return null;
+  return side === "top" ? position : 100 - position;
 }
 
 /** 最近 WINDOW 根对时间 0..WINDOW-1 的一元回归斜率。 */
@@ -300,5 +348,9 @@ export function intradayExtremes(points: IntradayMinute[], options?: { etf?: boo
     openTop = null;
   }
 
-  return marks.map(({ index, time, side, price }) => ({ index, time, side, price }));
+  const range = sessionRangeAfter(points);
+  return marks.map(({ index, time, side, price }) => {
+    const position = positionIndex(price, range);
+    return { index, time, side, price, position, confidence: markConfidence(side, position) };
+  });
 }

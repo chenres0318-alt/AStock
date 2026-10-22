@@ -28,6 +28,23 @@ const MA7_COLOR = "#2ad4c8";
 const MA20_COLOR = "#e4b454";
 const DIFF_COLOR = "#f4f7fb";
 
+type ExtremeTag = {
+  timeKey: string;
+  price: number;
+  side: "top" | "bottom";
+  x: number;
+  y: number;
+  position?: number | null;
+  confidence?: number | null;
+};
+
+function extremeCaption(tag: ExtremeTag, digits: number): string {
+  const price = formatPrice(tag.price, digits);
+  const rank =
+    tag.position != null && tag.confidence != null ? `，价位指数${tag.position}，可信度${tag.confidence}` : "";
+  return tag.side === "top" ? `顶部(股价:${price}${rank})，卖` : `底部(股价:${price}${rank})，买`;
+}
+
 function formatChartTime(time: unknown, withDate: boolean): string {
   if (typeof time === "string") return withDate ? time : time.slice(5);
   if (typeof time === "object" && time && "year" in time) {
@@ -173,9 +190,13 @@ export default function ChartView({
   const dragRef = useRef<BarSpan | null>(null);
   const pickedRef = useRef<BarSpan | null>(null);
   const placeRef = useRef<() => void>(() => {});
-  const trendMarksRef = useRef<Array<{ time: Time; price: number; side: "top" | "bottom" }>>([]);
-  const dayMarksRef = useRef<Array<{ time: Time; price: number; side: "top" | "bottom" }>>([]);
-  const [extremeTags, setExtremeTags] = useState<Array<{ timeKey: string; price: number; side: "top" | "bottom"; x: number; y: number }>>([]);
+  const trendMarksRef = useRef<
+    Array<{ time: Time; price: number; side: "top" | "bottom"; position?: number | null; confidence?: number | null }>
+  >([]);
+  const dayMarksRef = useRef<
+    Array<{ time: Time; price: number; side: "top" | "bottom"; position?: number | null; confidence?: number | null }>
+  >([]);
+  const [extremeTags, setExtremeTags] = useState<ExtremeTag[]>([]);
   const [macdTip, setMacdTip] = useState<TrendTip | null>(null);
   const [rangeMode, setRangeMode] = useState(false);
   const [picked, setPicked] = useState<BarSpan | null>(null);
@@ -214,17 +235,32 @@ export default function ChartView({
       const x = chart.timeScale().timeToCoordinate(mark.time);
       const y = series.priceToCoordinate(mark.price);
       if (x == null || y == null || x < 0 || x > width) return [];
-      const half = 156;
+      const half = mark.position != null ? 248 : 156;
       const left = Math.min(Math.max(x, half), Math.max(half, width - half));
       const top = mark.side === "top" ? Math.max(2, y - 22) : y + 16;
-      return [{ timeKey: String(mark.time), price: mark.price, side: mark.side, x: Math.round(left), y: Math.round(top) }];
+      return [
+        {
+          timeKey: String(mark.time),
+          price: mark.price,
+          side: mark.side,
+          x: Math.round(left),
+          y: Math.round(top),
+          position: mark.position ?? null,
+          confidence: mark.confidence ?? null,
+        },
+      ];
     });
     setExtremeTags((current) => {
       if (
         current.length === next.length &&
         current.every(
           (item, index) =>
-            item.x === next[index].x && item.y === next[index].y && item.timeKey === next[index].timeKey && item.side === next[index].side,
+            item.x === next[index].x &&
+            item.y === next[index].y &&
+            item.timeKey === next[index].timeKey &&
+            item.side === next[index].side &&
+            item.position === next[index].position &&
+            item.confidence === next[index].confidence,
         )
       ) {
         return current;
@@ -518,6 +554,8 @@ export default function ChartView({
         time: points[mark.index].timestamp as UTCTimestamp,
         price: mark.price,
         side: mark.side,
+        position: mark.position,
+        confidence: mark.confidence,
       }));
       trendMarksRef.current = marks;
       dayMarksRef.current = [];
@@ -728,7 +766,7 @@ export default function ChartView({
           {loading
             ? "加载中…"
             : mode === "trend"
-              ? "黄线现价 · 蓝线均价 · 下图 MACDFS(12,26,9) · 一对顶底须有1.5%以上波动 · ETF须有0.5%波动差距"
+              ? "黄线现价 · 蓝线均价 · 下图 MACDFS(12,26,9) · 一对顶底须有1.5%以上波动 · ETF须有0.5%波动差距 · 价位指数为9:45后高低位，顶可信度看高位，底可信度看低位"
               : mode === "day"
                 ? "红MA4 · 青MA7 · 黄MA20 · 近5日收盘斜率仍向上但变弱为顶，仍向下但变弱为底 · 收盘低于下降的20日线超过8%不算底"
                 : `红MA4 · 青MA7 · 黄MA20 · 4上穿7且站上20买 · 4下穿7或跌破20卖 · 买 ${ribbonCounts.buy} 卖 ${ribbonCounts.sell}`}
@@ -748,7 +786,7 @@ export default function ChartView({
                   transform: tag.side === "top" ? "translate(-50%, -100%)" : "translate(-50%, 0)",
                 }}
               >
-                {tag.side === "top" ? `顶部(股价:${formatPrice(tag.price, digits)})，卖` : `底部(股价:${formatPrice(tag.price, digits)})，买`}
+                {extremeCaption(tag, digits)}
               </div>
             ))
           : null}
