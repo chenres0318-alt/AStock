@@ -9,12 +9,10 @@
  *     并且 KDJ 的 J 在超买区，这一分钟量不低于近 5 分钟均量的六成（有量滞涨，滤掉无量虚顶）。
  * 底：现价在均价线下方，DEA > DIF，两条斜率仍为负但变弱，两条 EMA 下跌变慢，
  *     并且 KDJ 的 J 在超卖区，这一分钟有成交且量不超过近 5 分钟均量的 1.5 倍（滤掉无量和天量杀跌）。
- * 现价偏离均价线一手的差价，个股要盖过 5 元佣金、成交额 0.05% 印花税，再加 0.05 元；
- * ETF 按成交额 0.005% 佣金、免 5 元，贴着均价线的顶底丢掉。
  * 同一段连续满足时只标第一分钟。之后顶和底交替。
  * 还没配上对面时，更高的顶要红柱不低于前一个顶的八成才换掉；更低的底直接换掉前一个底。
- * 配成一对时，股票一手差价要盖过 5 元最低佣金，再加卖出一手的 0.05% 印花税。
- * ETF 免 5 元最低佣金，只看印花税。
+ * 贴着均价线也可以标。配成一对做 T 时，个股一手差价要盖过 5 元佣金、卖出一手的 0.05% 印花税，再加 0.05 元。
+ * ETF 按成交额 0.005% 佣金、免 5 元，不算印花税。差价盖不过成本的对面丢掉。
  */
 
 const LOT = 100;
@@ -124,21 +122,13 @@ export function recentVolumeAvg(points: IntradayMinute[], index: number, lookbac
   return sum / count;
 }
 
-/** 一手买卖的差价，要多于最低佣金加卖出一手的印花税。ETF 把最低佣金传 0。 */
-export function lotSpreadCoversCost(low: number, high: number, minCommission = COMMISSION): boolean {
+/** 一对顶底一手差价，要盖过做 T 成本。个股是 5 元佣金加印花税再加 0.05 元；ETF 只按成交额 0.005% 佣金。 */
+export function lotSpreadCoversCost(low: number, high: number, etf = false): boolean {
   if (!(high > low)) return false;
   const spread = (high - low) * LOT;
-  const stamp = high * LOT * STAMP_RATE;
-  return spread > minCommission + stamp;
-}
-
-/** 现价偏离均价线一手，要盖过佣金和税。贴着均价线的顶底丢掉。 */
-export function avgDeviationCoversCost(price: number, avg: number | null, etf = false): boolean {
-  if (avg == null || !Number.isFinite(price) || !Number.isFinite(avg)) return false;
-  const gap = Math.abs(price - avg) * LOT;
-  const turnover = price * LOT;
-  if (etf) return gap > turnover * ETF_COMMISSION_RATE;
-  return gap > COMMISSION + turnover * STAMP_RATE + EXTRA;
+  const turnover = high * LOT;
+  if (etf) return spread > turnover * ETF_COMMISSION_RATE;
+  return spread > COMMISSION + turnover * STAMP_RATE + EXTRA;
 }
 
 /** 最近 WINDOW 根对时间 0..WINDOW-1 的一元回归斜率。 */
@@ -166,7 +156,7 @@ function emaOnSeries(values: number[], period: number): Array<number | null> {
   return [...Array(start).fill(null), ...emaSeries(tail, period)];
 }
 
-function slopeCandidates(points: IntradayMinute[], etf = false): Candidate[] {
+function slopeCandidates(points: IntradayMinute[]): Candidate[] {
   const prices = points.map((point) => point.price);
   const macd = macdfsSeries(prices);
   const kdj = kdjSeries(prices);
@@ -214,7 +204,6 @@ function slopeCandidates(points: IntradayMinute[], etf = false): Candidate[] {
     const kdjOversold = Boolean(oscillator && oscillator.j <= KDJ_OVERSOLD);
     const volumeOkForTop = points[i].volume > 0 && (volRatio == null || volRatio >= TOP_MIN_VOLUME_RATIO);
     const volumeOkForBottom = points[i].volume > 0 && (volRatio == null || volRatio <= BOTTOM_MAX_VOLUME_RATIO);
-    const farFromAvg = avgDeviationCoversCost(points[i].price, points[i].avg, etf);
     const pricePace = priceNow - pricePrev;
     const prevPricePace = pricePrev - priceOlder;
     const histPace = histNow - histPrev;
@@ -234,8 +223,8 @@ function slopeCandidates(points: IntradayMinute[], etf = false): Candidate[] {
       pricePace > prevPricePace &&
       histPace > prevHistPace;
     let side: "top" | "bottom" | null = null;
-    if ((aboveAvg || belowAvg) && difAbove && riseWeakening && kdjOverbought && volumeOkForTop && farFromAvg) side = "top";
-    else if (belowAvg && deaAbove && dropWeakening && kdjOversold && volumeOkForBottom && farFromAvg) side = "bottom";
+    if ((aboveAvg || belowAvg) && difAbove && riseWeakening && kdjOverbought && volumeOkForTop) side = "top";
+    else if (belowAvg && deaAbove && dropWeakening && kdjOversold && volumeOkForBottom) side = "bottom";
     if (!side) {
       lastSide = null;
       continue;
@@ -262,16 +251,15 @@ function dropMark(marks: Candidate[], target: Candidate) {
   if (index >= 0) marks.splice(index, 1);
 }
 
-export function intradayExtremes(points: IntradayMinute[], options?: { etf?: boolean; minCommission?: number }): IntradayMark[] {
+export function intradayExtremes(points: IntradayMinute[], options?: { etf?: boolean }): IntradayMark[] {
   if (points.length < WINDOW + 2) return [];
   const etf = Boolean(options?.etf);
-  const minCommission = options?.minCommission ?? (etf ? 0 : COMMISSION);
   const marks: Candidate[] = [];
   let seek: "either" | "bottom" | "top" = "either";
   let openBottom: Candidate | null = null;
   let openTop: Candidate | null = null;
 
-  for (const candidate of slopeCandidates(points, etf)) {
+  for (const candidate of slopeCandidates(points)) {
     if (candidate.side === "top") {
       if (
         seek === "bottom" &&
@@ -290,7 +278,7 @@ export function intradayExtremes(points: IntradayMinute[], options?: { etf?: boo
         seek = "bottom";
         continue;
       }
-      if (seek !== "top" || !openBottom || !lotSpreadCoversCost(openBottom.price, candidate.price, minCommission)) continue;
+      if (seek !== "top" || !openBottom || !lotSpreadCoversCost(openBottom.price, candidate.price, etf)) continue;
       openTop = candidate;
       marks.push(candidate);
       seek = "bottom";
@@ -310,7 +298,7 @@ export function intradayExtremes(points: IntradayMinute[], options?: { etf?: boo
       seek = "top";
       continue;
     }
-    if (seek !== "bottom" || !openTop || !lotSpreadCoversCost(candidate.price, openTop.price, minCommission)) continue;
+    if (seek !== "bottom" || !openTop || !lotSpreadCoversCost(candidate.price, openTop.price, etf)) continue;
     openBottom = candidate;
     marks.push(candidate);
     seek = "top";
