@@ -12,7 +12,7 @@
  * 同一段连续满足时只标第一分钟。之后顶和底交替。
  * 还没配上对面时，更高的顶要红柱不低于前一个顶的八成才换掉；更低的底直接换掉前一个底。
  * 贴着均价线也可以标。配成一对时，个股顶底波动至少 1.5%，ETF 至少 0.5%。
- * 波动按 (高 - 低) / 低。不够的对面丢掉。
+ * 波动按 (高 - 低) / 低。第一个形态顶或底出现后，对面除了再等形态，价格相对达到这档波动也可以直接标，然后开始下一对。
  * 价位指数看 9:45 之后的日内高低：(现价 - 最低) / (最高 - 最低) × 100。越高越靠近高位，越低越靠近低位。
  * 顶的可信度等于价位指数，底的可信度等于 100 减去价位指数。
  */
@@ -294,6 +294,16 @@ function dropMark(marks: Candidate[], target: Candidate) {
   if (index >= 0) marks.splice(index, 1);
 }
 
+function swingMark(points: IntradayMinute[], index: number, side: "top" | "bottom"): Candidate {
+  return {
+    index,
+    time: points[index].time,
+    side,
+    price: points[index].price,
+    hist: 0,
+  };
+}
+
 export function intradayExtremes(points: IntradayMinute[], options?: { etf?: boolean }): IntradayMark[] {
   if (points.length < WINDOW + 2) return [];
   const etf = Boolean(options?.etf);
@@ -301,9 +311,25 @@ export function intradayExtremes(points: IntradayMinute[], options?: { etf?: boo
   let seek: "either" | "bottom" | "top" = "either";
   let openBottom: Candidate | null = null;
   let openTop: Candidate | null = null;
+  const pending = new Map<number, Candidate>();
+  for (const candidate of slopeCandidates(points)) pending.set(candidate.index, candidate);
 
-  for (const candidate of slopeCandidates(points)) {
-    if (candidate.side === "top") {
+  const closeWithTop = (candidate: Candidate) => {
+    openTop = candidate;
+    marks.push(candidate);
+    seek = "bottom";
+    openBottom = null;
+  };
+  const closeWithBottom = (candidate: Candidate) => {
+    openBottom = candidate;
+    marks.push(candidate);
+    seek = "top";
+    openTop = null;
+  };
+
+  for (let i = 0; i < points.length; i += 1) {
+    const candidate = pending.get(i);
+    if (candidate?.side === "top") {
       if (
         seek === "bottom" &&
         openTop &&
@@ -321,31 +347,37 @@ export function intradayExtremes(points: IntradayMinute[], options?: { etf?: boo
         seek = "bottom";
         continue;
       }
-      if (seek !== "top" || !openBottom || !pairSwingCovers(openBottom.price, candidate.price, etf)) continue;
-      openTop = candidate;
-      marks.push(candidate);
-      seek = "bottom";
-      openBottom = null;
-      continue;
+      if (seek === "top" && openBottom && pairSwingCovers(openBottom.price, candidate.price, etf)) {
+        closeWithTop(candidate);
+        continue;
+      }
+    } else if (candidate?.side === "bottom") {
+      if (seek === "top" && openBottom && candidate.price < openBottom.price) {
+        dropMark(marks, openBottom);
+        openBottom = candidate;
+        marks.push(candidate);
+        continue;
+      }
+      if (seek === "either") {
+        openBottom = candidate;
+        marks.push(candidate);
+        seek = "top";
+        continue;
+      }
+      if (seek === "bottom" && openTop && pairSwingCovers(candidate.price, openTop.price, etf)) {
+        closeWithBottom(candidate);
+        continue;
+      }
     }
 
-    if (seek === "top" && openBottom && candidate.price < openBottom.price) {
-      dropMark(marks, openBottom);
-      openBottom = candidate;
-      marks.push(candidate);
+    if (points[i].volume <= 0 || !(points[i].price > 0)) continue;
+    if (seek === "top" && openBottom && pairSwingCovers(openBottom.price, points[i].price, etf)) {
+      closeWithTop(swingMark(points, i, "top"));
       continue;
     }
-    if (seek === "either") {
-      openBottom = candidate;
-      marks.push(candidate);
-      seek = "top";
-      continue;
+    if (seek === "bottom" && openTop && pairSwingCovers(points[i].price, openTop.price, etf)) {
+      closeWithBottom(swingMark(points, i, "bottom"));
     }
-    if (seek !== "bottom" || !openTop || !pairSwingCovers(candidate.price, openTop.price, etf)) continue;
-    openBottom = candidate;
-    marks.push(candidate);
-    seek = "top";
-    openTop = null;
   }
 
   const range = sessionRangeAfter(points);
