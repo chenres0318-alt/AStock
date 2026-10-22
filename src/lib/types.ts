@@ -130,4 +130,6 @@ export type ScreenerHit = {
   dea: number;
   hist: number;
   reasons: string[];
+  sector: string | null;
+  sectorCode: string | null;
 };

@@ -323,6 +323,17 @@ export async function fetchEastMoneyCompanySurvey(code: string): Promise<Record<
   );
 }
 
+/** 东财 F10 公司概况里的所属行业，例如「白酒」。 */
+export async function fetchEastMoneyIndustry(code: string): Promise<string | null> {
+  const json = await fetchEastMoneyCompanySurvey(code);
+  const jbzl = json.jbzl;
+  if (!jbzl || typeof jbzl !== "object") return null;
+  const sshy = (jbzl as Record<string, unknown>).sshy;
+  if (typeof sshy !== "string") return null;
+  const name = sshy.trim();
+  return name && name !== "-" ? name : null;
+}
+
 export async function fetchEastMoneyHoldChanges(code: string): Promise<Array<Record<string, unknown>>> {
   const id = bareCode(code);
   return datacenterRows(
