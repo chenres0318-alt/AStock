@@ -8,7 +8,6 @@ import {
   indexCouldBeOpen,
   listMa4CrossStocks,
   memberGainsInWindow,
-  trendCoversLastBar,
   type SectorMemberPath,
   type SectorTrendSegment,
 } from "./sectorTrend";
@@ -67,13 +66,26 @@ async function industrySeries(code: string): Promise<{ name: string; bars: KBar[
   return fetchTonghuashunSeries(code, 160);
 }
 
+async function loadMembers(code: string): Promise<BoardMember[]> {
+  let last: BoardMember[] = [];
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      last = await listBoardMembers(code, 40, "amount");
+      if (last.length) return last;
+    } catch {
+      last = [];
+    }
+  }
+  return last;
+}
+
 export async function getSectorTrend(code: string): Promise<SectorTrendReport> {
   const boardCode = code.trim();
   if (!isTonghuashunBoard(boardCode)) throw new UpstreamError("请从同花顺行业或概念里选择一个板块", 400);
   const [boards, series, members] = await Promise.all([
     listSelectableBoards().catch(() => [] as SectorItem[]),
     industrySeries(boardCode),
-    listBoardMembers(boardCode, 40, "amount").catch(() => [] as BoardMember[]),
+    loadMembers(boardCode),
   ]);
   const bars = series.bars;
   const found = boards.find((item) => item.code === boardCode);
@@ -118,12 +130,16 @@ export async function getSectorTrend(code: string): Promise<SectorTrendReport> {
   };
 }
 
-/** 最新一根还落在趋势区间里的行业代码。先用指数价格筛，再对候选做成分股确认。 */
+/**
+ * 最新一根还落在趋势区间里的行业代码。
+ * 下拉标红只看指数价格是否还能把红框留到最后一根，避免对全市场成分股再扫一遍把当前板块拖死。
+ * 点进某个行业后，仍用成分股做完整捕捉。
+ */
 export async function listBoardsInTrend(): Promise<string[]> {
   try {
-    return await cached("boards-in-open-trend:v3", 10 * 60_000, async () => {
+    return await cached("boards-in-open-trend:v4", 10 * 60_000, async () => {
       const boards = await listAllIndustryBoards();
-      const klines = await mapPool(boards, 4, async (board) => {
+      const klines = await mapPool(boards, 6, async (board) => {
         try {
           const series = await industrySeries(board.code);
           return { code: board.code, bars: series.bars };
@@ -131,18 +147,10 @@ export async function listBoardsInTrend(): Promise<string[]> {
           return { code: board.code, bars: [] as KBar[] };
         }
       });
-      const candidates = klines.filter((item) => indexCouldBeOpen(item.bars));
-      const confirmed = await mapPool(candidates, 3, async (item) => {
-        try {
-          const members = await listBoardMembers(item.code, 40, "amount");
-          const paths = toMemberPaths(await memberSeries(members));
-          const trends = captureSectorTrends(item.bars, paths);
-          return trendCoversLastBar(trends, item.bars.at(-1)?.time) ? item.code : null;
-        } catch {
-          return null;
-        }
-      });
-      return confirmed.filter((code): code is string => code != null);
+      if (klines.every((item) => item.bars.length < 3)) {
+        throw new UpstreamError("板块日线暂时取不到");
+      }
+      return klines.filter((item) => indexCouldBeOpen(item.bars)).map((item) => item.code);
     });
   } catch {
     return [];

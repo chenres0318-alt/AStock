@@ -1,5 +1,5 @@
 import { cached } from "./cache";
-import { isTonghuashunBoard } from "./codes";
+import { isTonghuashunBoard, isTonghuashunIndustry } from "./codes";
 import { fetchBoardMembers } from "./sources/eastmoney";
 import { fetchSinaBoardMembers, type SinaNodeSort } from "./sources/sina";
 import { fetchTonghuashunConcepts, fetchTonghuashunIndustries, fetchTonghuashunMembers } from "./sources/tonghuashun";
@@ -30,10 +30,13 @@ export async function listBoardMembers(
   limit = 50,
   sort: "amount" | "turnover" = "amount",
 ): Promise<BoardMember[]> {
-  const key = `board-members:${boardCode}:${sort}:${limit}`;
+  const key = `board-members:v2:${boardCode}:${sort}:${limit}`;
   return cached(key, 30 * 60_000, async () => {
     if (isTonghuashunBoard(boardCode)) {
       const rows = await fetchTonghuashunMembers(boardCode, limit);
+      if (!rows.length && isTonghuashunIndustry(boardCode)) {
+        throw new Error("同花顺行业成分股暂时读不到");
+      }
       if (sort === "turnover") {
         return [...rows].sort((a, b) => (b.turnover ?? -1) - (a.turnover ?? -1));
       }

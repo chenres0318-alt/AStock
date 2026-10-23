@@ -11,6 +11,7 @@ import {
   type ISeriesApi,
   type Time,
 } from "lightweight-charts";
+import { applyBoardLive, mergeLiveCodes, readStoredLiveCodes, writeStoredLiveCodes } from "@/lib/boardLive";
 import { displaySymbol, isTonghuashunBoard, isTonghuashunConcept, priceDigits, toTencentCode } from "@/lib/codes";
 import { formatPct, formatPrice, toneClass } from "@/lib/format";
 import type { KBar, SectorItem } from "@/lib/types";
@@ -58,6 +59,9 @@ export default function SectorTrendView() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [liveCodes, setLiveCodes] = useState<string[]>([]);
+  const [liveHydrated, setLiveHydrated] = useState(false);
+  const liveListStarted = useRef(false);
+  const settledBoards = useRef(new Set<string>());
 
   useEffect(() => {
     readJson<{ items: SectorItem[] }>("/api/market/sectors?scope=all")
@@ -72,16 +76,21 @@ export default function SectorTrendView() {
   }, [code, router]);
 
   useEffect(() => {
-    let cancelled = false;
-    readJson<{ codes: string[] }>("/api/market/sector-trend?list=active", 300_000)
-      .then((data) => {
-        if (!cancelled) setLiveCodes(data.codes ?? []);
-      })
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
+    setLiveCodes((prev) => mergeLiveCodes(readStoredLiveCodes(), prev));
+    setLiveHydrated(true);
   }, []);
+
+  useEffect(() => {
+    if (liveHydrated) writeStoredLiveCodes(liveCodes);
+  }, [liveCodes, liveHydrated]);
+
+  useEffect(() => {
+    if (!report) return;
+    const last = report.bars.at(-1)?.time;
+    const live = report.trends.some((item) => item.status === "open" && item.end === last);
+    settledBoards.current.add(report.board.code);
+    setLiveCodes((prev) => applyBoardLive(prev, report.board.code, live));
+  }, [report]);
 
   useEffect(() => {
     if (!isTonghuashunBoard(code)) return;
@@ -107,17 +116,27 @@ export default function SectorTrendView() {
     };
   }, [code]);
 
-  const liveSet = useMemo(() => {
-    const set = new Set(liveCodes);
-    const last = report?.bars.at(-1)?.time;
-    const selfLive = report?.trends.some((item) => item.status === "open" && item.end === last) ?? false;
-    if (code && report) {
-      if (selfLive) set.add(code);
-      else set.delete(code);
-    }
-    return set;
-  }, [liveCodes, report, code]);
+  useEffect(() => {
+    if (!report || liveListStarted.current) return;
+    liveListStarted.current = true;
+    const load = (attempt: number) => {
+      readJson<{ codes: string[] }>("/api/market/sector-trend?list=active", 120_000)
+        .then((data) => {
+          setLiveCodes((prev) =>
+            mergeLiveCodes(
+              prev,
+              (data.codes ?? []).filter((item) => !settledBoards.current.has(item)),
+            ),
+          );
+        })
+        .catch(() => {
+          if (attempt < 2) window.setTimeout(() => load(attempt + 1), 2000);
+        });
+    };
+    load(0);
+  }, [report]);
 
+  const liveSet = useMemo(() => new Set(liveCodes), [liveCodes]);
   const selected = report?.trends.find((item) => item.start === picked) ?? report?.trends.at(-1) ?? null;
   const upTotal =
     report?.board.upCount != null
