@@ -489,6 +489,32 @@ const etfPop = session(
   ],
   20,
 );
+const openSpikeDump = session(
+  [
+    { n: 1, step: 0 },
+    { n: 10, step: 0.04 },
+    { n: 5, step: -0.05 },
+    { n: 15, step: -0.04 },
+    { n: 12, step: -0.08 },
+  ],
+  20,
+);
+assert(
+  openSpikeDump[0]?.time === "09:30" &&
+    openSpikeDump.some((point) => point.time === "09:40" && point.price === 20.4) &&
+    openSpikeDump.some((point) => point.time === "10:00"),
+  "the open-spike tape pops 2 percent by 9:40 then dumps through 10:00",
+);
+assert(
+  intradayExtremes(openSpikeDump).every((mark) => mark.time > "10:00") &&
+    intradayExtremes(openSpikeDump, { minConfidence: 0 }).every((mark) => mark.time > "10:00"),
+  "an opening spike that gives back half by 10:00 does not keep 9:30-10:00 top or bottom marks",
+);
+assert(
+  intradayExtremes(openSpikeDump, { minConfidence: 0 }).some((mark) => mark.side === "bottom" && mark.time > "10:00"),
+  "after 10:00 the same dump can still open a bottom",
+);
+
 assert(intradayExtremes(etfPop, { etf: true }).every((mark) => mark.side !== "top"), "an ETF also waits for a bottom before marking a top");
 assert(intradayExtremes(etfPop).length === 0, "the same 0.6 percent pop is not enough to open a stock top");
 assert(shapeExtremes(etfPop, { etf: true }).length === 0, "without the live swing door that small ETF pop is not a shape top");

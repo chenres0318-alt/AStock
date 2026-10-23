@@ -13,6 +13,7 @@
  * 还没配上对面时，更高的顶要红柱不低于前一个顶的八成才换掉；更低的底直接换掉前一个底。
  * 贴着均价线也可以标。配成一对时，个股顶底波动至少 1.5%，ETF 至少 0.5%。
  * 波动按 (高 - 低) / 低。9:45 之后相对波动够了也可以先标第一个底，不必等 MACD 形态，盘中就能看到。
+ * 9:30 到 9:45 先急拉出一对波动、10:00 前又吐回至少一半的，当作开盘冲高回落，这段时间不标顶底。
  * 对面除了再等形态，价格相对达到这档波动也可以直接标，然后开始下一对。
  * 价位指数看 9:45 之后的日内高低：(现价 - 最低) / (最高 - 最低) × 100。越高越靠近高位，越低越靠近低位。
  * 顶的可信度等于价位指数，底的可信度等于 100 减去价位指数。
@@ -44,6 +45,13 @@ const BOTTOM_MAX_VOLUME_RATIO = 1.5;
 /** 价位指数从这一分钟起算当日高低，避开开盘前 15 分钟。 */
 const RANGE_START = "09:45";
 const RANGE_END = "15:00";
+const OPEN_BELL = "09:30";
+/** 开盘急拉看这一段的高点。 */
+const OPEN_SPIKE_END = "09:45";
+/** 急拉后又快速回落时，顶底标记推迟到这一分钟之后。 */
+const OPEN_QUIET_END = "10:00";
+/** 从开盘高点吐回这么多，才认定是冲高回落。 */
+const OPEN_DUMP_RETRACE = 0.5;
 /** 到这一分钟还没有 70 顶、只剩底时，现价比底高就补一个卖顶。 */
 const FORCE_TOP_DEADLINE = "14:45";
 /** 补卖顶只看到这一分钟的现价，14:52 之后不再跟着走。 */
@@ -252,6 +260,32 @@ function emaOnSeries(values: number[], period: number): Array<number | null> {
   return [...Array(start).fill(null), ...emaSeries(tail, period)];
 }
 
+/** 9:30–9:45 已从开盘价拉出一对波动，且当前价吐回了至少一半。 */
+function isOpenSpikeDump(points: IntradayMinute[], index: number, etf: boolean): boolean {
+  if (index < 0 || index >= points.length) return false;
+  if (points[index].time < OPEN_BELL || points[index].time > OPEN_QUIET_END) return false;
+  let open = 0;
+  let openAt = -1;
+  for (let i = 0; i <= index; i += 1) {
+    if (points[i].time < OPEN_BELL || points[i].time > OPEN_QUIET_END) continue;
+    if (!Number.isFinite(points[i].price) || !(points[i].price > 0)) continue;
+    open = points[i].price;
+    openAt = i;
+    break;
+  }
+  if (openAt < 0) return false;
+  let earlyHigh = open;
+  for (let i = openAt; i <= index; i += 1) {
+    if (points[i].time > OPEN_SPIKE_END) break;
+    if (points[i].time < OPEN_BELL) continue;
+    if (Number.isFinite(points[i].price) && points[i].price > earlyHigh) earlyHigh = points[i].price;
+  }
+  if (!pairSwingCovers(open, earlyHigh, etf)) return false;
+  const spike = earlyHigh - open;
+  if (!(spike > 0)) return false;
+  return (earlyHigh - points[index].price) / spike >= OPEN_DUMP_RETRACE;
+}
+
 function slopeCandidates(points: IntradayMinute[], priorPrices: number[] = []): Candidate[] {
   const prices = points.map((point) => point.price);
   const macd = macdfsSeries(prices, priorPrices);
@@ -382,6 +416,8 @@ export function intradayExtremes(
   for (const candidate of slopeCandidates(points, options?.priorPrices ?? [])) pending.set(candidate.index, candidate);
   let runHigh = -Infinity;
   let runLow = Infinity;
+  const quietLast = lastPointFrom(points, OPEN_BELL, OPEN_QUIET_END);
+  const openTrap = quietLast >= 0 && isOpenSpikeDump(points, quietLast, etf);
 
   const closeWithTop = (candidate: Candidate) => {
     openTop = candidate;
@@ -402,6 +438,7 @@ export function intradayExtremes(
       runLow = Math.min(runLow, points[i].price);
     }
     const phase = state.seek;
+    if (openTrap && points[i].time <= OPEN_QUIET_END) continue;
     const candidate = pending.get(i);
     if (candidate?.side === "top") {
       if (
