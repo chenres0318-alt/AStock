@@ -238,7 +238,7 @@ export type MaCrossStock = {
   time: string;
 };
 
-const MAX_SIGNAL_DAYS = 2;
+const MAX_SIGNAL_DAYS = 1;
 
 function maAt(values: number[], period: number, index: number): number | null {
   if (index < period - 1 || index >= values.length) return null;
@@ -302,7 +302,7 @@ function standCrossRed(closes: number[], hist: Array<number | null>, index: numb
 
 /**
  * 板块这段趋势的最新一根上，收盘站上 MA4 和 MA7、4 日线上叉 7 日线后仍在上方、MACD 红柱，
- * 并且这套信号从金叉那天起连续成立不超过 2 日。
+ * 并且这套信号从金叉那天起只成立当天（不超过 1 日）。
  */
 export function listMa4CrossStocks(
   segment: { start: string; end: string },
