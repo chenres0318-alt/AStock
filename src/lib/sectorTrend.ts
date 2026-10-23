@@ -234,51 +234,23 @@ function walkSegments(
 export type MaCrossStock = {
   code: string;
   name: string;
-  /** 这段信号开始的交易日，也就是 4 日均线上穿 7 日均线那天。 */
+  /** 4 日均线上穿 7 日均线那天。 */
   time: string;
+  score: number;
+  /** 盘中现价已经掉到 MA4 下面。 */
+  belowMa4: boolean;
 };
 
-const MAX_SIGNAL_DAYS = 3;
+function isStarBoardShare(code: string): boolean {
+  const id = code.replace(/^[a-z]+/i, "").replace(/\D/g, "").slice(-6);
+  return id.startsWith("688") || id.startsWith("689");
+}
 
 function maAt(values: number[], period: number, index: number): number | null {
   if (index < period - 1 || index >= values.length) return null;
   let sum = 0;
   for (let i = index - period + 1; i <= index; i += 1) sum += values[i];
   return sum / period;
-}
-
-function emaSeries(values: number[], period: number): Array<number | null> {
-  const out: Array<number | null> = Array(values.length).fill(null);
-  if (values.length < period) return out;
-  const k = 2 / (period + 1);
-  let sum = 0;
-  for (let i = 0; i < period; i += 1) sum += values[i];
-  let prev = sum / period;
-  out[period - 1] = prev;
-  for (let i = period; i < values.length; i += 1) {
-    prev = values[i] * k + prev * (1 - k);
-    out[i] = prev;
-  }
-  return out;
-}
-
-function macdHist(closes: number[]): Array<number | null> {
-  const ema12 = emaSeries(closes, 12);
-  const ema26 = emaSeries(closes, 26);
-  const difVals: number[] = [];
-  const map: number[] = [];
-  for (let i = 0; i < closes.length; i += 1) {
-    if (ema12[i] == null || ema26[i] == null) continue;
-    difVals.push(ema12[i]! - ema26[i]!);
-    map.push(i);
-  }
-  const deaVals = emaSeries(difVals, 9);
-  const out: Array<number | null> = Array(closes.length).fill(null);
-  for (let j = 0; j < difVals.length; j += 1) {
-    if (deaVals[j] == null) continue;
-    out[map[j]] = 2 * (difVals[j] - deaVals[j]!);
-  }
-  return out;
 }
 
 /** 前一日 MA4 还不超过 MA7，当日 MA4 升到 MA7 之上。 */
@@ -291,76 +263,72 @@ function ma4CrossedUpMa7(closes: number[], index: number): boolean {
   return ma4Prev <= ma7Prev && ma4 > ma7;
 }
 
-/** 收盘站上 4/7 日均线，且 4 日线仍在 7 日线上方。 */
-function standAbove(closes: number[], index: number): boolean {
-  const ma4 = maAt(closes, 4, index);
-  const ma7 = maAt(closes, 7, index);
-  if (ma4 == null || ma7 == null) return false;
-  return closes[index] > ma4 && closes[index] > ma7 && ma4 > ma7;
-}
-
-/** 低开高走：开盘低于昨收，收盘高于开盘。 */
-function lowOpenHighWalk(bars: KBar[], index: number): boolean {
-  if (index < 1) return false;
-  const bar = bars[index];
-  const prevClose = bars[index - 1].close;
-  if (!(prevClose > 0) || !(bar.open > 0)) return false;
-  return bar.open < prevClose && bar.close > bar.open;
-}
-
-/** 金叉当天到这根（最多 3 日）里，只要有一天低开高走就算。 */
-function lowOpenHighWalkInRange(bars: KBar[], start: number, last: number): boolean {
-  const end = Math.min(last, start + MAX_SIGNAL_DAYS - 1);
-  for (let i = start; i <= end; i += 1) {
-    if (lowOpenHighWalk(bars, i)) return true;
+/** 还守着 MA4 在 MA7 上方时，最近一次上叉的位置。 */
+function latestHeldCross(closes: number[], last: number): number {
+  const ma4Last = maAt(closes, 4, last);
+  const ma7Last = maAt(closes, 7, last);
+  if (ma4Last == null || ma7Last == null || ma4Last <= ma7Last) return -1;
+  for (let i = last; i >= 7; i -= 1) {
+    if (ma4CrossedUpMa7(closes, i)) return i;
+    const ma4 = maAt(closes, 4, i);
+    const ma7 = maAt(closes, 7, i);
+    if (ma4 == null || ma7 == null || ma4 <= ma7) return -1;
   }
-  return false;
+  return -1;
 }
 
-/**
- * MACD 柱比前一日更高：绿柱缩短是空头减弱，红柱变长是多头增强。
- * 不要求当天必须是红柱。
- */
-function macdImproving(hist: Array<number | null>, index: number): boolean {
-  const cur = hist[index];
-  const prev = hist[index - 1];
-  if (cur == null || prev == null) return false;
-  return cur > prev;
-}
+type ScoredRow = MaCrossStock & { strength: number };
 
 /**
- * 板块这段趋势的最新一根上，收盘站上 MA4 和 MA7、4 日线上叉 7 日线后仍在上方，
- * 金叉当天 MACD 空头减弱或多头增强，金叉起 3 日内有低开高走，连续成立不超过 3 日。
+ * 这段趋势最新一根上：现价站上 MA4 且 MA4 上叉 MA7 记 1 分，
+ * 多头趋势（MA4 相对 MA7 的开口）最大的再记 1 分，按总分从高到低。
+ * 不含科创板。现价掉到 MA4 下面仍列出，并标止盈止损。
  */
 export function listMa4CrossStocks(
   segment: { start: string; end: string },
-  stocks: Array<{ code: string; name: string; bars: KBar[] }>,
+  stocks: Array<{ code: string; name: string; bars: KBar[]; price?: number | null }>,
 ): MaCrossStock[] {
-  const hits: MaCrossStock[] = [];
+  const rows: ScoredRow[] = [];
   for (const stock of stocks) {
+    if (isStarBoardShare(stock.code)) continue;
     const closes = stock.bars.map((bar) => bar.close);
-    const hist = macdHist(closes);
     let last = -1;
     for (let i = 0; i < stock.bars.length; i += 1) {
       const time = stock.bars[i].time;
       if (time >= segment.start && time <= segment.end) last = i;
     }
-    if (last < 0 || !standAbove(closes, last)) continue;
-    let days = 0;
-    let cursor = last;
-    while (cursor >= 0 && standAbove(closes, cursor)) {
-      days += 1;
-      cursor -= 1;
-    }
-    if (days < 1 || days > MAX_SIGNAL_DAYS) continue;
-    const start = last - days + 1;
-    if (!ma4CrossedUpMa7(closes, start)) continue;
-    if (!lowOpenHighWalkInRange(stock.bars, start, last)) continue;
-    if (!macdImproving(hist, start)) continue;
-    hits.push({ code: stock.code, name: stock.name, time: stock.bars[start].time });
+    if (last < 0) continue;
+    const ma4 = maAt(closes, 4, last);
+    const ma7 = maAt(closes, 7, last);
+    if (ma4 == null || ma7 == null || !(ma4 > 0) || !(ma7 > 0)) continue;
+    const crossAt = latestHeldCross(closes, last);
+    if (crossAt < 0) continue;
+    const spot = stock.price != null && stock.price > 0 ? stock.price : closes[last];
+    const belowMa4 = spot < ma4;
+    const standOnMa4 = spot >= ma4;
+    rows.push({
+      code: stock.code,
+      name: stock.name,
+      time: stock.bars[crossAt].time,
+      score: standOnMa4 ? 1 : 0,
+      belowMa4,
+      strength: (ma4 - ma7) / ma7,
+    });
   }
-  hits.sort((a, b) => (a.time === b.time ? a.name.localeCompare(b.name, "zh-CN") : a.time < b.time ? 1 : -1));
-  return hits;
+  if (rows.length) {
+    const best = Math.max(...rows.map((row) => row.strength));
+    if (best > 0) {
+      for (const row of rows) {
+        if (row.strength === best) row.score += 1;
+      }
+    }
+  }
+  rows.sort((a, b) => {
+    if (a.score !== b.score) return b.score - a.score;
+    if (a.strength !== b.strength) return b.strength - a.strength;
+    return a.name.localeCompare(b.name, "zh-CN");
+  });
+  return rows.map(({ strength: _strength, ...item }) => item);
 }
 
 /**

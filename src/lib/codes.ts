@@ -110,6 +110,12 @@ export function toEastMoneyF10Code(input: string): string {
   return `${prefix}${bareCode(code)}`;
 }
 
+/** 科创板：688 / 689。 */
+export function isStarShare(code: string): boolean {
+  const id = bareCode(code);
+  return id.startsWith("688") || id.startsWith("689");
+}
+
 export function marketLabel(code: string): string {
   const tx = toTencentCode(code);
   const id = bareCode(tx);

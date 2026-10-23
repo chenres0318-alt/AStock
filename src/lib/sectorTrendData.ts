@@ -1,6 +1,6 @@
 import { listAllIndustryBoards, listBoardMembers, listSelectableBoards } from "./boards";
 import { cached } from "./cache";
-import { isTonghuashunBoard } from "./codes";
+import { isStarShare, isTonghuashunBoard } from "./codes";
 import { UpstreamError } from "./http";
 import { mapPool } from "./pool";
 import {
@@ -23,6 +23,8 @@ export type MaCrossStockView = {
   code: string;
   name: string;
   time: string;
+  score: number;
+  belowMa4: boolean;
 };
 
 export type SectorTrendView = SectorTrendSegment & {
@@ -39,19 +41,23 @@ export type SectorTrendReport = {
   memberCount: number;
 };
 
-async function memberSeries(members: BoardMember[]): Promise<Array<{ code: string; name: string; bars: KBar[] }>> {
+async function memberSeries(
+  members: BoardMember[],
+): Promise<Array<{ code: string; name: string; bars: KBar[]; price: number | null }>> {
   const rows = await mapPool(members, 5, async (member) => {
     try {
       const bars = await cached(`trend-member:${member.code}:160`, 10 * 60_000, () =>
         fetchTencentKline(member.code, "day", 160),
       );
       if (!bars.length) return null;
-      return { code: member.code, name: member.name, bars };
+      return { code: member.code, name: member.name, bars, price: member.price };
     } catch {
       return null;
     }
   });
-  return rows.filter((item): item is { code: string; name: string; bars: KBar[] } => item != null);
+  return rows.filter(
+    (item): item is { code: string; name: string; bars: KBar[]; price: number | null } => item != null,
+  );
 }
 
 function toMemberPaths(series: Array<{ code: string; name: string; bars: KBar[] }>): SectorMemberPath[] {
@@ -115,7 +121,10 @@ export async function getSectorTrend(code: string): Promise<SectorTrendReport> {
     const trendRoster = members
       .map((item) => ({ ...item, gain: gains.get(item.code) ?? null }))
       .sort((a, b) => (b.gain ?? -999) - (a.gain ?? -999));
-    const maCrosses = listMa4CrossStocks(segment, stocks);
+    const maCrosses = listMa4CrossStocks(
+      segment,
+      stocks.filter((stock) => !isStarShare(stock.code)),
+    );
     return { ...segment, roster: trendRoster, maCrosses };
   });
   const base = bars.length >= 6 ? bars[bars.length - 6] : null;
