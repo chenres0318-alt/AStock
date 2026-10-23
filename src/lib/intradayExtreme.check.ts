@@ -17,6 +17,10 @@ function assert(cond: unknown, message: string) {
   if (!cond) throw new Error(message);
 }
 
+function shapeExtremes(points: IntradayMinute[], options?: { etf?: boolean }) {
+  return intradayExtremes(points, { ...options, openWithSwing: false });
+}
+
 function session(parts: Array<{ n: number; step: number }>, origin: number, avgAt?: (price: number, index: number) => number): IntradayMinute[] {
   const points: IntradayMinute[] = [];
   let price = origin;
@@ -66,7 +70,7 @@ assert(priceDigits("sz159516", "半导体设备ETF国泰") === 3 && formatPrice(
 assert(formatPrice(100.123, 3) === "100.123", "three decimals stay on an ETF price above 100");
 assert(priceDigits("sh601138", "工业富联") === 2 && formatPrice(48.31) === "48.31", "a stock price stays at two decimals");
 assert(formatPrice(0.598) === "0.60", "two decimals still round a third digit");
-assert(intradayExtremes(session([{ n: 80, step: 0 }], 20)).length === 0, "a flat session has no top or bottom");
+assert(shapeExtremes(session([{ n: 80, step: 0 }], 20)).length === 0, "a flat session has no top or bottom");
 
 const easingRise = session(
   [
@@ -77,7 +81,7 @@ const easingRise = session(
   ],
   20,
 );
-const topMarks = intradayExtremes(easingRise);
+const topMarks = shapeExtremes(easingRise);
 assert(topMarks[0]?.side === "top" && topMarks[0].time === "10:16", "a rise that is still up but slowing is a top");
 assert(
   topMarks.length === 2 && topMarks[1].side === "bottom" && pairSwingCovers(topMarks[1].price, topMarks[0].price),
@@ -113,7 +117,7 @@ const easingDrop = session(
   ],
   20,
 );
-const bottomMarks = intradayExtremes(easingDrop);
+const bottomMarks = shapeExtremes(easingDrop);
 assert(bottomMarks[0]?.side === "bottom" && bottomMarks[0].time === "10:18", "a drop that is still down but slowing is a bottom");
 assert(
   bottomMarks.length === 2 && bottomMarks[1].side === "top" && pairSwingCovers(bottomMarks[0].price, bottomMarks[1].price),
@@ -140,7 +144,7 @@ assert(
 const bottomBar = macdfsSeries(bottomPrices)[bottomMarks[0].index];
 assert(bottomBar != null && bottomBar.dea > bottomBar.dif, "the bottom is still inside DEA above DIF");
 
-const higherTop = intradayExtremes(
+const higherTop = shapeExtremes(
   session(
     [
       { n: 40, step: 0 },
@@ -155,7 +159,7 @@ const higherTop = intradayExtremes(
 assert(higherTop.length === 1 && higherTop[0].side === "top" && higherTop[0].time === "10:26", "a later higher top replaces the earlier top");
 assert(Math.abs(higherTop[0].price - 25.62) < 1e-9, "the kept top is the higher one");
 
-const lowerBottom = intradayExtremes(
+const lowerBottom = shapeExtremes(
   session(
     [
       { n: 40, step: 0 },
@@ -174,7 +178,7 @@ assert(
 );
 assert(Math.abs(lowerBottom[0].price - 14.6) < 1e-9, "the kept bottom is the lower one");
 
-const paired = intradayExtremes(
+const paired = shapeExtremes(
   session(
     [
       { n: 40, step: 0 },
@@ -202,21 +206,21 @@ const dropThenBounce = [
   { n: 8, step: -0.35 },
   { n: 6, step: -0.08 },
 ];
-const swingFromBottom = intradayExtremes(session([...dropThenBounce, { n: 1, step: 0.8 }], 20));
+const swingFromBottom = shapeExtremes(session([...dropThenBounce, { n: 1, step: 0.8 }], 20));
 assert(
   swingFromBottom.length === 2 && swingFromBottom[0].side === "bottom" && swingFromBottom[1].side === "top",
   "a 1.5 percent bounce after a morphological bottom marks a top even if the slope is not weakening",
 );
 assert(pairSwingCovers(swingFromBottom[0].price, swingFromBottom[1].price), "that bounce covers the stock 1.5 percent floor");
-const shyBounce = intradayExtremes(session([...dropThenBounce, { n: 1, step: 0.5 }], 20));
+const shyBounce = shapeExtremes(session([...dropThenBounce, { n: 1, step: 0.5 }], 20));
 assert(shyBounce.length === 1 && shyBounce[0].side === "bottom", "a bounce under 1.5 percent does not mint a stock top");
-const etfBounce = intradayExtremes(session([...dropThenBounce, { n: 1, step: 0.5 }], 20), { etf: true });
+const etfBounce = shapeExtremes(session([...dropThenBounce, { n: 1, step: 0.5 }], 20), { etf: true });
 assert(
   etfBounce.length === 2 && etfBounce[0].side === "bottom" && etfBounce[1].side === "top",
   "the same 0.5 yuan bounce is enough to pair an ETF top at the 0.5 percent floor",
 );
 
-const steadyRise = intradayExtremes(
+const steadyRise = shapeExtremes(
   session(
     [
       { n: 40, step: 0 },
@@ -227,7 +231,7 @@ const steadyRise = intradayExtremes(
 );
 assert(steadyRise.length === 0, "a steady rise whose slope is not shrinking has no top");
 
-const belowAvgTop = intradayExtremes(
+const belowAvgTop = shapeExtremes(
   session(
     [
       { n: 40, step: 0 },
@@ -243,7 +247,7 @@ assert(
   "a weakening rise below the average line is still a top while DIF stays above DEA",
 );
 
-const dropAboveAvg = intradayExtremes(
+const dropAboveAvg = shapeExtremes(
   session(
     [
       { n: 40, step: 0 },
@@ -256,7 +260,7 @@ const dropAboveAvg = intradayExtremes(
 );
 assert(dropAboveAvg.every((mark) => mark.side !== "bottom"), "a weakening drop above the average line is not a bottom");
 
-const huggingAvg = intradayExtremes(
+const huggingAvg = shapeExtremes(
   session(
     [
       { n: 40, step: 0 },
@@ -283,11 +287,71 @@ assert(flatKdj[8] != null && Math.abs(flatKdj[8].k - 50) < 1e-9 && Math.abs(flat
 
 assert(recentVolumeAvg(easingRise, 10) === 1000, "a flat tape keeps the recent volume average at 1000");
 const dryRise = easingRise.map((point, index) => ({ ...point, volume: index >= topMarks[0].index ? 50 : 1000 }));
-assert(intradayExtremes(dryRise).every((mark) => mark.side !== "top"), "a weakening rise on a dry tape is not a top");
+assert(shapeExtremes(dryRise).every((mark) => mark.side !== "top"), "a weakening rise on a dry tape is not a top");
 const dumpBottom = easingDrop.map((point, index) => ({ ...point, volume: index >= bottomMarks[0].index ? 5000 : 1000 }));
-assert(intradayExtremes(dumpBottom).every((mark) => mark.side !== "bottom"), "a weakening drop on a blow-off tape is not a bottom");
+assert(shapeExtremes(dumpBottom).every((mark) => mark.side !== "bottom"), "a weakening drop on a blow-off tape is not a bottom");
 const silentDrop = easingDrop.map((point, index) => ({ ...point, volume: index >= bottomMarks[0].index ? 0 : 1000 }));
-assert(intradayExtremes(silentDrop).every((mark) => mark.side !== "bottom"), "a minute with no volume is not a bottom");
+assert(shapeExtremes(silentDrop).every((mark) => mark.side !== "bottom"), "a minute with no volume is not a bottom");
+
+const liveTop = intradayExtremes(
+  session(
+    [
+      { n: 15, step: 0 },
+      { n: 1, step: 0 },
+      { n: 4, step: 0.1 },
+    ],
+    20,
+  ),
+);
+assert(liveTop.length >= 1 && liveTop[0].side === "top" && liveTop[0].time >= "09:45", "after 9:45 a 1.5 percent rise can open a top without waiting for MACD shape");
+assert(pairSwingCovers(20, liveTop[0].price), "that live top covers the 1.5 percent floor from the 9:45 low");
+
+const liveBottom = intradayExtremes(
+  session(
+    [
+      { n: 15, step: 0 },
+      { n: 1, step: 0 },
+      { n: 4, step: -0.1 },
+    ],
+    20,
+  ),
+);
+assert(liveBottom.length >= 1 && liveBottom[0].side === "bottom" && liveBottom[0].time >= "09:45", "after 9:45 a 1.5 percent drop can open a bottom without waiting for MACD shape");
+
+const beforeOpenRange = intradayExtremes(session([{ n: 14, step: 0.3 }], 20));
+assert(
+  beforeOpenRange.every((mark) => mark.time >= "09:45" || mark.side !== "top"),
+  "a swing before 9:45 does not open the first top by the live rule",
+);
+assert(beforeOpenRange.filter((mark) => mark.time < "09:45").length === 0, "no swing-opened mark is stamped before 9:45");
+
+const livePair = intradayExtremes(
+  session(
+    [
+      { n: 15, step: 0 },
+      { n: 1, step: 0 },
+      { n: 4, step: 0.1 },
+      { n: 4, step: -0.12 },
+    ],
+    20,
+  ),
+);
+assert(
+  livePair.length === 2 && livePair[0].side === "top" && livePair[1].side === "bottom",
+  "after a live swing top, a 1.5 percent drop still pairs the opposite bottom",
+);
+
+const etfPop = session(
+  [
+    { n: 15, step: 0 },
+    { n: 1, step: 0 },
+    { n: 2, step: 0.06 },
+  ],
+  20,
+);
+assert(intradayExtremes(etfPop, { etf: true }).some((mark) => mark.side === "top"), "an ETF can open a live top at the 0.5 percent floor");
+assert(intradayExtremes(etfPop).length === 0, "the same 0.6 percent pop is not enough to open a stock top");
+assert(shapeExtremes(etfPop, { etf: true }).length === 0, "without the live swing door that small ETF pop is not a shape top");
 
 console.log(
   "intradayExtreme.check ok",
