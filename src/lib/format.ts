@@ -81,6 +81,11 @@ export function shanghaiParts(date = new Date()) {
   };
 }
 
+export function shanghaiDate(date = new Date()): string {
+  const p = shanghaiParts(date);
+  return `${p.year}-${p.month}-${p.day}`;
+}
+
 export function formatClock(date = new Date()): string {
   const p = shanghaiParts(date);
   return `${p.year}-${p.month}-${p.day} ${String(p.hour).padStart(2, "0")}:${String(p.minute).padStart(2, "0")}:${String(p.second).padStart(2, "0")}`;

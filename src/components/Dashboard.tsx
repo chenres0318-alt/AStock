@@ -104,10 +104,12 @@ export default function Dashboard() {
     if (!silent) setChartLoading(true);
     try {
       if (mode === "trend") {
-        const data = await readJson<{ points: TrendPoint[]; preClose: number | null }>(
-          `/api/market/trend?code=${selected}`,
-        );
+        const [data, day] = await Promise.all([
+          readJson<{ points: TrendPoint[]; preClose: number | null }>(`/api/market/trend?code=${selected}`),
+          readJson<{ bars: KBar[] }>(`/api/market/kline?code=${selected}&period=day`).catch(() => ({ bars: [] as KBar[] })),
+        ]);
         setTrend({ points: data.points, preClose: data.preClose });
+        if (day.bars.length) setBars(day.bars);
       } else {
         const data = await readJson<{ bars: KBar[] }>(`/api/market/kline?code=${selected}&period=${mode}`);
         setBars(data.bars);

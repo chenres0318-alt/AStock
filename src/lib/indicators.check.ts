@@ -1,4 +1,4 @@
-import { adxSeries, analyzeBars, buildMaLines, findBuyPoints, findTrendSwingBuys, klineRangeChange, maAt, macdSeries, passesScreen, screenReasons, tdSequential } from "./indicators.ts";
+import { adxSeries, analyzeBars, buildMaLines, findBuyPoints, findTrendSwingBuys, klineRangeChange, maAt, macdSeries, passesScreen, priceBelowDailyMa4AndMa7, screenReasons, tdSequential } from "./indicators.ts";
 import type { KBar } from "./types.ts";
 
 function assert(cond: unknown, message: string) {
@@ -326,6 +326,12 @@ almost(forward?.pct ?? NaN, 0.2);
 const reversed = klineRangeChange(rangeBars, rangeBars[2].time, rangeBars[0].time);
 assert(reversed?.from === forward?.from && reversed?.to === forward?.to && reversed?.count === 3, "a right-to-left drag uses the same interval");
 assert(klineRangeChange([], "a", "b") === null, "an empty range has no change");
+
+const fallingDaily = barsFromCloses(Array.from({ length: 10 }, (_, i) => 20 - i));
+assert(priceBelowDailyMa4AndMa7(fallingDaily, fallingDaily.at(-1)!.close) === true, "a falling close sits below both MA4 and MA7");
+assert(priceBelowDailyMa4AndMa7(fallingDaily, 40) === false, "a price above both averages is not a daily-MA exit");
+const risingDaily = barsFromCloses(risingCloses(10, 10, 1));
+assert(priceBelowDailyMa4AndMa7(risingDaily, risingDaily.at(-1)!.close) === false, "a rising close stays above MA4 and MA7");
 
 console.log("indicators.check ok", {
   cross: { ma4: cross.ma4.toFixed(3), ma7: cross.ma7.toFixed(3), hist: cross.hist.toFixed(4) },
