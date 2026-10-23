@@ -294,19 +294,36 @@ assert(
   "a setup that has held past three days is dropped",
 );
 
-const gapped = bounce.map((bar, index) =>
-  index === 41 ? { ...bar, open: Number((bounce[40].close * 1.01).toFixed(4)), high: Math.max(bar.close, bounce[40].close * 1.01) } : bar,
-);
+function gapUp(bars: KBar[], index: number): KBar[] {
+  return bars.map((bar, i) => {
+    if (i !== index || i < 1) return bar;
+    const open = Number((bars[i - 1].close * 1.01).toFixed(4));
+    return { ...bar, open, high: Math.max(bar.close, open) };
+  });
+}
+
+const gappedDay1 = gapUp(bounce, 41);
 assert(
-  listMa4CrossStocks({ start: bounceTimes[40], end: crossTime }, [{ code: "sh600001", name: "高开", bars: gapped }]).length === 0,
-  "a gap-up open on the cross day is not a low-open high-close",
+  listMa4CrossStocks({ start: bounceTimes[40], end: crossTime }, [{ code: "sh600001", name: "高开", bars: gappedDay1 }]).length === 0,
+  "a gap-up on the cross day is not enough without a later low-open high-close",
+);
+const delayedWalk = listMa4CrossStocks({ start: bounceTimes[40], end: day2 }, [{ code: "sh600001", name: "次日低开", bars: gappedDay1 }]);
+assert(
+  delayedWalk.length === 1 && delayedWalk[0].time === crossTime,
+  "a low-open high-close on the second day still counts",
 );
 
-const beforeWindow = listMa4CrossStocks(
+const gappedAll = [41, 42, 43].reduce((bars, index) => gapUp(bars, index), bounce);
+assert(
+  listMa4CrossStocks({ start: bounceTimes[40], end: day3 }, [{ code: "sh600001", name: "三天高开", bars: gappedAll }]).length === 0,
+  "three gap-up days after the cross are not a low-open high-close",
+);
+
+const laterBox = listMa4CrossStocks(
   { start: day2, end: day2 },
   [{ code: "sh600001", name: "金叉", bars: bounce }],
 );
-assert(beforeWindow.length === 0, "a cross that started before this trend is left out");
+assert(laterBox.length === 1 && laterBox[0].time === crossTime, "a still-live setup is kept even if the box starts after the cross");
 
 const stillUnder = datedBars(Array.from({ length: 46 }, () => 10));
 assert(
