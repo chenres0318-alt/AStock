@@ -166,7 +166,7 @@ export default function ChartView({
   mode: ChartMode;
   onMode: (mode: ChartMode) => void;
   bars: KBar[];
-  trend: { points: TrendPoint[]; preClose: number | null };
+  trend: { points: TrendPoint[]; preClose: number | null; priorCloses?: number[] };
   quote?: Quote;
   loading: boolean;
 }) {
@@ -506,7 +506,8 @@ export default function ChartView({
           })),
       );
       const prices = points.map((item) => item.price);
-      const macd = macdfsSeries(prices);
+      const priorCloses = trend.priorCloses ?? [];
+      const macd = macdfsSeries(prices, priorCloses);
       const kdj = kdjSeries(prices);
       macdPointsRef.current = macd;
       kdjPointsRef.current = kdj;
@@ -566,7 +567,11 @@ export default function ChartView({
       const checkPrice = checkPoint?.price ?? quote?.price ?? null;
       const today = lastPoint ? shanghaiDate(new Date(lastPoint.timestamp * 1000)) : undefined;
       const belowDaily = checkPrice != null && priceBelowDailyMa4AndMa7(bars, checkPrice, today);
-      const marks = intradayExtremes(points, { etf, belowDailyMa4AndMa7: belowDaily }).map((mark) => ({
+      const marks = intradayExtremes(points, {
+        etf,
+        belowDailyMa4AndMa7: belowDaily,
+        priorPrices: priorCloses,
+      }).map((mark) => ({
         time: points[mark.index].timestamp as UTCTimestamp,
         price: mark.price,
         side: mark.side,
@@ -782,7 +787,7 @@ export default function ChartView({
           {loading
             ? "加载中…"
             : mode === "trend"
-              ? "黄线现价 · 蓝线均价 · 下图 MACDFS(12,26,9) · 先底后顶；9:45后相对1.5%/ETF0.5%也可先标底 · 顶可信度看高位，底可信度看低位，70以上才标 · 14:45到14:52若只有底没有70顶且现价比底高则标顶 · 14:50现价仍低于日线MA4和MA7则标清仓离场"
+              ? "黄线现价 · 蓝线均价 · 下图 MACDFS(12,26,9，接昨尾盘1分钟EMA) · 先底后顶；9:45后相对1.5%/ETF0.5%也可先标底 · 顶可信度看高位，底可信度看低位，70以上才标 · 14:45到14:52若只有底没有70顶且现价比底高则标顶 · 14:50现价仍低于日线MA4和MA7则标清仓离场"
               : mode === "day"
                 ? "红MA4 · 青MA7 · 黄MA20 · 近5日收盘斜率仍向上但变弱为顶，仍向下但变弱为底 · 收盘低于下降的20日线超过8%不算底"
                 : `红MA4 · 青MA7 · 黄MA20 · 4上穿7且站上20买 · 4下穿7或跌破20卖 · 买 ${ribbonCounts.buy} 卖 ${ribbonCounts.sell}`}

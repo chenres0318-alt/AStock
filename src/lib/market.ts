@@ -5,7 +5,8 @@ import { firstOk } from "./http";
 import { getMarketStatus } from "./market-status";
 import { fetchEastMoneyMainNet, fetchEastMoneySearch } from "./sources/eastmoney";
 import { fetchSinaIndustries, fetchSinaRank, fetchSinaSuggest } from "./sources/sina";
-import { fetchTencentKline, fetchTencentQuotes, fetchTencentTrend } from "./sources/tencent";
+import { pickPriorCloses } from "./intradayExtreme";
+import { fetchTencentKline, fetchTencentMinuteKline, fetchTencentQuotes, fetchTencentTrend } from "./sources/tencent";
 import type {
   KBar,
   KlinePeriod,
@@ -52,8 +53,16 @@ export async function getTrend(code: string): Promise<{
   points: TrendPoint[];
   preClose: number | null;
   tradeDate: string | null;
+  priorCloses: number[];
 }> {
-  return cached(`trend:${toTencentCode(code)}`, 4000, () => fetchTencentTrend(code));
+  const tx = toTencentCode(code);
+  return cached(`trend:${tx}`, 4000, async () => {
+    const [trend, minutes] = await Promise.all([
+      fetchTencentTrend(code),
+      cached(`mkline:${tx}`, 60_000, () => fetchTencentMinuteKline(code)).catch(() => []),
+    ]);
+    return { ...trend, priorCloses: pickPriorCloses(minutes, trend.tradeDate) };
+  });
 }
 
 export async function getSearch(keyword: string): Promise<SearchItem[]> {

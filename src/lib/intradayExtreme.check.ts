@@ -6,6 +6,7 @@ import {
   linearSlope,
   markConfidence,
   pairSwingCovers,
+  pickPriorCloses,
   positionIndex,
   sessionRangeAfter,
   macdfsSeries,
@@ -491,6 +492,36 @@ const etfPop = session(
 assert(intradayExtremes(etfPop, { etf: true }).every((mark) => mark.side !== "top"), "an ETF also waits for a bottom before marking a top");
 assert(intradayExtremes(etfPop).length === 0, "the same 0.6 percent pop is not enough to open a stock top");
 assert(shapeExtremes(etfPop, { etf: true }).length === 0, "without the live swing door that small ETF pop is not a shape top");
+
+const coldOpen = Array.from({ length: 40 }, (_, i) => 10 + i * 0.01);
+assert(macdfsSeries(coldOpen)[32] == null, "without yesterday bars MACDFS is still warming at the 33rd minute");
+assert(macdfsSeries(coldOpen)[33] != null, "MACDFS(12,26,9) first prints on the 34th minute of a cold open");
+
+const prior40 = Array.from({ length: 40 }, (_, i) => 20 + Math.sin(i / 4) * 0.3);
+const todayOpen = [20.4, 20.5, 20.45, 20.6];
+const seeded = macdfsSeries(todayOpen, prior40);
+const combined = macdfsSeries([...prior40, ...todayOpen]);
+assert(seeded[0] != null, "40 prior 1-minute closes seed EMA so today's 9:30 already has MACDFS");
+assert(
+  seeded.every((bar, index) => {
+    const full = combined[prior40.length + index];
+    return bar != null && full != null && Math.abs(bar.dif - full.dif) < 1e-12 && Math.abs(bar.dea - full.dea) < 1e-12;
+  }),
+  "today's MACDFS continues from yesterday's ending EMA rather than restarting",
+);
+
+const prior26 = Array.from({ length: 26 }, () => 15);
+assert(macdfsSeries(todayOpen, prior26)[0] == null, "26 prior closes warm EMA26 but DEA still needs a few more minutes");
+assert(macdfsSeries(todayOpen, Array.from({ length: 34 }, () => 15))[0] != null, "34 prior closes also seed DEA so 9:30 has a histogram");
+
+const mkline = [
+  ...Array.from({ length: 50 }, (_, i) => ({ date: "20261022", close: 10 + i * 0.01 })),
+  ...Array.from({ length: 10 }, (_, i) => ({ date: "20261023", close: 11 + i * 0.01 })),
+];
+const picked = pickPriorCloses(mkline, "20261023");
+assert(picked.length === 40 && picked[0] === 10.1 && picked.at(-1) === 10.49, "prior closes take the last 40 bars of the previous session");
+assert(pickPriorCloses(mkline.slice(0, 20), "20261023").length === 0, "fewer than 26 prior bars are not used as an EMA seed");
+assert(pickPriorCloses(mkline, "2026-10-23").length === 40, "a dashed trade date still selects yesterday's closes");
 
 console.log(
   "intradayExtreme.check ok",

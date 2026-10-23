@@ -19,6 +19,8 @@
  * 看盘默认只标可信度 70 及以上的顶底；区间展开后不够 70 的会藏掉。
  * 到 14:45 还只有底、没有 70 以上的顶时，14:45 到 14:52 的现价只要比底高就标成顶。
  * 尾盘 14:50 现价仍同时低于日线 MA4 和 MA7 时，标清仓离场。
+ * MACDFS 仍用 12/26/9。单独从今天 9:30 起算时，EMA26 和 DEA9 要到约 10:04 才有柱。
+ * 方案 A：带上前一个交易日尾盘至少 26 根 1 分钟收盘，用昨收处的 EMA 当初始状态，再接着算今天。
  */
 
 /** 个股一对顶底至少要有这么多相对波动。 */
@@ -50,6 +52,14 @@ const FORCE_TOP_END = "14:52";
 const CLEAR_EXIT_DEADLINE = "14:50";
 /** 看盘默认只标可信度达到这一档的顶底。 */
 export const MIN_MARK_CONFIDENCE = 70;
+/** MACDFS 快线、慢线、信号线，参数保持 12/26/9。 */
+export const MACDFS_FAST = 12;
+export const MACDFS_SLOW = 26;
+export const MACDFS_SIGNAL = 9;
+/** 昨尾盘至少这么多 1 分钟收盘，EMA26 才能接到今天开盘。 */
+export const MACDFS_PRIOR_MIN = 26;
+/** 实际多取一些，让 DEA(9) 在昨收就成型，今天 9:30 就有柱。 */
+export const MACDFS_PRIOR_BARS = 40;
 
 export type IntradayMinute = {
   time: string;
@@ -96,9 +106,9 @@ function emaSeries(values: number[], period: number): Array<number | null> {
   return out;
 }
 
-export function macdfsSeries(prices: number[]): Array<MacdfsBar | null> {
-  const ema12 = emaSeries(prices, 12);
-  const ema26 = emaSeries(prices, 26);
+function macdfsFrom(prices: number[]): Array<MacdfsBar | null> {
+  const ema12 = emaSeries(prices, MACDFS_FAST);
+  const ema26 = emaSeries(prices, MACDFS_SLOW);
   const difVals: number[] = [];
   const map: number[] = [];
   for (let i = 0; i < prices.length; i += 1) {
@@ -106,7 +116,7 @@ export function macdfsSeries(prices: number[]): Array<MacdfsBar | null> {
     difVals.push(ema12[i]! - ema26[i]!);
     map.push(i);
   }
-  const deaVals = emaSeries(difVals, 9);
+  const deaVals = emaSeries(difVals, MACDFS_SIGNAL);
   const out: Array<MacdfsBar | null> = Array(prices.length).fill(null);
   for (let j = 0; j < difVals.length; j += 1) {
     if (deaVals[j] == null) continue;
@@ -115,6 +125,37 @@ export function macdfsSeries(prices: number[]): Array<MacdfsBar | null> {
     out[map[j]] = { dif, dea, hist: 2 * (dif - dea) };
   }
   return out;
+}
+
+/**
+ * 算 MACDFS(12,26,9)。priorPrices 是前一个交易日尾盘 1 分钟收盘，
+ * 用那段序列结尾的 EMA 当今天的初始状态，再继续往下算。
+ */
+export function macdfsSeries(prices: number[], priorPrices: number[] = []): Array<MacdfsBar | null> {
+  const prefix = priorPrices.filter((price) => Number.isFinite(price) && price > 0);
+  if (!prefix.length) return macdfsFrom(prices);
+  return macdfsFrom([...prefix, ...prices]).slice(prefix.length);
+}
+
+/** 从 1 分钟 K 线里取出前一个交易日尾盘收盘价，至少 min 根，最多 take 根。 */
+export function pickPriorCloses(
+  bars: Array<{ date: string; close: number }>,
+  today: string | null,
+  take = MACDFS_PRIOR_BARS,
+  min = MACDFS_PRIOR_MIN,
+): number[] {
+  if (!bars.length) return [];
+  const todayKey = (today ?? "").replace(/-/g, "").slice(0, 8);
+  const dates = Array.from(new Set(bars.map((bar) => bar.date))).sort();
+  const priorDate = todayKey
+    ? [...dates].reverse().find((date) => date < todayKey)
+    : dates.length >= 2
+      ? dates[dates.length - 2]
+      : null;
+  if (!priorDate) return [];
+  const prior = bars.filter((bar) => bar.date === priorDate && Number.isFinite(bar.close) && bar.close > 0);
+  if (prior.length < min) return [];
+  return prior.slice(-take).map((bar) => bar.close);
 }
 
 /** 分时价的 KDJ(9,3,3)。没有高低开，就用这 9 分钟现价的最高最低。 */
@@ -211,9 +252,9 @@ function emaOnSeries(values: number[], period: number): Array<number | null> {
   return [...Array(start).fill(null), ...emaSeries(tail, period)];
 }
 
-function slopeCandidates(points: IntradayMinute[]): Candidate[] {
+function slopeCandidates(points: IntradayMinute[], priorPrices: number[] = []): Candidate[] {
   const prices = points.map((point) => point.price);
-  const macd = macdfsSeries(prices);
+  const macd = macdfsSeries(prices, priorPrices);
   const kdj = kdjSeries(prices);
   const hist = macd.map((bar) => bar?.hist ?? Number.NaN);
   const priceEma = emaSeries(prices, WINDOW);
@@ -324,6 +365,7 @@ export function intradayExtremes(
     minConfidence?: number;
     openFirst?: "either" | "bottom";
     belowDailyMa4AndMa7?: boolean;
+    priorPrices?: number[];
   },
 ): IntradayMark[] {
   if (points.length < WINDOW + 2) return [];
@@ -337,7 +379,7 @@ export function intradayExtremes(
   let openTop: Candidate | null = null;
   let topFirst = false;
   const pending = new Map<number, Candidate>();
-  for (const candidate of slopeCandidates(points)) pending.set(candidate.index, candidate);
+  for (const candidate of slopeCandidates(points, options?.priorPrices ?? [])) pending.set(candidate.index, candidate);
   let runHigh = -Infinity;
   let runLow = Infinity;
 
