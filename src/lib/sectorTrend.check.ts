@@ -284,6 +284,14 @@ assert(
   listMa4CrossStocks(window, [{ code: "sh688001", name: "科创", bars: bounce }]).length === 0,
   "STAR board names are dropped",
 );
+assert(
+  listMa4CrossStocks(window, [{ code: "sz300001", name: "创业", bars: bounce }]).length === 0,
+  "ChiNext 300 names are dropped",
+);
+assert(
+  listMa4CrossStocks(window, [{ code: "sz301001", name: "创业注册", bars: bounce }]).length === 0,
+  "ChiNext 301 names are dropped",
+);
 
 const dipped = listMa4CrossStocks(window, [{ code: "sz000003", name: "回落", bars: bounce, price: 1 }]);
 assert(dipped.length === 1 && dipped[0].belowMa4 && dipped[0].score === 1, "a live print under MA4 stays listed with the stop mark, and still gets the trend-strength point if it is the only name");

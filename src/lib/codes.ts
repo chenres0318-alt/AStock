@@ -116,6 +116,17 @@ export function isStarShare(code: string): boolean {
   return id.startsWith("688") || id.startsWith("689");
 }
 
+/** 创业板：300 / 301。 */
+export function isChiNextShare(code: string): boolean {
+  const id = bareCode(code);
+  return id.startsWith("300") || id.startsWith("301");
+}
+
+/** 科创板或创业板。 */
+export function isGrowthBoardShare(code: string): boolean {
+  return isStarShare(code) || isChiNextShare(code);
+}
+
 export function marketLabel(code: string): string {
   const tx = toTencentCode(code);
   const id = bareCode(tx);
