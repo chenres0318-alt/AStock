@@ -269,16 +269,17 @@ const lastTime = bounceTimes[45];
 const day1Hit = listMa4CrossStocks({ start: bounceTimes[40], end: crossTime }, [{ code: "sh600001", name: "金叉", bars: bounce }]);
 assert(day1Hit.length === 1 && day1Hit[0].time === crossTime, "stand above MA4/MA7, a same-day 4/7 cross, and a red MACD bar is kept");
 
-const day2Hit = listMa4CrossStocks({ start: bounceTimes[40], end: day2 }, [{ code: "sh600001", name: "金叉", bars: bounce }]);
-assert(day2Hit.length === 1 && day2Hit[0].time === crossTime, "the same setup on the second day is still kept");
-
+assert(
+  listMa4CrossStocks({ start: bounceTimes[40], end: day2 }, [{ code: "sh600001", name: "金叉", bars: bounce }]).length === 0,
+  "the same setup on the second day is older than one day",
+);
 assert(
   listMa4CrossStocks({ start: bounceTimes[40], end: day3 }, [{ code: "sh600001", name: "金叉", bars: bounce }]).length === 0,
-  "the same setup on the third day is older than two days",
+  "the same setup on the third day is older than one day",
 );
 assert(
   listMa4CrossStocks({ start: bounceTimes[40], end: lastTime }, [{ code: "sh600001", name: "金叉", bars: bounce }]).length === 0,
-  "a setup that has held past two days is dropped",
+  "a setup that has held past one day is dropped",
 );
 
 const beforeWindow = listMa4CrossStocks(
