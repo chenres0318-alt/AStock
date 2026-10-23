@@ -121,7 +121,7 @@ export async function getSectorTrend(code: string): Promise<SectorTrendReport> {
 /** 最新一根还落在趋势区间里的行业代码。先用指数价格筛，再对候选做成分股确认。 */
 export async function listBoardsInTrend(): Promise<string[]> {
   try {
-    return await cached("boards-in-open-trend", 10 * 60_000, async () => {
+    return await cached("boards-in-open-trend:v3", 10 * 60_000, async () => {
       const boards = await listAllIndustryBoards();
       const klines = await mapPool(boards, 4, async (board) => {
         try {
