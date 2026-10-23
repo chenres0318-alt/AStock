@@ -17,7 +17,7 @@
  * 价位指数看 9:45 之后的日内高低：(现价 - 最低) / (最高 - 最低) × 100。越高越靠近高位，越低越靠近低位。
  * 顶的可信度等于价位指数，底的可信度等于 100 减去价位指数。
  * 看盘默认只标可信度 70 及以上的顶底；区间展开后不够 70 的会藏掉。
- * 到 14:45 还只有底、没有 70 以上的顶时，14:45 后现价只要比底高就标成顶。
+ * 到 14:45 还只有底、没有 70 以上的顶时，14:45 到 14:52 的现价只要比底高就标成顶。
  * 尾盘 14:50 现价仍同时低于日线 MA4 和 MA7 时，标清仓离场。
  */
 
@@ -44,6 +44,8 @@ const RANGE_START = "09:45";
 const RANGE_END = "15:00";
 /** 到这一分钟还没有 70 顶、只剩底时，现价比底高就补一个卖顶。 */
 const FORCE_TOP_DEADLINE = "14:45";
+/** 补卖顶只看到这一分钟的现价，14:52 之后不再跟着走。 */
+const FORCE_TOP_END = "14:52";
 /** 现价仍低于日线 MA4 和 MA7 时，在这一分钟标清仓离场。 */
 const CLEAR_EXIT_DEADLINE = "14:50";
 /** 看盘默认只标可信度达到这一档的顶底。 */
@@ -440,23 +442,23 @@ export function intradayExtremes(
   return withClearExit(points, withForcedSellTop(points, scored), Boolean(options?.belowDailyMa4AndMa7));
 }
 
-function lastPointFrom(points: IntradayMinute[], start: string): number {
+function lastPointFrom(points: IntradayMinute[], start: string, end: string): number {
   let index = -1;
   for (let i = 0; i < points.length; i += 1) {
-    if (points[i].time < start || points[i].time > RANGE_END) continue;
+    if (points[i].time < start || points[i].time > end) continue;
     if (!Number.isFinite(points[i].price) || !(points[i].price > 0)) continue;
     index = i;
   }
   return index;
 }
 
-/** 14:45 已到、可见标记只有底没有顶、现价比底高时，用 14:45 后现价补一个卖顶。 */
+/** 14:45 已到、可见标记只有底没有顶、现价比底高时，用 14:45 到 14:52 的现价补一个卖顶。 */
 function withForcedSellTop(points: IntradayMinute[], marks: IntradayMark[]): IntradayMark[] {
   if (!points.some((point) => point.time >= FORCE_TOP_DEADLINE)) return marks;
   if (marks.some((mark) => mark.side === "top") || !marks.some((mark) => mark.side === "bottom")) return marks;
   const lastBottom = [...marks].reverse().find((mark) => mark.side === "bottom");
   if (!lastBottom) return marks;
-  const index = lastPointFrom(points, FORCE_TOP_DEADLINE);
+  const index = lastPointFrom(points, FORCE_TOP_DEADLINE, FORCE_TOP_END);
   if (index < 0 || !(points[index].price > lastBottom.price)) return marks;
   if (marks.some((mark) => mark.index === index && mark.side === "top")) return marks;
   const range = sessionRangeAfter(points);

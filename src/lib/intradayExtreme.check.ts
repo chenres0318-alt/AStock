@@ -416,13 +416,17 @@ assert(
   intradayExtremes(belowBottom).every((mark) => mark.side !== "top"),
   "after 14:45 a current price still under the bottom does not mint a sell top",
 );
-const closeHigher = withDeadline(laterHigherHigh, [
+const insideWindow = withDeadline(laterHigherHigh, [
   { time: "14:45", price: liveAfterBottom },
-  { time: "15:00", price: liveAfterBottom + 1 },
+  { time: "14:52", price: liveAfterBottom + 0.5 },
+  { time: "14:53", price: liveAfterBottom + 1 },
+  { time: "15:00", price: liveAfterBottom + 2 },
 ]);
+const forcedInsideWindow = intradayExtremes(insideWindow);
 assert(
-  intradayExtremes(closeHigher).some((mark) => mark.side === "top" && mark.time === "15:00" && mark.price === liveAfterBottom + 1),
-  "after 14:45 the forced top follows the latest price as long as it stays above the bottom",
+  forcedInsideWindow.some((mark) => mark.side === "top" && mark.time === "14:52" && mark.price === liveAfterBottom + 0.5) &&
+    !forcedInsideWindow.some((mark) => mark.side === "top" && (mark.time === "14:53" || mark.time === "15:00")),
+  "the forced top follows the latest price only through 14:52, not later prints",
 );
 
 const alreadyHasTop = intradayExtremes(
