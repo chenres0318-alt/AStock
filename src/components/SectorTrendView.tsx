@@ -215,9 +215,9 @@ export default function SectorTrendView() {
             </div>
           ) : null}
           <div className="mt-4 border-t border-line pt-3">
-            <div className="text-sm">站上MA4/MA7上叉转强</div>
+            <div className="text-sm">站上MA4 / MA4上叉MA7</div>
             <div className="mt-1 text-[11px] leading-4 text-mute">
-              收盘站上两条均线，4 上叉 7，金叉起 3 日内有低开高走，MACD 空头减弱或多头增强，且这套信号不超过 3 日
+              现价站上MA4且MA4上叉MA7记1分，多头趋势最大再记1分，按总分从高到低。不含科创板。盘中现价低于MA4则标记止盈止损。
             </div>
             {selected?.maCrosses.length ? (
               <ol className="mt-2 max-h-72 space-y-2 overflow-auto scroll-thin">
@@ -228,12 +228,19 @@ export default function SectorTrendView() {
                       {item.name}
                       <span className="ml-2 text-[11px] text-mute">{displaySymbol(item.code)}</span>
                     </Link>
-                    <span className="num shrink-0 text-mute">{item.time.slice(5)}</span>
+                    <span className="shrink-0 text-right">
+                      <span className="num text-mute">{item.score}分</span>
+                      {item.belowMa4 ? (
+                        <div className="text-[11px] text-up">低于MA4，止盈止损</div>
+                      ) : (
+                        <div className="num text-[11px] text-mute">{item.time.slice(5)}</div>
+                      )}
+                    </span>
                   </li>
                 ))}
               </ol>
             ) : (
-              <EmptyHint text="这段没有站上均线、上叉转强不超过3日的个股" />
+              <EmptyHint text="这段没有现价站上MA4、MA4上叉MA7的个股" />
             )}
           </div>
         </section>
