@@ -370,3 +370,31 @@ assert(
   bearHit.length === 1 && bearHit[0].time === bearWeak[51].time,
   "a 4/7 cross with a low-open high-close still counts when MACD is only a shortening green bar",
 );
+
+function k(time: string, open: number, high: number, low: number, close: number): KBar {
+  return { time, open, high, low, close, volume: 1 };
+}
+
+/** 半导体 10-19 到 10-23：假周六会挡住 10-23 当天启动。 */
+const semi = [
+  k("2026-10-16", 14055, 14064, 13510, 13627),
+  k("2026-10-19", 13529, 13678, 13142, 13537),
+  k("2026-10-20", 13495, 14139, 13420, 13933),
+  k("2026-10-21", 14076, 14256, 13883, 13948),
+  k("2026-10-22", 13968, 14009, 13475, 13535),
+  k("2026-10-23", 13240, 14088, 12788, 14029),
+];
+const semiMembers = membersAheadFrom(semi, semi.length - 1);
+const semiLive = captureSectorTrends(semi, semiMembers);
+assert(
+  semiLive.some((item) => item.status === "open" && item.start === "2026-10-23" && item.end === "2026-10-23"),
+  "Oct 23 itself is an open launch when it is the last bar",
+);
+assert(trendCoversLastBar(semiLive, "2026-10-23"), "the open launch still covers the latest trading day");
+const semiFake = [...semi, { ...semi.at(-1)!, time: "2026-10-24" }];
+const semiBlocked = captureSectorTrends(semiFake, membersAheadFrom(semiFake, semiFake.length - 2));
+assert(
+  !trendCoversLastBar(semiBlocked, semiFake.at(-1)?.time) &&
+    !semiBlocked.some((item) => item.status === "open" && item.start === "2026-10-23"),
+  "a Saturday clone of Oct 23 blocks that launch and leaves no open box on the last bar",
+);

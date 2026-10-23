@@ -3,6 +3,7 @@ import { isTonghuashunBoard, isTonghuashunConcept, isTonghuashunIndustry } from 
 import { toNumber } from "../format";
 import { fetchGbk, fetchUtf, firstOk, retryOk, UpstreamError } from "../http";
 import { mapPool } from "../pool";
+import { isShanghaiWeekend, thsRealtimeTradeDate, withToday } from "../thsRealtime";
 import type { BoardMember, KBar, SectorItem } from "../types";
 
 const LIST_REFERER = "https://q.10jqka.com.cn/thshy/";
@@ -377,9 +378,8 @@ async function fetchTonghuashunToday(code: string): Promise<KBar | null> {
     const payload = parseJsonp<{ items?: Record<string, string> }>(text);
     const items = payload.items;
     if (!items) return null;
-    const stamp = items.time || items.updateTime || "";
-    const date = stamp.slice(0, 10);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+    const date = thsRealtimeTradeDate(items);
+    if (!date || isShanghaiWeekend(date)) return null;
     const open = positive(items["7"]);
     const high = positive(items["8"]);
     const low = positive(items["9"]);
@@ -399,14 +399,6 @@ async function fetchTonghuashunToday(code: string): Promise<KBar | null> {
   } catch {
     return null;
   }
-}
-
-function withToday(bars: KBar[], today: KBar | null): KBar[] {
-  if (!today) return bars;
-  const last = bars.at(-1);
-  if (!last || today.time > last.time) return [...bars, today];
-  if (today.time === last.time) return [...bars.slice(0, -1), today];
-  return bars;
 }
 
 async function fetchTonghuashunHistory(code: string, count: number): Promise<Series> {
@@ -434,8 +426,10 @@ async function fetchTonghuashunHistory(code: string, count: number): Promise<Ser
     const volume = Number(fields[5]);
     const turnover = Number(fields[6]);
     if (!matched || ![open, high, low, close].every((value) => Number.isFinite(value) && value > 0)) continue;
+    const time = `${matched[1]}-${matched[2]}-${matched[3]}`;
+    if (isShanghaiWeekend(time)) continue;
     bars.push({
-      time: `${matched[1]}-${matched[2]}-${matched[3]}`,
+      time,
       open,
       high,
       low,
@@ -453,10 +447,10 @@ export async function fetchTonghuashunSeries(code: string, count = 160): Promise
   if (!isTonghuashunBoard(code)) {
     throw new UpstreamError("请从同花顺行业或概念里选择一个板块", 400);
   }
-  const history = await cached(`ths-kline-hist:${code}:${count}`, 10 * 60_000, () =>
+  const history = await cached(`ths-kline-hist:v2:${code}:${count}`, 10 * 60_000, () =>
     fetchTonghuashunHistory(code, count),
   );
-  const today = await cached(`ths-kline-today:${code}`, 20_000, () => fetchTonghuashunToday(code));
+  const today = await cached(`ths-kline-today:v3:${code}`, 20_000, () => fetchTonghuashunToday(code));
   const room = Math.max(1, count);
   const bars = withToday(history.bars, today).slice(-room);
   return { name: history.name, bars };
