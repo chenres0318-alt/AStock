@@ -18,7 +18,7 @@ function assert(cond: unknown, message: string) {
 }
 
 function shapeExtremes(points: IntradayMinute[], options?: { etf?: boolean }) {
-  return intradayExtremes(points, { ...options, openWithSwing: false });
+  return intradayExtremes(points, { ...options, openWithSwing: false, minConfidence: 0 });
 }
 
 function session(parts: Array<{ n: number; step: number }>, origin: number, avgAt?: (price: number, index: number) => number): IntradayMinute[] {
@@ -339,6 +339,42 @@ const livePair = intradayExtremes(
 assert(
   livePair.length === 2 && livePair[0].side === "top" && livePair[1].side === "bottom",
   "after a live swing top, a 1.5 percent drop still pairs the opposite bottom",
+);
+assert(
+  livePair[0].confidence != null &&
+    livePair[0].confidence >= 70 &&
+    livePair[1].confidence != null &&
+    livePair[1].confidence >= 70,
+  "a live paired top and bottom both keep at least 70 confidence and stay marked",
+);
+
+const laterHigherHigh = session(
+  [
+    { n: 15, step: 0 },
+    { n: 1, step: 0 },
+    { n: 4, step: 0.1 },
+    { n: 4, step: -0.12 },
+    { n: 20, step: 0.5 },
+  ],
+  20,
+);
+const midRangeKept = intradayExtremes(laterHigherHigh, { minConfidence: 0 });
+const midRangeShown = intradayExtremes(laterHigherHigh);
+assert(
+  midRangeKept.some((mark) => mark.side === "top" && mark.confidence != null && mark.confidence < 70),
+  "after a later higher high, the earlier top sits mid-range and falls below 70 confidence",
+);
+assert(
+  midRangeShown.every((mark) => mark.confidence != null && mark.confidence >= 70),
+  "the watch chart hides tops and bottoms whose confidence is under 70",
+);
+assert(
+  midRangeShown.some((mark) => mark.side === "bottom" && mark.confidence === 100),
+  "the session-low bottom still shows because its confidence stays at 100",
+);
+assert(
+  midRangeShown.every((mark) => mark.side !== "top"),
+  "the mid-range top is not marked once confidence is below 70",
 );
 
 const etfPop = session(

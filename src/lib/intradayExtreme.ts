@@ -16,6 +16,7 @@
  * 对面除了再等形态，价格相对达到这档波动也可以直接标，然后开始下一对。
  * 价位指数看 9:45 之后的日内高低：(现价 - 最低) / (最高 - 最低) × 100。越高越靠近高位，越低越靠近低位。
  * 顶的可信度等于价位指数，底的可信度等于 100 减去价位指数。
+ * 看盘默认只标可信度 70 及以上的顶底；区间展开后不够 70 的会藏掉。
  */
 
 /** 个股一对顶底至少要有这么多相对波动。 */
@@ -39,6 +40,8 @@ const BOTTOM_MAX_VOLUME_RATIO = 1.5;
 /** 价位指数从这一分钟起算当日高低，避开开盘前 15 分钟。 */
 const RANGE_START = "09:45";
 const RANGE_END = "15:00";
+/** 看盘默认只标可信度达到这一档的顶底。 */
+export const MIN_MARK_CONFIDENCE = 70;
 
 export type IntradayMinute = {
   time: string;
@@ -307,11 +310,12 @@ function swingMark(points: IntradayMinute[], index: number, side: "top" | "botto
 
 export function intradayExtremes(
   points: IntradayMinute[],
-  options?: { etf?: boolean; openWithSwing?: boolean },
+  options?: { etf?: boolean; openWithSwing?: boolean; minConfidence?: number },
 ): IntradayMark[] {
   if (points.length < WINDOW + 2) return [];
   const etf = Boolean(options?.etf);
   const openWithSwing = options?.openWithSwing !== false;
+  const minConfidence = options?.minConfidence ?? MIN_MARK_CONFIDENCE;
   const marks: Candidate[] = [];
   let seek: "either" | "bottom" | "top" = "either";
   let openBottom: Candidate | null = null;
@@ -407,8 +411,10 @@ export function intradayExtremes(
   }
 
   const range = sessionRangeAfter(points);
-  return marks.map(({ index, time, side, price }) => {
-    const position = positionIndex(price, range);
-    return { index, time, side, price, position, confidence: markConfidence(side, position) };
-  });
+  return marks
+    .map(({ index, time, side, price }) => {
+      const position = positionIndex(price, range);
+      return { index, time, side, price, position, confidence: markConfidence(side, position) };
+    })
+    .filter((mark) => minConfidence <= 0 || (mark.confidence != null && mark.confidence >= minConfidence));
 }
