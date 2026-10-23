@@ -391,36 +391,38 @@ function withDeadline(points: IntradayMinute[], extra: Array<{ time: string; pri
   ];
 }
 
-const morningOnlyBottoms = withDeadline(laterHigherHigh, [{ time: "14:49", price: Math.max(...laterHigherHigh.map((point) => point.price)) }]);
+const morningOnlyBottoms = withDeadline(laterHigherHigh, [{ time: "14:44", price: Math.max(...laterHigherHigh.map((point) => point.price)) }]);
 assert(
-  !morningOnlyBottoms.some((point) => point.time >= "14:50") &&
+  !morningOnlyBottoms.some((point) => point.time >= "14:45") &&
     intradayExtremes(morningOnlyBottoms).every((mark) => mark.side !== "top"),
-  "before 14:50 a tape with only bottoms does not force a sell top",
+  "before 14:45 a tape with only bottoms does not force a sell top",
 );
 
 const lateHigh = Math.max(...laterHigherHigh.map((point) => point.price)) + 2;
+const lastBottomPrice = laterHigherHigh.reduce((low, point) => Math.min(low, point.price), Infinity);
+const liveAfterBottom = lastBottomPrice + 1;
 const bottomsPastDeadline = withDeadline(laterHigherHigh, [
   { time: "14:42", price: lateHigh },
-  { time: "14:50", price: lateHigh - 0.2 },
+  { time: "14:45", price: liveAfterBottom },
 ]);
 const forcedSell = intradayExtremes(bottomsPastDeadline);
 assert(
   forcedSell.some((mark) => mark.side === "bottom") &&
-    forcedSell.some((mark) => mark.side === "top" && mark.time === "14:42" && mark.price === lateHigh),
-  "at 14:50 a tape that still only shows bottoms must mark a sell top at the high by 14:50",
+    forcedSell.some((mark) => mark.side === "top" && mark.time === "14:45" && mark.price === liveAfterBottom),
+  "after 14:45 a tape that still only shows bottoms marks a top at the current price if it is above the bottom",
 );
+const belowBottom = withDeadline(laterHigherHigh, [{ time: "14:45", price: lastBottomPrice - 0.5 }]);
 assert(
-  (forcedSell.find((mark) => mark.side === "top")?.confidence ?? 0) >= 70,
-  "the forced 14:50 sell top sits at the high so confidence stays at least 70",
+  intradayExtremes(belowBottom).every((mark) => mark.side !== "top"),
+  "after 14:45 a current price still under the bottom does not mint a sell top",
 );
 const closeHigher = withDeadline(laterHigherHigh, [
-  { time: "14:42", price: lateHigh },
-  { time: "14:50", price: lateHigh - 0.2 },
-  { time: "15:00", price: lateHigh + 1 },
+  { time: "14:45", price: liveAfterBottom },
+  { time: "15:00", price: liveAfterBottom + 1 },
 ]);
 assert(
-  intradayExtremes(closeHigher).some((mark) => mark.side === "top" && mark.time === "14:42" && mark.price === lateHigh),
-  "a higher 15:00 print does not move the forced sell top off the 14:50 high",
+  intradayExtremes(closeHigher).some((mark) => mark.side === "top" && mark.time === "15:00" && mark.price === liveAfterBottom + 1),
+  "after 14:45 the forced top follows the latest price as long as it stays above the bottom",
 );
 
 const alreadyHasTop = intradayExtremes(
@@ -461,7 +463,13 @@ assert(
   clearExit.some((mark) => mark.side === "clear" && mark.time === "14:50") && clearExit.every((mark) => mark.side !== "top"),
   "at 14:50 a tape still below daily MA4 and MA7 marks 清仓离场 even without a prior top",
 );
-const bottomThenClear = intradayExtremes(bottomsPastDeadline, { belowDailyMa4AndMa7: true });
+const bottomThenClear = intradayExtremes(
+  withDeadline(laterHigherHigh, [
+    { time: "14:45", price: liveAfterBottom },
+    { time: "14:50", price: liveAfterBottom },
+  ]),
+  { belowDailyMa4AndMa7: true },
+);
 assert(
   bottomThenClear.some((mark) => mark.side === "bottom") &&
     bottomThenClear.some((mark) => mark.side === "clear" && mark.time === "14:50"),
