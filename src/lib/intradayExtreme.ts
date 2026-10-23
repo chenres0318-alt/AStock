@@ -12,7 +12,8 @@
  * 同一段连续满足时只标第一分钟。之后顶和底交替。
  * 还没配上对面时，更高的顶要红柱不低于前一个顶的八成才换掉；更低的底直接换掉前一个底。
  * 贴着均价线也可以标。配成一对时，个股顶底波动至少 1.5%，ETF 至少 0.5%。
- * 波动按 (高 - 低) / 低。第一个形态顶或底出现后，对面除了再等形态，价格相对达到这档波动也可以直接标，然后开始下一对。
+ * 波动按 (高 - 低) / 低。9:45 之后相对波动够了也可以先标第一个顶或底，不必等 MACD 形态，盘中就能看到。
+ * 对面除了再等形态，价格相对达到这档波动也可以直接标，然后开始下一对。
  * 价位指数看 9:45 之后的日内高低：(现价 - 最低) / (最高 - 最低) × 100。越高越靠近高位，越低越靠近低位。
  * 顶的可信度等于价位指数，底的可信度等于 100 减去价位指数。
  */
@@ -304,15 +305,21 @@ function swingMark(points: IntradayMinute[], index: number, side: "top" | "botto
   };
 }
 
-export function intradayExtremes(points: IntradayMinute[], options?: { etf?: boolean }): IntradayMark[] {
+export function intradayExtremes(
+  points: IntradayMinute[],
+  options?: { etf?: boolean; openWithSwing?: boolean },
+): IntradayMark[] {
   if (points.length < WINDOW + 2) return [];
   const etf = Boolean(options?.etf);
+  const openWithSwing = options?.openWithSwing !== false;
   const marks: Candidate[] = [];
   let seek: "either" | "bottom" | "top" = "either";
   let openBottom: Candidate | null = null;
   let openTop: Candidate | null = null;
   const pending = new Map<number, Candidate>();
   for (const candidate of slopeCandidates(points)) pending.set(candidate.index, candidate);
+  let runHigh = -Infinity;
+  let runLow = Infinity;
 
   const closeWithTop = (candidate: Candidate) => {
     openTop = candidate;
@@ -328,6 +335,10 @@ export function intradayExtremes(points: IntradayMinute[], options?: { etf?: boo
   };
 
   for (let i = 0; i < points.length; i += 1) {
+    if (points[i].time >= RANGE_START && points[i].time <= RANGE_END && Number.isFinite(points[i].price)) {
+      runHigh = Math.max(runHigh, points[i].price);
+      runLow = Math.min(runLow, points[i].price);
+    }
     const candidate = pending.get(i);
     if (candidate?.side === "top") {
       if (
@@ -371,6 +382,21 @@ export function intradayExtremes(points: IntradayMinute[], options?: { etf?: boo
     }
 
     if (points[i].volume <= 0 || !(points[i].price > 0)) continue;
+    if (
+      openWithSwing &&
+      seek === "either" &&
+      points[i].time >= RANGE_START &&
+      pairSwingCovers(runLow, runHigh, etf)
+    ) {
+      if (points[i].price >= runHigh) {
+        closeWithTop(swingMark(points, i, "top"));
+        continue;
+      }
+      if (points[i].price <= runLow) {
+        closeWithBottom(swingMark(points, i, "bottom"));
+        continue;
+      }
+    }
     if (seek === "top" && openBottom && pairSwingCovers(openBottom.price, points[i].price, etf)) {
       closeWithTop(swingMark(points, i, "top"));
       continue;

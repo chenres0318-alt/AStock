@@ -234,7 +234,8 @@ export default function ChartView({
     const next = marks.flatMap((mark) => {
       const x = chart.timeScale().timeToCoordinate(mark.time);
       const y = series.priceToCoordinate(mark.price);
-      if (x == null || y == null || x < 0 || x > width) return [];
+      if (x == null || y == null) return [];
+      if (x < -48 || x > width + 48) return [];
       const half = mark.position != null ? 248 : 156;
       const left = Math.min(Math.max(x, half), Math.max(half, width - half));
       const top = mark.side === "top" ? Math.max(2, y - 22) : y + 16;
@@ -766,7 +767,7 @@ export default function ChartView({
           {loading
             ? "加载中…"
             : mode === "trend"
-              ? "黄线现价 · 蓝线均价 · 下图 MACDFS(12,26,9) · 形态顶底，或相对1.5%/ETF0.5%即可配对面 · 价位指数为9:45后高低位，顶可信度看高位，底可信度看低位"
+              ? "黄线现价 · 蓝线均价 · 下图 MACDFS(12,26,9) · 形态顶底；9:45后相对1.5%/ETF0.5%也可先标，对面同样可按波动配对 · 价位指数为9:45后高低位，顶可信度看高位，底可信度看低位"
               : mode === "day"
                 ? "红MA4 · 青MA7 · 黄MA20 · 近5日收盘斜率仍向上但变弱为顶，仍向下但变弱为底 · 收盘低于下降的20日线超过8%不算底"
                 : `红MA4 · 青MA7 · 黄MA20 · 4上穿7且站上20买 · 4下穿7或跌破20卖 · 买 ${ribbonCounts.buy} 卖 ${ribbonCounts.sell}`}
