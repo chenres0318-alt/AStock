@@ -17,6 +17,7 @@
  * 价位指数看 9:45 之后的日内高低：(现价 - 最低) / (最高 - 最低) × 100。越高越靠近高位，越低越靠近低位。
  * 顶的可信度等于价位指数，底的可信度等于 100 减去价位指数。
  * 看盘默认只标可信度 70 及以上的顶底；区间展开后不够 70 的会藏掉。
+ * 到 14:50 还只有底、没有 70 以上的顶时，按 9:45 到 14:50 的最高价补一个卖顶。
  */
 
 /** 个股一对顶底至少要有这么多相对波动。 */
@@ -40,6 +41,8 @@ const BOTTOM_MAX_VOLUME_RATIO = 1.5;
 /** 价位指数从这一分钟起算当日高低，避开开盘前 15 分钟。 */
 const RANGE_START = "09:45";
 const RANGE_END = "15:00";
+/** 到这一分钟还没有 70 顶、只剩底时，按高点补一个卖顶。 */
+const FORCE_TOP_DEADLINE = "14:50";
 /** 看盘默认只标可信度达到这一档的顶底。 */
 export const MIN_MARK_CONFIDENCE = 70;
 
@@ -411,10 +414,45 @@ export function intradayExtremes(
   }
 
   const range = sessionRangeAfter(points);
-  return marks
+  const scored = marks
     .map(({ index, time, side, price }) => {
       const position = positionIndex(price, range);
       return { index, time, side, price, position, confidence: markConfidence(side, position) };
     })
     .filter((mark) => minConfidence <= 0 || (mark.confidence != null && mark.confidence >= minConfidence));
+  return withForcedSellTop(points, scored);
+}
+
+function sessionHighMark(points: IntradayMinute[]): IntradayMark | null {
+  let high = -Infinity;
+  let index = -1;
+  for (let i = 0; i < points.length; i += 1) {
+    if (points[i].time < RANGE_START || points[i].time > FORCE_TOP_DEADLINE) continue;
+    if (!Number.isFinite(points[i].price) || !(points[i].price > 0)) continue;
+    if (points[i].price > high) {
+      high = points[i].price;
+      index = i;
+    }
+  }
+  if (index < 0) return null;
+  const range = sessionRangeAfter(points);
+  const position = positionIndex(high, range);
+  return {
+    index,
+    time: points[index].time,
+    side: "top",
+    price: high,
+    position,
+    confidence: markConfidence("top", position),
+  };
+}
+
+/** 14:50 已到、可见标记只有底没有顶时，用 9:45 到 14:50 的最高价补一个卖顶。 */
+function withForcedSellTop(points: IntradayMinute[], marks: IntradayMark[]): IntradayMark[] {
+  if (!points.some((point) => point.time >= FORCE_TOP_DEADLINE)) return marks;
+  if (marks.some((mark) => mark.side === "top") || !marks.some((mark) => mark.side === "bottom")) return marks;
+  const forced = sessionHighMark(points);
+  if (!forced) return marks;
+  if (marks.some((mark) => mark.index === forced.index && mark.side === "top")) return marks;
+  return [...marks, forced].sort((a, b) => a.index - b.index);
 }

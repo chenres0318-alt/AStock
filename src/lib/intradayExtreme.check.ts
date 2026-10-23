@@ -377,6 +377,81 @@ assert(
   "the mid-range top is not marked once confidence is below 70",
 );
 
+function withDeadline(points: IntradayMinute[], extra: Array<{ time: string; price: number }>): IntradayMinute[] {
+  return [
+    ...points,
+    ...extra.map((item) => ({ time: item.time, price: item.price, volume: 1000, avg: item.price })),
+  ];
+}
+
+const morningOnlyBottoms = withDeadline(laterHigherHigh, [{ time: "14:49", price: Math.max(...laterHigherHigh.map((point) => point.price)) }]);
+assert(
+  !morningOnlyBottoms.some((point) => point.time >= "14:50") &&
+    intradayExtremes(morningOnlyBottoms).every((mark) => mark.side !== "top"),
+  "before 14:50 a tape with only bottoms does not force a sell top",
+);
+
+const lateHigh = Math.max(...laterHigherHigh.map((point) => point.price)) + 2;
+const bottomsPastDeadline = withDeadline(laterHigherHigh, [
+  { time: "14:42", price: lateHigh },
+  { time: "14:50", price: lateHigh - 0.2 },
+]);
+const forcedSell = intradayExtremes(bottomsPastDeadline);
+assert(
+  forcedSell.some((mark) => mark.side === "bottom") &&
+    forcedSell.some((mark) => mark.side === "top" && mark.time === "14:42" && mark.price === lateHigh),
+  "at 14:50 a tape that still only shows bottoms must mark a sell top at the high by 14:50",
+);
+assert(
+  (forcedSell.find((mark) => mark.side === "top")?.confidence ?? 0) >= 70,
+  "the forced 14:50 sell top sits at the high so confidence stays at least 70",
+);
+const closeHigher = withDeadline(laterHigherHigh, [
+  { time: "14:42", price: lateHigh },
+  { time: "14:50", price: lateHigh - 0.2 },
+  { time: "15:00", price: lateHigh + 1 },
+]);
+assert(
+  intradayExtremes(closeHigher).some((mark) => mark.side === "top" && mark.time === "14:42" && mark.price === lateHigh),
+  "a higher 15:00 print does not move the forced sell top off the 14:50 high",
+);
+
+const alreadyHasTop = intradayExtremes(
+  withDeadline(
+    session(
+      [
+        { n: 15, step: 0 },
+        { n: 1, step: 0 },
+        { n: 4, step: 0.1 },
+        { n: 4, step: -0.12 },
+      ],
+      20,
+    ),
+    [{ time: "14:50", price: 20.1 }],
+  ),
+);
+assert(
+  alreadyHasTop.some((mark) => mark.side === "top") && alreadyHasTop.filter((mark) => mark.side === "top").length === 1,
+  "a 70-confidence top already on the tape is not doubled at 14:50",
+);
+const liveTopPastDeadline = intradayExtremes(
+  withDeadline(
+    session(
+      [
+        { n: 15, step: 0 },
+        { n: 1, step: 0 },
+        { n: 4, step: 0.1 },
+      ],
+      20,
+    ),
+    [{ time: "14:50", price: 20.2 }],
+  ),
+);
+assert(
+  liveTopPastDeadline.some((mark) => mark.side === "top") && liveTopPastDeadline.every((mark) => mark.side !== "bottom"),
+  "a tape with a top and no bottom does not mint a second forced top at 14:50",
+);
+
 const etfPop = session(
   [
     { n: 15, step: 0 },
