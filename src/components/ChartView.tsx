@@ -14,10 +14,10 @@ import {
   type UTCTimestamp,
 } from "lightweight-charts";
 import { isEtf, priceDigits } from "@/lib/codes";
-import { formatPrice } from "@/lib/format";
+import { formatPrice, shanghaiDate } from "@/lib/format";
 import { dailyExtremes } from "@/lib/dailyExtreme";
 import { intradayExtremes, kdjSeries, macdfsSeries, type KdjBar, type MacdfsBar } from "@/lib/intradayExtreme";
-import { buildMaLines, klineRangeChange, maAt } from "@/lib/indicators";
+import { buildMaLines, klineRangeChange, maAt, priceBelowDailyMa4AndMa7 } from "@/lib/indicators";
 import type { KBar, Quote, TrendPoint } from "@/lib/types";
 
 export type ChartMode = "trend" | "day" | "week" | "month";
@@ -31,7 +31,7 @@ const DIFF_COLOR = "#f4f7fb";
 type ExtremeTag = {
   timeKey: string;
   price: number;
-  side: "top" | "bottom";
+  side: "top" | "bottom" | "clear";
   x: number;
   y: number;
   position?: number | null;
@@ -40,6 +40,7 @@ type ExtremeTag = {
 
 function extremeCaption(tag: ExtremeTag, digits: number): string {
   const price = formatPrice(tag.price, digits);
+  if (tag.side === "clear") return `清仓离场(股价:${price})`;
   const rank =
     tag.position != null && tag.confidence != null ? `，价位指数${tag.position}，可信度${tag.confidence}` : "";
   return tag.side === "top" ? `顶部(股价:${price}${rank})，卖` : `底部(股价:${price}${rank})，买`;
@@ -191,7 +192,13 @@ export default function ChartView({
   const pickedRef = useRef<BarSpan | null>(null);
   const placeRef = useRef<() => void>(() => {});
   const trendMarksRef = useRef<
-    Array<{ time: Time; price: number; side: "top" | "bottom"; position?: number | null; confidence?: number | null }>
+    Array<{
+      time: Time;
+      price: number;
+      side: "top" | "bottom" | "clear";
+      position?: number | null;
+      confidence?: number | null;
+    }>
   >([]);
   const dayMarksRef = useRef<
     Array<{ time: Time; price: number; side: "top" | "bottom"; position?: number | null; confidence?: number | null }>
@@ -238,7 +245,7 @@ export default function ChartView({
       if (x < -48 || x > width + 48) return [];
       const half = mark.position != null ? 248 : 156;
       const left = Math.min(Math.max(x, half), Math.max(half, width - half));
-      const top = mark.side === "top" ? Math.max(2, y - 22) : y + 16;
+      const top = mark.side === "bottom" ? y + 16 : Math.max(2, y - 22);
       return [
         {
           timeKey: String(mark.time),
@@ -551,7 +558,11 @@ export default function ChartView({
           title: "昨收",
         });
       }
-      const marks = intradayExtremes(points, { etf }).map((mark) => ({
+      const lastPoint = trend.points.at(-1);
+      const lastPrice = lastPoint?.price ?? quote?.price ?? null;
+      const today = lastPoint ? shanghaiDate(new Date(lastPoint.timestamp * 1000)) : undefined;
+      const belowDaily = lastPrice != null && priceBelowDailyMa4AndMa7(bars, lastPrice, today);
+      const marks = intradayExtremes(points, { etf, belowDailyMa4AndMa7: belowDaily }).map((mark) => ({
         time: points[mark.index].timestamp as UTCTimestamp,
         price: mark.price,
         side: mark.side,
@@ -562,19 +573,19 @@ export default function ChartView({
       dayMarksRef.current = [];
       line.setMarkers(
         marks.map((mark) =>
-          mark.side === "top"
+          mark.side === "bottom"
             ? {
-                time: mark.time,
-                position: "aboveBar" as const,
-                color: UP,
-                shape: "arrowDown" as const,
-                size: 2,
-              }
-            : {
                 time: mark.time,
                 position: "belowBar" as const,
                 color: DOWN,
                 shape: "arrowUp" as const,
+                size: 2,
+              }
+            : {
+                time: mark.time,
+                position: "aboveBar" as const,
+                color: mark.side === "clear" ? MA20_COLOR : UP,
+                shape: "arrowDown" as const,
                 size: 2,
               },
         ),
@@ -767,7 +778,7 @@ export default function ChartView({
           {loading
             ? "加载中…"
             : mode === "trend"
-              ? "黄线现价 · 蓝线均价 · 下图 MACDFS(12,26,9) · 形态顶底；9:45后相对1.5%/ETF0.5%也可先标，对面同样可按波动配对 · 价位指数为9:45后高低位，顶可信度看高位，底可信度看低位，70以上才标 · 14:50前若只有底没有70顶，按高点补卖顶"
+              ? "黄线现价 · 蓝线均价 · 下图 MACDFS(12,26,9) · 先底后顶；9:45后相对1.5%/ETF0.5%也可先标底 · 顶可信度看高位，底可信度看低位，70以上才标 · 14:50前若只有底没有70顶，按高点补卖顶 · 若先出顶且日线现价同时低于MA4和MA7，14:50标清仓离场"
               : mode === "day"
                 ? "红MA4 · 青MA7 · 黄MA20 · 近5日收盘斜率仍向上但变弱为顶，仍向下但变弱为底 · 收盘低于下降的20日线超过8%不算底"
                 : `红MA4 · 青MA7 · 黄MA20 · 4上穿7且站上20买 · 4下穿7或跌破20卖 · 买 ${ribbonCounts.buy} 卖 ${ribbonCounts.sell}`}
@@ -783,8 +794,8 @@ export default function ChartView({
                 style={{
                   left: tag.x,
                   top: tag.y,
-                  color: tag.side === "top" ? UP : DOWN,
-                  transform: tag.side === "top" ? "translate(-50%, -100%)" : "translate(-50%, 0)",
+                  color: tag.side === "bottom" ? DOWN : tag.side === "clear" ? MA20_COLOR : UP,
+                  transform: tag.side === "bottom" ? "translate(-50%, 0)" : "translate(-50%, -100%)",
                 }}
               >
                 {extremeCaption(tag, digits)}

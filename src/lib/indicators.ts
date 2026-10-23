@@ -61,6 +61,24 @@ export function maAt(values: number[], period: number, index: number): number | 
   return sum / period;
 }
 
+/** 日线现价是否同时低于 MA4 和 MA7。today 有值时，用现价覆盖/补上当日 K 线再算均线。 */
+export function priceBelowDailyMa4AndMa7(bars: KBar[], price: number, today?: string): boolean {
+  if (!Number.isFinite(price) || bars.length < 6) return false;
+  const closes = bars.map((bar) => bar.close);
+  const lastTime = bars.at(-1)?.time;
+  if (today && lastTime) {
+    if (lastTime === today) closes[closes.length - 1] = price;
+    else if (lastTime < today) closes.push(price);
+    else closes[closes.length - 1] = price;
+  } else {
+    closes[closes.length - 1] = price;
+  }
+  const index = closes.length - 1;
+  const ma4 = maAt(closes, 4, index);
+  const ma7 = maAt(closes, 7, index);
+  return ma4 != null && ma7 != null && price < ma4 && price < ma7;
+}
+
 export function macdSeries(closes: number[]): Array<MacdPoint | null> {
   const ema12 = emaSeries(closes, 12);
   const ema26 = emaSeries(closes, 26);

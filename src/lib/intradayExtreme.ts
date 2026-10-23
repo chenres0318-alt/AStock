@@ -9,15 +9,16 @@
  *     并且 KDJ 的 J 在超买区，这一分钟量不低于近 5 分钟均量的六成（有量滞涨，滤掉无量虚顶）。
  * 底：现价在均价线下方，DEA > DIF，两条斜率仍为负但变弱，两条 EMA 下跌变慢，
  *     并且 KDJ 的 J 在超卖区，这一分钟有成交且量不超过近 5 分钟均量的 1.5 倍（滤掉无量和天量杀跌）。
- * 同一段连续满足时只标第一分钟。之后顶和底交替。
+ * 同一段连续满足时只标第一分钟。之后顶和底交替。看盘默认先出底再找顶，先走出的顶不当普通顶。
  * 还没配上对面时，更高的顶要红柱不低于前一个顶的八成才换掉；更低的底直接换掉前一个底。
  * 贴着均价线也可以标。配成一对时，个股顶底波动至少 1.5%，ETF 至少 0.5%。
- * 波动按 (高 - 低) / 低。9:45 之后相对波动够了也可以先标第一个顶或底，不必等 MACD 形态，盘中就能看到。
+ * 波动按 (高 - 低) / 低。9:45 之后相对波动够了也可以先标第一个底，不必等 MACD 形态，盘中就能看到。
  * 对面除了再等形态，价格相对达到这档波动也可以直接标，然后开始下一对。
  * 价位指数看 9:45 之后的日内高低：(现价 - 最低) / (最高 - 最低) × 100。越高越靠近高位，越低越靠近低位。
  * 顶的可信度等于价位指数，底的可信度等于 100 减去价位指数。
  * 看盘默认只标可信度 70 及以上的顶底；区间展开后不够 70 的会藏掉。
  * 到 14:50 还只有底、没有 70 以上的顶时，按 9:45 到 14:50 的最高价补一个卖顶。
+ * 若先走出顶，且当前价在日线上同时低于 MA4 和 MA7，则在 14:50 标清仓离场。
  */
 
 /** 个股一对顶底至少要有这么多相对波动。 */
@@ -56,7 +57,7 @@ export type IntradayMinute = {
 export type IntradayMark = {
   index: number;
   time: string;
-  side: "bottom" | "top";
+  side: "bottom" | "top" | "clear";
   price: number;
   /** 9:45 后日内位置，0 是最低，100 是最高。 */
   position: number | null;
@@ -313,16 +314,24 @@ function swingMark(points: IntradayMinute[], index: number, side: "top" | "botto
 
 export function intradayExtremes(
   points: IntradayMinute[],
-  options?: { etf?: boolean; openWithSwing?: boolean; minConfidence?: number },
+  options?: {
+    etf?: boolean;
+    openWithSwing?: boolean;
+    minConfidence?: number;
+    openFirst?: "either" | "bottom";
+    belowDailyMa4AndMa7?: boolean;
+  },
 ): IntradayMark[] {
   if (points.length < WINDOW + 2) return [];
   const etf = Boolean(options?.etf);
   const openWithSwing = options?.openWithSwing !== false;
   const minConfidence = options?.minConfidence ?? MIN_MARK_CONFIDENCE;
+  const openFirst = options?.openFirst ?? "bottom";
   const marks: Candidate[] = [];
-  let seek: "either" | "bottom" | "top" = "either";
+  const state: { seek: "either" | "bottom" | "top" } = { seek: openFirst === "either" ? "either" : "bottom" };
   let openBottom: Candidate | null = null;
   let openTop: Candidate | null = null;
+  let topFirst = false;
   const pending = new Map<number, Candidate>();
   for (const candidate of slopeCandidates(points)) pending.set(candidate.index, candidate);
   let runHigh = -Infinity;
@@ -331,13 +340,13 @@ export function intradayExtremes(
   const closeWithTop = (candidate: Candidate) => {
     openTop = candidate;
     marks.push(candidate);
-    seek = "bottom";
+    state.seek = "bottom";
     openBottom = null;
   };
   const closeWithBottom = (candidate: Candidate) => {
     openBottom = candidate;
     marks.push(candidate);
-    seek = "top";
+    state.seek = "top";
     openTop = null;
   };
 
@@ -346,10 +355,11 @@ export function intradayExtremes(
       runHigh = Math.max(runHigh, points[i].price);
       runLow = Math.min(runLow, points[i].price);
     }
+    const phase = state.seek;
     const candidate = pending.get(i);
     if (candidate?.side === "top") {
       if (
-        seek === "bottom" &&
+        phase === "bottom" &&
         openTop &&
         candidate.price > openTop.price &&
         candidate.hist >= openTop.hist * REPLACE_HIST_RATIO
@@ -359,30 +369,30 @@ export function intradayExtremes(
         marks.push(candidate);
         continue;
       }
-      if (seek === "either") {
-        openTop = candidate;
-        marks.push(candidate);
-        seek = "bottom";
-        continue;
-      }
-      if (seek === "top" && openBottom && pairSwingCovers(openBottom.price, candidate.price, etf)) {
+      if (phase === "either") {
         closeWithTop(candidate);
         continue;
       }
+      if (phase === "top" && openBottom && pairSwingCovers(openBottom.price, candidate.price, etf)) {
+        closeWithTop(candidate);
+        continue;
+      }
+      if (!openBottom && !openTop) {
+        topFirst = true;
+        continue;
+      }
     } else if (candidate?.side === "bottom") {
-      if (seek === "top" && openBottom && candidate.price < openBottom.price) {
+      if (phase === "top" && openBottom && candidate.price < openBottom.price) {
         dropMark(marks, openBottom);
         openBottom = candidate;
         marks.push(candidate);
         continue;
       }
-      if (seek === "either") {
-        openBottom = candidate;
-        marks.push(candidate);
-        seek = "top";
+      if (phase === "either" || (phase === "bottom" && !openBottom)) {
+        closeWithBottom(candidate);
         continue;
       }
-      if (seek === "bottom" && openTop && pairSwingCovers(candidate.price, openTop.price, etf)) {
+      if (phase === "bottom" && openTop && pairSwingCovers(candidate.price, openTop.price, etf)) {
         closeWithBottom(candidate);
         continue;
       }
@@ -391,24 +401,29 @@ export function intradayExtremes(
     if (points[i].volume <= 0 || !(points[i].price > 0)) continue;
     if (
       openWithSwing &&
-      seek === "either" &&
+      !openBottom &&
+      !openTop &&
       points[i].time >= RANGE_START &&
       pairSwingCovers(runLow, runHigh, etf)
     ) {
-      if (points[i].price >= runHigh) {
-        closeWithTop(swingMark(points, i, "top"));
-        continue;
-      }
       if (points[i].price <= runLow) {
         closeWithBottom(swingMark(points, i, "bottom"));
         continue;
       }
+      if (points[i].price >= runHigh) {
+        if (phase === "either") {
+          closeWithTop(swingMark(points, i, "top"));
+          continue;
+        }
+        topFirst = true;
+        continue;
+      }
     }
-    if (seek === "top" && openBottom && pairSwingCovers(openBottom.price, points[i].price, etf)) {
+    if (phase === "top" && openBottom && pairSwingCovers(openBottom.price, points[i].price, etf)) {
       closeWithTop(swingMark(points, i, "top"));
       continue;
     }
-    if (seek === "bottom" && openTop && pairSwingCovers(points[i].price, openTop.price, etf)) {
+    if (phase === "bottom" && openTop && pairSwingCovers(points[i].price, openTop.price, etf)) {
       closeWithBottom(swingMark(points, i, "bottom"));
     }
   }
@@ -420,7 +435,7 @@ export function intradayExtremes(
       return { index, time, side, price, position, confidence: markConfidence(side, position) };
     })
     .filter((mark) => minConfidence <= 0 || (mark.confidence != null && mark.confidence >= minConfidence));
-  return withForcedSellTop(points, scored);
+  return withClearExit(points, withForcedSellTop(points, scored), topFirst, Boolean(options?.belowDailyMa4AndMa7));
 }
 
 function sessionHighMark(points: IntradayMinute[]): IntradayMark | null {
@@ -455,4 +470,35 @@ function withForcedSellTop(points: IntradayMinute[], marks: IntradayMark[]): Int
   if (!forced) return marks;
   if (marks.some((mark) => mark.index === forced.index && mark.side === "top")) return marks;
   return [...marks, forced].sort((a, b) => a.index - b.index);
+}
+
+function deadlineIndex(points: IntradayMinute[]): number {
+  let after = -1;
+  for (let i = 0; i < points.length; i += 1) {
+    if (points[i].time === FORCE_TOP_DEADLINE) return i;
+    if (after < 0 && points[i].time >= FORCE_TOP_DEADLINE && points[i].time <= RANGE_END) after = i;
+  }
+  return after;
+}
+
+/** 先走出顶、日线现价同时低于 MA4 和 MA7 时，在 14:50 标清仓离场。 */
+function withClearExit(
+  points: IntradayMinute[],
+  marks: IntradayMark[],
+  topFirst: boolean,
+  belowDailyMa4AndMa7: boolean,
+): IntradayMark[] {
+  if (!topFirst || !belowDailyMa4AndMa7) return marks;
+  const index = deadlineIndex(points);
+  if (index < 0) return marks;
+  if (marks.some((mark) => mark.side === "clear" && mark.index === index)) return marks;
+  const clear: IntradayMark = {
+    index,
+    time: points[index].time,
+    side: "clear",
+    price: points[index].price,
+    position: null,
+    confidence: null,
+  };
+  return [...marks, clear].sort((a, b) => a.index - b.index);
 }
