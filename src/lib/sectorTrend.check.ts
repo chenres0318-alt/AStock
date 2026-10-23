@@ -233,15 +233,21 @@ console.log("sectorTrend.check ok", {
   closed: finishedTrends[0].gain,
 });
 
-function isoBar(time: string, close: number): KBar {
-  return { time, open: close, high: close, low: close, close, volume: 1000 };
-}
-
 function datedBars(closes: number[], start = "2026-01-02"): KBar[] {
   const origin = Date.parse(`${start}T00:00:00Z`);
   return closes.map((close, index) => {
     const time = new Date(origin + index * 86_400_000).toISOString().slice(0, 10);
-    return isoBar(time, close);
+    const prev = index > 0 ? closes[index - 1] : close;
+    const rising = close >= prev;
+    const open = Number((rising ? prev * 0.992 : prev * 1.005).toFixed(4));
+    return {
+      time,
+      open,
+      high: Math.max(open, close),
+      low: Math.min(open, close),
+      close,
+      volume: 1000,
+    };
   });
 }
 
@@ -264,22 +270,36 @@ const bounceTimes = bounce.map((bar) => bar.time);
 const crossTime = bounceTimes[41];
 const day2 = bounceTimes[42];
 const day3 = bounceTimes[43];
+const day4 = bounceTimes[44];
 const lastTime = bounceTimes[45];
 
 const day1Hit = listMa4CrossStocks({ start: bounceTimes[40], end: crossTime }, [{ code: "sh600001", name: "金叉", bars: bounce }]);
-assert(day1Hit.length === 1 && day1Hit[0].time === crossTime, "stand above MA4/MA7, a same-day 4/7 cross, and a red MACD bar is kept");
+assert(
+  day1Hit.length === 1 && day1Hit[0].time === crossTime,
+  "stand above MA4/MA7, a same-day 4/7 cross, low-open high-close, and improving MACD is kept",
+);
+
+const day2Hit = listMa4CrossStocks({ start: bounceTimes[40], end: day2 }, [{ code: "sh600001", name: "金叉", bars: bounce }]);
+assert(day2Hit.length === 1 && day2Hit[0].time === crossTime, "the same setup on the second day is still kept");
+
+const day3Hit = listMa4CrossStocks({ start: bounceTimes[40], end: day3 }, [{ code: "sh600001", name: "金叉", bars: bounce }]);
+assert(day3Hit.length === 1 && day3Hit[0].time === crossTime, "the same setup on the third day is still kept");
 
 assert(
-  listMa4CrossStocks({ start: bounceTimes[40], end: day2 }, [{ code: "sh600001", name: "金叉", bars: bounce }]).length === 0,
-  "the same setup on the second day is older than one day",
-);
-assert(
-  listMa4CrossStocks({ start: bounceTimes[40], end: day3 }, [{ code: "sh600001", name: "金叉", bars: bounce }]).length === 0,
-  "the same setup on the third day is older than one day",
+  listMa4CrossStocks({ start: bounceTimes[40], end: day4 }, [{ code: "sh600001", name: "金叉", bars: bounce }]).length === 0,
+  "the same setup on the fourth day is older than three days",
 );
 assert(
   listMa4CrossStocks({ start: bounceTimes[40], end: lastTime }, [{ code: "sh600001", name: "金叉", bars: bounce }]).length === 0,
-  "a setup that has held past one day is dropped",
+  "a setup that has held past three days is dropped",
+);
+
+const gapped = bounce.map((bar, index) =>
+  index === 41 ? { ...bar, open: Number((bounce[40].close * 1.01).toFixed(4)), high: Math.max(bar.close, bounce[40].close * 1.01) } : bar,
+);
+assert(
+  listMa4CrossStocks({ start: bounceTimes[40], end: crossTime }, [{ code: "sh600001", name: "高开", bars: gapped }]).length === 0,
+  "a gap-up open on the cross day is not a low-open high-close",
 );
 
 const beforeWindow = listMa4CrossStocks(
@@ -293,7 +313,7 @@ assert(
   listMa4CrossStocks({ start: stillUnder[8].time, end: stillUnder[20].time }, [
     { code: "sh600002", name: "持平", bars: stillUnder },
   ]).length === 0,
-  "a flat tape is not a stand-and-cross red-bar setup",
+  "a flat tape is not a stand-and-cross improving-MACD setup",
 );
 
 const falling = datedBars(
@@ -304,4 +324,32 @@ assert(
     { code: "sh600003", name: "下跌", bars: falling },
   ]).length === 0,
   "a decline without a 4/7 cross is not kept",
+);
+
+function ma4CrossWhileBearWeakens(): number[] {
+  const closes: number[] = [];
+  let price = 20;
+  for (let i = 0; i < 30; i += 1) {
+    closes.push(Number(price.toFixed(4)));
+    price *= 1.0005;
+  }
+  for (let i = 0; i < 20; i += 1) {
+    price *= 0.996;
+    closes.push(Number(price.toFixed(4)));
+  }
+  for (let i = 0; i < 2; i += 1) {
+    price *= 1.015;
+    closes.push(Number(price.toFixed(4)));
+  }
+  return closes;
+}
+
+const bearWeak = datedBars(ma4CrossWhileBearWeakens());
+const bearHit = listMa4CrossStocks(
+  { start: bearWeak[48].time, end: bearWeak[51].time },
+  [{ code: "sh600004", name: "绿柱缩短", bars: bearWeak }],
+);
+assert(
+  bearHit.length === 1 && bearHit[0].time === bearWeak[51].time,
+  "a 4/7 cross with a low-open high-close still counts when MACD is only a shortening green bar",
 );

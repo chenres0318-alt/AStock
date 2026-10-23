@@ -238,7 +238,7 @@ export type MaCrossStock = {
   time: string;
 };
 
-const MAX_SIGNAL_DAYS = 1;
+const MAX_SIGNAL_DAYS = 3;
 
 function maAt(values: number[], period: number, index: number): number | null {
   if (index < period - 1 || index >= values.length) return null;
@@ -291,18 +291,37 @@ function ma4CrossedUpMa7(closes: number[], index: number): boolean {
   return ma4Prev <= ma7Prev && ma4 > ma7;
 }
 
-/** 收盘站上 4/7 日均线，MA4 在 MA7 上方，MACD 红柱。 */
-function standCrossRed(closes: number[], hist: Array<number | null>, index: number): boolean {
+/** 收盘站上 4/7 日均线，且 4 日线仍在 7 日线上方。 */
+function standAbove(closes: number[], index: number): boolean {
   const ma4 = maAt(closes, 4, index);
   const ma7 = maAt(closes, 7, index);
-  const bar = hist[index];
-  if (ma4 == null || ma7 == null || bar == null) return false;
-  return closes[index] > ma4 && closes[index] > ma7 && ma4 > ma7 && bar > 0;
+  if (ma4 == null || ma7 == null) return false;
+  return closes[index] > ma4 && closes[index] > ma7 && ma4 > ma7;
+}
+
+/** 低开高走：开盘低于昨收，收盘高于开盘。 */
+function lowOpenHighWalk(bars: KBar[], index: number): boolean {
+  if (index < 1) return false;
+  const bar = bars[index];
+  const prevClose = bars[index - 1].close;
+  if (!(prevClose > 0) || !(bar.open > 0)) return false;
+  return bar.open < prevClose && bar.close > bar.open;
 }
 
 /**
- * 板块这段趋势的最新一根上，收盘站上 MA4 和 MA7、4 日线上叉 7 日线后仍在上方、MACD 红柱，
- * 并且这套信号从金叉那天起只成立当天（不超过 1 日）。
+ * MACD 柱比前一日更高：绿柱缩短是空头减弱，红柱变长是多头增强。
+ * 不要求当天必须是红柱。
+ */
+function macdImproving(hist: Array<number | null>, index: number): boolean {
+  const cur = hist[index];
+  const prev = hist[index - 1];
+  if (cur == null || prev == null) return false;
+  return cur > prev;
+}
+
+/**
+ * 板块这段趋势的最新一根上，收盘站上 MA4 和 MA7、4 日线上叉 7 日线后仍在上方，
+ * 金叉当天低开高走，且当天 MACD 空头减弱或多头增强，从金叉起连续成立不超过 3 日。
  */
 export function listMa4CrossStocks(
   segment: { start: string; end: string },
@@ -317,16 +336,18 @@ export function listMa4CrossStocks(
       const time = stock.bars[i].time;
       if (time >= segment.start && time <= segment.end) last = i;
     }
-    if (last < 0 || !standCrossRed(closes, hist, last)) continue;
+    if (last < 0 || !standAbove(closes, last)) continue;
     let days = 0;
     let cursor = last;
-    while (cursor >= 0 && standCrossRed(closes, hist, cursor)) {
+    while (cursor >= 0 && standAbove(closes, cursor)) {
       days += 1;
       cursor -= 1;
     }
     if (days < 1 || days > MAX_SIGNAL_DAYS) continue;
     const start = last - days + 1;
     if (!ma4CrossedUpMa7(closes, start)) continue;
+    if (!lowOpenHighWalk(stock.bars, start)) continue;
+    if (!macdImproving(hist, start)) continue;
     if (stock.bars[start].time < segment.start) continue;
     hits.push({ code: stock.code, name: stock.name, time: stock.bars[start].time });
   }
