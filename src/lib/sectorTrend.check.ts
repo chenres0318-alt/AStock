@@ -237,30 +237,70 @@ function isoBar(time: string, close: number): KBar {
   return { time, open: close, high: close, low: close, close, volume: 1000 };
 }
 
-function closesToBars(closes: number[], start = "2026-04-01"): KBar[] {
+function datedBars(closes: number[], start = "2026-01-02"): KBar[] {
+  const origin = Date.parse(`${start}T00:00:00Z`);
   return closes.map((close, index) => {
-    const day = String(index + 1).padStart(2, "0");
-    return isoBar(`${start.slice(0, 8)}${day}`, close);
+    const time = new Date(origin + index * 86_400_000).toISOString().slice(0, 10);
+    return isoBar(time, close);
   });
 }
 
-const flatThenJump = closesToBars([...Array(12).fill(10), 20, 20, 20]);
-const inside = listMa4CrossStocks(
-  { start: "2026-04-10", end: "2026-04-15" },
-  [{ code: "sh600001", name: "上穿", bars: flatThenJump }],
+function downThenUp(down = 40, up = 6, start = 20, downStep = 0.4, upStep = 1.8): number[] {
+  const closes: number[] = [];
+  let price = start;
+  for (let i = 0; i < down; i += 1) {
+    price *= 1 - downStep / 100;
+    closes.push(Number(price.toFixed(4)));
+  }
+  for (let i = 0; i < up; i += 1) {
+    price *= 1 + upStep / 100;
+    closes.push(Number(price.toFixed(4)));
+  }
+  return closes;
+}
+
+const bounce = datedBars(downThenUp());
+const bounceTimes = bounce.map((bar) => bar.time);
+const crossTime = bounceTimes[41];
+const day2 = bounceTimes[42];
+const day3 = bounceTimes[43];
+const lastTime = bounceTimes[45];
+
+const day1Hit = listMa4CrossStocks({ start: bounceTimes[40], end: crossTime }, [{ code: "sh600001", name: "金叉", bars: bounce }]);
+assert(day1Hit.length === 1 && day1Hit[0].time === crossTime, "stand above MA4/MA7, a same-day 4/7 cross, and a red MACD bar is kept");
+
+const day2Hit = listMa4CrossStocks({ start: bounceTimes[40], end: day2 }, [{ code: "sh600001", name: "金叉", bars: bounce }]);
+assert(day2Hit.length === 1 && day2Hit[0].time === crossTime, "the same setup on the second day is still kept");
+
+assert(
+  listMa4CrossStocks({ start: bounceTimes[40], end: day3 }, [{ code: "sh600001", name: "金叉", bars: bounce }]).length === 0,
+  "the same setup on the third day is older than two days",
 );
-assert(inside.length === 1 && inside[0].time === "2026-04-13", "MA4 crossing above MA7 inside the trend is kept");
+assert(
+  listMa4CrossStocks({ start: bounceTimes[40], end: lastTime }, [{ code: "sh600001", name: "金叉", bars: bounce }]).length === 0,
+  "a setup that has held past two days is dropped",
+);
 
 const beforeWindow = listMa4CrossStocks(
-  { start: "2026-04-14", end: "2026-04-15" },
-  [{ code: "sh600001", name: "上穿", bars: flatThenJump }],
+  { start: day2, end: day2 },
+  [{ code: "sh600001", name: "金叉", bars: bounce }],
 );
-assert(beforeWindow.length === 0, "a 4/7 cross before this trend is left out");
+assert(beforeWindow.length === 0, "a cross that started before this trend is left out");
 
-const stillUnder = closesToBars(Array.from({ length: 16 }, () => 10));
+const stillUnder = datedBars(Array.from({ length: 46 }, () => 10));
 assert(
-  listMa4CrossStocks({ start: "2026-04-08", end: "2026-04-16" }, [
+  listMa4CrossStocks({ start: stillUnder[8].time, end: stillUnder[20].time }, [
     { code: "sh600002", name: "持平", bars: stillUnder },
   ]).length === 0,
-  "MA4 sitting on MA7 is not an upward cross",
+  "a flat tape is not a stand-and-cross red-bar setup",
+);
+
+const falling = datedBars(
+  Array.from({ length: 46 }, (_, i) => Number((20 - i * 0.12).toFixed(4))),
+);
+assert(
+  listMa4CrossStocks({ start: falling[30].time, end: falling[45].time }, [
+    { code: "sh600003", name: "下跌", bars: falling },
+  ]).length === 0,
+  "a decline without a 4/7 cross is not kept",
 );

@@ -234,28 +234,76 @@ function walkSegments(
 export type MaCrossStock = {
   code: string;
   name: string;
-  /** 这段趋势里最近一次 4 日均线上穿 7 日均线的交易日。 */
+  /** 这段信号开始的交易日，也就是 4 日均线上穿 7 日均线那天。 */
   time: string;
 };
 
-/** 前一日 MA4 还不超过 MA7，当日 MA4 升到 MA7 之上。 */
-function maAtClose(closes: number[], period: number, index: number): number | null {
-  if (index < period - 1 || index >= closes.length) return null;
+const MAX_SIGNAL_DAYS = 2;
+
+function maAt(values: number[], period: number, index: number): number | null {
+  if (index < period - 1 || index >= values.length) return null;
   let sum = 0;
-  for (let i = index - period + 1; i <= index; i += 1) sum += closes[i];
+  for (let i = index - period + 1; i <= index; i += 1) sum += values[i];
   return sum / period;
 }
 
+function emaSeries(values: number[], period: number): Array<number | null> {
+  const out: Array<number | null> = Array(values.length).fill(null);
+  if (values.length < period) return out;
+  const k = 2 / (period + 1);
+  let sum = 0;
+  for (let i = 0; i < period; i += 1) sum += values[i];
+  let prev = sum / period;
+  out[period - 1] = prev;
+  for (let i = period; i < values.length; i += 1) {
+    prev = values[i] * k + prev * (1 - k);
+    out[i] = prev;
+  }
+  return out;
+}
+
+function macdHist(closes: number[]): Array<number | null> {
+  const ema12 = emaSeries(closes, 12);
+  const ema26 = emaSeries(closes, 26);
+  const difVals: number[] = [];
+  const map: number[] = [];
+  for (let i = 0; i < closes.length; i += 1) {
+    if (ema12[i] == null || ema26[i] == null) continue;
+    difVals.push(ema12[i]! - ema26[i]!);
+    map.push(i);
+  }
+  const deaVals = emaSeries(difVals, 9);
+  const out: Array<number | null> = Array(closes.length).fill(null);
+  for (let j = 0; j < difVals.length; j += 1) {
+    if (deaVals[j] == null) continue;
+    out[map[j]] = 2 * (difVals[j] - deaVals[j]!);
+  }
+  return out;
+}
+
+/** 前一日 MA4 还不超过 MA7，当日 MA4 升到 MA7 之上。 */
 function ma4CrossedUpMa7(closes: number[], index: number): boolean {
-  const ma4 = maAtClose(closes, 4, index);
-  const ma4Prev = maAtClose(closes, 4, index - 1);
-  const ma7 = maAtClose(closes, 7, index);
-  const ma7Prev = maAtClose(closes, 7, index - 1);
+  const ma4 = maAt(closes, 4, index);
+  const ma4Prev = maAt(closes, 4, index - 1);
+  const ma7 = maAt(closes, 7, index);
+  const ma7Prev = maAt(closes, 7, index - 1);
   if (ma4 == null || ma4Prev == null || ma7 == null || ma7Prev == null) return false;
   return ma4Prev <= ma7Prev && ma4 > ma7;
 }
 
-/** 板块这段趋势的日期里，日线出现过 MA4 上穿 MA7 的成分股。多次上穿只留最近一次。 */
+/** 收盘站上 4/7 日均线，MA4 在 MA7 上方，MACD 红柱。 */
+function standCrossRed(closes: number[], hist: Array<number | null>, index: number): boolean {
+  const ma4 = maAt(closes, 4, index);
+  const ma7 = maAt(closes, 7, index);
+  const bar = hist[index];
+  if (ma4 == null || ma7 == null || bar == null) return false;
+  return closes[index] > ma4 && closes[index] > ma7 && ma4 > ma7 && bar > 0;
+}
+
+/**
+ * 板块这段趋势的最新一根上，收盘站上 MA4 和 MA7、4 日线上叉 7 日线后仍在上方、MACD 红柱，
+ * 并且这套信号从金叉那天起连续成立不超过 2 日。
+ */
 export function listMa4CrossStocks(
   segment: { start: string; end: string },
   stocks: Array<{ code: string; name: string; bars: KBar[] }>,
@@ -263,13 +311,24 @@ export function listMa4CrossStocks(
   const hits: MaCrossStock[] = [];
   for (const stock of stocks) {
     const closes = stock.bars.map((bar) => bar.close);
-    let latest: string | null = null;
-    for (let i = 1; i < stock.bars.length; i += 1) {
+    const hist = macdHist(closes);
+    let last = -1;
+    for (let i = 0; i < stock.bars.length; i += 1) {
       const time = stock.bars[i].time;
-      if (time < segment.start || time > segment.end) continue;
-      if (ma4CrossedUpMa7(closes, i)) latest = time;
+      if (time >= segment.start && time <= segment.end) last = i;
     }
-    if (latest) hits.push({ code: stock.code, name: stock.name, time: latest });
+    if (last < 0 || !standCrossRed(closes, hist, last)) continue;
+    let days = 0;
+    let cursor = last;
+    while (cursor >= 0 && standCrossRed(closes, hist, cursor)) {
+      days += 1;
+      cursor -= 1;
+    }
+    if (days < 1 || days > MAX_SIGNAL_DAYS) continue;
+    const start = last - days + 1;
+    if (!ma4CrossedUpMa7(closes, start)) continue;
+    if (stock.bars[start].time < segment.start) continue;
+    hits.push({ code: stock.code, name: stock.name, time: stock.bars[start].time });
   }
   hits.sort((a, b) => (a.time === b.time ? a.name.localeCompare(b.name, "zh-CN") : a.time < b.time ? 1 : -1));
   return hits;
