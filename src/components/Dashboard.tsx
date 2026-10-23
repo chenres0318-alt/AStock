@@ -173,11 +173,16 @@ export default function Dashboard() {
   useEffect(() => {
     if (!ready) return;
     let cancelled = false;
-    readJson<{ codes: string[] }>("/api/market/sector-trend?list=active", 300_000)
-      .then((data) => {
-        if (!cancelled) setLiveCodes(data.codes ?? []);
-      })
-      .catch(() => undefined);
+    const load = (attempt: number) => {
+      readJson<{ codes: string[] }>("/api/market/sector-trend?list=active", 120_000)
+        .then((data) => {
+          if (!cancelled) setLiveCodes(data.codes ?? []);
+        })
+        .catch(() => {
+          if (!cancelled && attempt < 2) window.setTimeout(() => load(attempt + 1), 2000);
+        });
+    };
+    load(0);
     return () => {
       cancelled = true;
     };
