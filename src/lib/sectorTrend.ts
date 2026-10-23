@@ -308,6 +308,15 @@ function lowOpenHighWalk(bars: KBar[], index: number): boolean {
   return bar.open < prevClose && bar.close > bar.open;
 }
 
+/** 金叉当天到这根（最多 3 日）里，只要有一天低开高走就算。 */
+function lowOpenHighWalkInRange(bars: KBar[], start: number, last: number): boolean {
+  const end = Math.min(last, start + MAX_SIGNAL_DAYS - 1);
+  for (let i = start; i <= end; i += 1) {
+    if (lowOpenHighWalk(bars, i)) return true;
+  }
+  return false;
+}
+
 /**
  * MACD 柱比前一日更高：绿柱缩短是空头减弱，红柱变长是多头增强。
  * 不要求当天必须是红柱。
@@ -321,7 +330,7 @@ function macdImproving(hist: Array<number | null>, index: number): boolean {
 
 /**
  * 板块这段趋势的最新一根上，收盘站上 MA4 和 MA7、4 日线上叉 7 日线后仍在上方，
- * 金叉当天低开高走，且当天 MACD 空头减弱或多头增强，从金叉起连续成立不超过 3 日。
+ * 金叉当天 MACD 空头减弱或多头增强，金叉起 3 日内有低开高走，连续成立不超过 3 日。
  */
 export function listMa4CrossStocks(
   segment: { start: string; end: string },
@@ -346,9 +355,8 @@ export function listMa4CrossStocks(
     if (days < 1 || days > MAX_SIGNAL_DAYS) continue;
     const start = last - days + 1;
     if (!ma4CrossedUpMa7(closes, start)) continue;
-    if (!lowOpenHighWalk(stock.bars, start)) continue;
+    if (!lowOpenHighWalkInRange(stock.bars, start, last)) continue;
     if (!macdImproving(hist, start)) continue;
-    if (stock.bars[start].time < segment.start) continue;
     hits.push({ code: stock.code, name: stock.name, time: stock.bars[start].time });
   }
   hits.sort((a, b) => (a.time === b.time ? a.name.localeCompare(b.name, "zh-CN") : a.time < b.time ? 1 : -1));

@@ -198,7 +198,7 @@ export default function SectorTrendView() {
           <div className="mt-4 border-t border-line pt-3">
             <div className="text-sm">站上MA4/MA7上叉转强</div>
             <div className="mt-1 text-[11px] leading-4 text-mute">
-              收盘站上两条均线，4 上叉 7，首日低开高走，MACD 空头减弱或多头增强，且这套信号不超过 3 日
+              收盘站上两条均线，4 上叉 7，金叉起 3 日内有低开高走，MACD 空头减弱或多头增强，且这套信号不超过 3 日
             </div>
             {selected?.maCrosses.length ? (
               <ol className="mt-2 max-h-72 space-y-2 overflow-auto scroll-thin">
