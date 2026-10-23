@@ -196,8 +196,10 @@ export default function SectorTrendView() {
             </div>
           ) : null}
           <div className="mt-4 border-t border-line pt-3">
-            <div className="text-sm">站上MA4/MA7上叉红柱</div>
-            <div className="mt-1 text-[11px] leading-4 text-mute">收盘站上两条均线，4 上叉 7，MACD 红柱，且这套信号不超过 1 日</div>
+            <div className="text-sm">站上MA4/MA7上叉转强</div>
+            <div className="mt-1 text-[11px] leading-4 text-mute">
+              收盘站上两条均线，4 上叉 7，首日低开高走，MACD 空头减弱或多头增强，且这套信号不超过 3 日
+            </div>
             {selected?.maCrosses.length ? (
               <ol className="mt-2 max-h-72 space-y-2 overflow-auto scroll-thin">
                 {selected.maCrosses.map((item, index) => (
@@ -212,7 +214,7 @@ export default function SectorTrendView() {
                 ))}
               </ol>
             ) : (
-              <EmptyHint text="这段没有站上均线、上叉且红柱不超过1日的个股" />
+              <EmptyHint text="这段没有站上均线、上叉转强不超过3日的个股" />
             )}
           </div>
         </section>
