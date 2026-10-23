@@ -241,9 +241,14 @@ export type MaCrossStock = {
   belowMa4: boolean;
 };
 
-function isStarBoardShare(code: string): boolean {
+function isGrowthBoardShare(code: string): boolean {
   const id = code.replace(/^[a-z]+/i, "").replace(/\D/g, "").slice(-6);
-  return id.startsWith("688") || id.startsWith("689");
+  return (
+    id.startsWith("688") ||
+    id.startsWith("689") ||
+    id.startsWith("300") ||
+    id.startsWith("301")
+  );
 }
 
 function maAt(values: number[], period: number, index: number): number | null {
@@ -282,7 +287,7 @@ type ScoredRow = MaCrossStock & { strength: number };
 /**
  * 这段趋势最新一根上：现价站上 MA4 且 MA4 上叉 MA7 记 1 分，
  * 多头趋势（MA4 相对 MA7 的开口）最大的再记 1 分，按总分从高到低。
- * 不含科创板。现价掉到 MA4 下面仍列出，并标止盈止损。
+ * 不含科创板、创业板。现价掉到 MA4 下面仍列出，并标止盈止损。
  */
 export function listMa4CrossStocks(
   segment: { start: string; end: string },
@@ -290,7 +295,7 @@ export function listMa4CrossStocks(
 ): MaCrossStock[] {
   const rows: ScoredRow[] = [];
   for (const stock of stocks) {
-    if (isStarBoardShare(stock.code)) continue;
+    if (isGrowthBoardShare(stock.code)) continue;
     const closes = stock.bars.map((bar) => bar.close);
     let last = -1;
     for (let i = 0; i < stock.bars.length; i += 1) {

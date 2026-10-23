@@ -1,6 +1,6 @@
 import { listAllIndustryBoards, listBoardMembers, listSelectableBoards } from "./boards";
 import { cached } from "./cache";
-import { isStarShare, isTonghuashunBoard } from "./codes";
+import { isGrowthBoardShare, isTonghuashunBoard } from "./codes";
 import { UpstreamError } from "./http";
 import { mapPool } from "./pool";
 import {
@@ -123,7 +123,7 @@ export async function getSectorTrend(code: string): Promise<SectorTrendReport> {
       .sort((a, b) => (b.gain ?? -999) - (a.gain ?? -999));
     const maCrosses = listMa4CrossStocks(
       segment,
-      stocks.filter((stock) => !isStarShare(stock.code)),
+      stocks.filter((stock) => !isGrowthBoardShare(stock.code)),
     );
     return { ...segment, roster: trendRoster, maCrosses };
   });

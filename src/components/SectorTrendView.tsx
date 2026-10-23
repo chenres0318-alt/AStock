@@ -217,7 +217,7 @@ export default function SectorTrendView() {
           <div className="mt-4 border-t border-line pt-3">
             <div className="text-sm">站上MA4 / MA4上叉MA7</div>
             <div className="mt-1 text-[11px] leading-4 text-mute">
-              现价站上MA4且MA4上叉MA7记1分，多头趋势最大再记1分，按总分从高到低。不含科创板。盘中现价低于MA4则标记止盈止损。
+              现价站上MA4且MA4上叉MA7记1分，多头趋势最大再记1分，按总分从高到低。不含科创板、创业板。盘中现价低于MA4则标记止盈止损。
             </div>
             {selected?.maCrosses.length ? (
               <ol className="mt-2 max-h-72 space-y-2 overflow-auto scroll-thin">
