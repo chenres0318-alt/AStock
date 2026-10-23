@@ -44,9 +44,10 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<ChartMode>("trend");
   const [bars, setBars] = useState<KBar[]>([]);
-  const [trend, setTrend] = useState<{ points: TrendPoint[]; preClose: number | null }>({
+  const [trend, setTrend] = useState<{ points: TrendPoint[]; preClose: number | null; priorCloses: number[] }>({
     points: [],
     preClose: null,
+    priorCloses: [],
   });
   const [chartLoading, setChartLoading] = useState(false);
   const [sectors, setSectors] = useState<SectorItem[]>([]);
@@ -105,10 +106,10 @@ export default function Dashboard() {
     try {
       if (mode === "trend") {
         const [data, day] = await Promise.all([
-          readJson<{ points: TrendPoint[]; preClose: number | null }>(`/api/market/trend?code=${selected}`),
+          readJson<{ points: TrendPoint[]; preClose: number | null; priorCloses?: number[] }>(`/api/market/trend?code=${selected}`),
           readJson<{ bars: KBar[] }>(`/api/market/kline?code=${selected}&period=day`).catch(() => ({ bars: [] as KBar[] })),
         ]);
-        setTrend({ points: data.points, preClose: data.preClose });
+        setTrend({ points: data.points, preClose: data.preClose, priorCloses: data.priorCloses ?? [] });
         if (day.bars.length) setBars(day.bars);
       } else {
         const data = await readJson<{ bars: KBar[] }>(`/api/market/kline?code=${selected}&period=${mode}`);

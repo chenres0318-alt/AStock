@@ -123,6 +123,43 @@ export async function fetchTencentKline(code: string, period: KlinePeriod, count
   return parseKlineRows(preferred);
 }
 
+type MklinePayload = {
+  data?: Record<
+    string,
+    {
+      m1?: unknown[];
+    }
+  >;
+};
+
+export type MinuteBar = {
+  date: string;
+  time: string;
+  close: number;
+};
+
+/** 最近 count 根 1 分钟 K 线，含跨日，用来接昨尾盘 EMA。 */
+export async function fetchTencentMinuteKline(code: string, count = 300): Promise<MinuteBar[]> {
+  const tx = toTencentCode(code);
+  const url = `https://ifzq.gtimg.cn/appstock/app/kline/mkline?param=${tx},m1,,${count}`;
+  const json = await fetchJson<MklinePayload>(url, { referer: "https://gu.qq.com/" });
+  const rows = json.data?.[tx]?.m1 ?? [];
+  const bars: MinuteBar[] = [];
+  for (const row of rows) {
+    if (!Array.isArray(row) || row.length < 3) continue;
+    const stamp = String(row[0]);
+    if (!/^\d{12}$/.test(stamp)) continue;
+    const close = toNumber(row[2]);
+    if (close == null || !(close > 0)) continue;
+    bars.push({
+      date: stamp.slice(0, 8),
+      time: `${stamp.slice(8, 10)}:${stamp.slice(10, 12)}`,
+      close,
+    });
+  }
+  return bars;
+}
+
 type MinutePayload = {
   data?: Record<
     string,
