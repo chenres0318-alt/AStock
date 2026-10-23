@@ -459,7 +459,13 @@ assert(
 const clearExit = intradayExtremes(liveTopPastDeadline, { belowDailyMa4AndMa7: true });
 assert(
   clearExit.some((mark) => mark.side === "clear" && mark.time === "14:50") && clearExit.every((mark) => mark.side !== "top"),
-  "a top-first tape that is below daily MA4 and MA7 marks 清仓离场 at 14:50",
+  "at 14:50 a tape still below daily MA4 and MA7 marks 清仓离场 even without a prior top",
+);
+const bottomThenClear = intradayExtremes(bottomsPastDeadline, { belowDailyMa4AndMa7: true });
+assert(
+  bottomThenClear.some((mark) => mark.side === "bottom") &&
+    bottomThenClear.some((mark) => mark.side === "clear" && mark.time === "14:50"),
+  "a bottom-first tape also marks 清仓离场 at 14:50 when price is still below MA4 and MA7",
 );
 
 const etfPop = session(

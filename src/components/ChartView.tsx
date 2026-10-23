@@ -559,9 +559,13 @@ export default function ChartView({
         });
       }
       const lastPoint = trend.points.at(-1);
-      const lastPrice = lastPoint?.price ?? quote?.price ?? null;
+      const checkPoint =
+        points.find((item) => item.time === "14:50") ??
+        points.find((item) => item.time >= "14:50") ??
+        lastPoint;
+      const checkPrice = checkPoint?.price ?? quote?.price ?? null;
       const today = lastPoint ? shanghaiDate(new Date(lastPoint.timestamp * 1000)) : undefined;
-      const belowDaily = lastPrice != null && priceBelowDailyMa4AndMa7(bars, lastPrice, today);
+      const belowDaily = checkPrice != null && priceBelowDailyMa4AndMa7(bars, checkPrice, today);
       const marks = intradayExtremes(points, { etf, belowDailyMa4AndMa7: belowDaily }).map((mark) => ({
         time: points[mark.index].timestamp as UTCTimestamp,
         price: mark.price,
@@ -778,7 +782,7 @@ export default function ChartView({
           {loading
             ? "加载中…"
             : mode === "trend"
-              ? "黄线现价 · 蓝线均价 · 下图 MACDFS(12,26,9) · 先底后顶；9:45后相对1.5%/ETF0.5%也可先标底 · 顶可信度看高位，底可信度看低位，70以上才标 · 14:50前若只有底没有70顶，按高点补卖顶 · 若先出顶且日线现价同时低于MA4和MA7，14:50标清仓离场"
+              ? "黄线现价 · 蓝线均价 · 下图 MACDFS(12,26,9) · 先底后顶；9:45后相对1.5%/ETF0.5%也可先标底 · 顶可信度看高位，底可信度看低位，70以上才标 · 14:50前若只有底没有70顶，按高点补卖顶 · 14:50现价仍低于日线MA4和MA7则标清仓离场"
               : mode === "day"
                 ? "红MA4 · 青MA7 · 黄MA20 · 近5日收盘斜率仍向上但变弱为顶，仍向下但变弱为底 · 收盘低于下降的20日线超过8%不算底"
                 : `红MA4 · 青MA7 · 黄MA20 · 4上穿7且站上20买 · 4下穿7或跌破20卖 · 买 ${ribbonCounts.buy} 卖 ${ribbonCounts.sell}`}

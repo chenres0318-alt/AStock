@@ -18,7 +18,7 @@
  * 顶的可信度等于价位指数，底的可信度等于 100 减去价位指数。
  * 看盘默认只标可信度 70 及以上的顶底；区间展开后不够 70 的会藏掉。
  * 到 14:50 还只有底、没有 70 以上的顶时，按 9:45 到 14:50 的最高价补一个卖顶。
- * 若先走出顶，且当前价在日线上同时低于 MA4 和 MA7，则在 14:50 标清仓离场。
+ * 尾盘 14:50 现价仍同时低于日线 MA4 和 MA7 时，标清仓离场。
  */
 
 /** 个股一对顶底至少要有这么多相对波动。 */
@@ -435,7 +435,7 @@ export function intradayExtremes(
       return { index, time, side, price, position, confidence: markConfidence(side, position) };
     })
     .filter((mark) => minConfidence <= 0 || (mark.confidence != null && mark.confidence >= minConfidence));
-  return withClearExit(points, withForcedSellTop(points, scored), topFirst, Boolean(options?.belowDailyMa4AndMa7));
+  return withClearExit(points, withForcedSellTop(points, scored), Boolean(options?.belowDailyMa4AndMa7));
 }
 
 function sessionHighMark(points: IntradayMinute[]): IntradayMark | null {
@@ -481,14 +481,13 @@ function deadlineIndex(points: IntradayMinute[]): number {
   return after;
 }
 
-/** 先走出顶、日线现价同时低于 MA4 和 MA7 时，在 14:50 标清仓离场。 */
+/** 14:50 现价仍低于日线 MA4 和 MA7 时，标清仓离场。不要求先出顶。 */
 function withClearExit(
   points: IntradayMinute[],
   marks: IntradayMark[],
-  topFirst: boolean,
   belowDailyMa4AndMa7: boolean,
 ): IntradayMark[] {
-  if (!topFirst || !belowDailyMa4AndMa7) return marks;
+  if (!belowDailyMa4AndMa7) return marks;
   const index = deadlineIndex(points);
   if (index < 0) return marks;
   if (marks.some((mark) => mark.side === "clear" && mark.index === index)) return marks;
