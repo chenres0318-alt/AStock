@@ -20,6 +20,7 @@
  * 看盘默认只标可信度 70 及以上的顶底；区间展开后不够 70 的会藏掉。
  * 到 14:45 还只有底、没有 70 以上的顶时，14:45 到 14:52 的现价只要比底高就标成顶。
  * 尾盘 14:50 现价仍同时低于日线 MA4 和 MA7 时，标清仓离场。
+ * 做T接在这些标记上：先底后买，配成对且波动够的顶才卖；不成对的顶、10:00 前、14:00 后的新底、14:45 补顶和清仓都不做成T。
  * MACDFS 仍用 12/26/9。单独从今天 9:30 起算时，EMA26 和 DEA9 要到约 10:04 才有柱。
  * 方案 A：带上前一个交易日尾盘至少 26 根 1 分钟收盘，用昨收处的 EMA 当初始状态，再接着算今天。
  */
@@ -58,6 +59,12 @@ const FORCE_TOP_DEADLINE = "14:45";
 const FORCE_TOP_END = "14:52";
 /** 现价仍低于日线 MA4 和 MA7 时，在这一分钟标清仓离场。 */
 const CLEAR_EXIT_DEADLINE = "14:50";
+/** 开盘急拉回落走完之前，底也不做成T。 */
+export const T_OPEN_START = "10:00";
+/** 14:00 之后的底来不及再做完一对，不再开新T、不再买回。 */
+export const T_BUY_END = "14:00";
+/** 14:42 之后的顶按清仓处理，不按做T卖。 */
+export const T_SELL_END = "14:42";
 /** 看盘默认只标可信度达到这一档的顶底。 */
 export const MIN_MARK_CONFIDENCE = 70;
 /** MACDFS 快线、慢线、信号线，参数保持 12/26/9。 */
@@ -85,7 +92,14 @@ export type IntradayMark = {
   position: number | null;
   /** 顶看高位、底看低位，0 到 100。 */
   confidence: number | null;
+  /** 形态顶底、14:45 补顶、还是 14:50 清仓。 */
+  origin?: "shape" | "forced" | "clear";
 };
+
+/** 接到现有顶底之后，这一标是不是做成T。 */
+export type TAction = "t-buy" | "t-rebuy" | "t-sell" | "flatten" | "ignore";
+
+export type TTaggedMark = IntradayMark & { t: TAction };
 
 export type MacdfsBar = { dif: number; dea: number; hist: number };
 
@@ -515,10 +529,71 @@ export function intradayExtremes(
   const scored = marks
     .map(({ index, time, side, price }) => {
       const position = positionIndex(price, range);
-      return { index, time, side, price, position, confidence: markConfidence(side, position) };
+      return {
+        index,
+        time,
+        side,
+        price,
+        position,
+        confidence: markConfidence(side, position),
+        origin: "shape" as const,
+      };
     })
     .filter((mark) => minConfidence <= 0 || (mark.confidence != null && mark.confidence >= minConfidence));
   return withClearExit(points, withForcedSellTop(points, scored), Boolean(options?.belowDailyMa4AndMa7));
+}
+
+/**
+ * 用已经标出的底和顶做T：先底后买，配成对的顶才卖。
+ * 不成对的顶、开盘 10:00 前、14:00 后的新底、14:45 补顶、14:50 清仓，都不做成T。
+ */
+export function tagTTrades(marks: IntradayMark[], etf = false): TTaggedMark[] {
+  const ordered = [...marks].sort((a, b) => a.index - b.index);
+  const tagged: TTaggedMark[] = [];
+  let held = false;
+  let lastBuy: IntradayMark | null = null;
+  let opened = false;
+  for (const mark of ordered) {
+    const forcedTop =
+      mark.side === "top" && (mark.origin === "forced" || mark.time >= FORCE_TOP_DEADLINE);
+    if (mark.side === "clear" || mark.origin === "clear") {
+      tagged.push({ ...mark, t: "flatten" });
+      held = false;
+      lastBuy = null;
+      continue;
+    }
+    if (forcedTop) {
+      tagged.push({ ...mark, t: "flatten" });
+      held = false;
+      lastBuy = null;
+      continue;
+    }
+    if (mark.side === "bottom") {
+      if (mark.time < T_OPEN_START || mark.time >= T_BUY_END || held) {
+        tagged.push({ ...mark, t: "ignore" });
+        continue;
+      }
+      tagged.push({ ...mark, t: opened ? "t-rebuy" : "t-buy" });
+      held = true;
+      lastBuy = mark;
+      opened = true;
+      continue;
+    }
+    if (mark.time < T_OPEN_START || !held || lastBuy == null || !pairSwingCovers(lastBuy.price, mark.price, etf)) {
+      tagged.push({ ...mark, t: "ignore" });
+      continue;
+    }
+    if (mark.time >= T_SELL_END) {
+      tagged.push({ ...mark, t: "flatten" });
+      held = false;
+      lastBuy = null;
+      continue;
+    }
+    tagged.push({ ...mark, t: "t-sell" });
+    held = false;
+    lastBuy = null;
+  }
+  return tagged;
 }
 
 function lastPointFrom(points: IntradayMinute[], start: string, end: string): number {
@@ -549,6 +624,7 @@ function withForcedSellTop(points: IntradayMinute[], marks: IntradayMark[]): Int
     price: points[index].price,
     position,
     confidence: markConfidence("top", position),
+    origin: "forced",
   };
   return [...marks, forced].sort((a, b) => a.index - b.index);
 }
@@ -579,6 +655,7 @@ function withClearExit(
     price: points[index].price,
     position: null,
     confidence: null,
+    origin: "clear",
   };
   return [...marks, clear].sort((a, b) => a.index - b.index);
 }

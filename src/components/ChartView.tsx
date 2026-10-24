@@ -16,7 +16,15 @@ import {
 import { isEtf, priceDigits } from "@/lib/codes";
 import { formatPrice, shanghaiDate } from "@/lib/format";
 import { dailyExtremes } from "@/lib/dailyExtreme";
-import { intradayExtremes, kdjSeries, macdfsSeries, type KdjBar, type MacdfsBar } from "@/lib/intradayExtreme";
+import {
+  intradayExtremes,
+  kdjSeries,
+  macdfsSeries,
+  tagTTrades,
+  type KdjBar,
+  type MacdfsBar,
+  type TAction,
+} from "@/lib/intradayExtreme";
 import { buildMaLines, klineRangeChange, maAt, priceBelowDailyMa4AndMa7 } from "@/lib/indicators";
 import type { KBar, Quote, TrendPoint } from "@/lib/types";
 
@@ -36,14 +44,25 @@ type ExtremeTag = {
   y: number;
   position?: number | null;
   confidence?: number | null;
+  t?: TAction;
 };
+
+function tSuffix(t: TAction | undefined, side: ExtremeTag["side"]): string {
+  if (side === "clear" || t === "flatten") return side === "clear" ? "" : "，清仓不做成T";
+  if (t === "t-buy") return "，做T买";
+  if (t === "t-rebuy") return "，做T买回";
+  if (t === "t-sell") return "，做T卖";
+  if (t === "ignore") return "，不做成T";
+  return side === "top" ? "，卖" : "，买";
+}
 
 function extremeCaption(tag: ExtremeTag, digits: number): string {
   const price = formatPrice(tag.price, digits);
   if (tag.side === "clear") return `清仓离场(股价:${price})`;
   const rank =
     tag.position != null && tag.confidence != null ? `，价位指数${tag.position}，可信度${tag.confidence}` : "";
-  return tag.side === "top" ? `顶部(股价:${price}${rank})，卖` : `底部(股价:${price}${rank})，买`;
+  const name = tag.side === "top" ? "顶部" : "底部";
+  return `${name}(股价:${price}${rank})${tSuffix(tag.t, tag.side)}`;
 }
 
 function formatChartTime(time: unknown, withDate: boolean): string {
@@ -198,6 +217,7 @@ export default function ChartView({
       side: "top" | "bottom" | "clear";
       position?: number | null;
       confidence?: number | null;
+      t?: TAction;
     }>
   >([]);
   const dayMarksRef = useRef<
@@ -255,6 +275,7 @@ export default function ChartView({
           y: Math.round(top),
           position: mark.position ?? null,
           confidence: mark.confidence ?? null,
+          t: "t" in mark ? mark.t : undefined,
         },
       ];
     });
@@ -268,7 +289,8 @@ export default function ChartView({
             item.timeKey === next[index].timeKey &&
             item.side === next[index].side &&
             item.position === next[index].position &&
-            item.confidence === next[index].confidence,
+            item.confidence === next[index].confidence &&
+            item.t === next[index].t,
         )
       ) {
         return current;
@@ -567,37 +589,51 @@ export default function ChartView({
       const checkPrice = checkPoint?.price ?? quote?.price ?? null;
       const today = lastPoint ? shanghaiDate(new Date(lastPoint.timestamp * 1000)) : undefined;
       const belowDaily = checkPrice != null && priceBelowDailyMa4AndMa7(bars, checkPrice, today);
-      const marks = intradayExtremes(points, {
+      const marks = tagTTrades(
+        intradayExtremes(points, {
+          etf,
+          belowDailyMa4AndMa7: belowDaily,
+          priorPrices: priorCloses,
+        }),
         etf,
-        belowDailyMa4AndMa7: belowDaily,
-        priorPrices: priorCloses,
-      }).map((mark) => ({
+      ).map((mark) => ({
         time: points[mark.index].timestamp as UTCTimestamp,
         price: mark.price,
         side: mark.side,
         position: mark.position,
         confidence: mark.confidence,
+        t: mark.t,
       }));
       trendMarksRef.current = marks;
       dayMarksRef.current = [];
       line.setMarkers(
-        marks.map((mark) =>
-          mark.side === "bottom"
+        marks.map((mark) => {
+          const tText =
+            mark.t === "t-buy" || mark.t === "t-rebuy"
+              ? "T买"
+              : mark.t === "t-sell"
+                ? "T卖"
+                : mark.t === "flatten" || mark.side === "clear"
+                  ? "清"
+                  : "";
+          return mark.side === "bottom"
             ? {
                 time: mark.time,
                 position: "belowBar" as const,
                 color: DOWN,
                 shape: "arrowUp" as const,
                 size: 2,
+                text: tText,
               }
             : {
                 time: mark.time,
                 position: "aboveBar" as const,
-                color: mark.side === "clear" ? MA20_COLOR : UP,
+                color: mark.side === "clear" || mark.t === "flatten" ? MA20_COLOR : UP,
                 shape: "arrowDown" as const,
                 size: 2,
-              },
-        ),
+                text: tText,
+              };
+        }),
       );
       requestAnimationFrame(() => placeRef.current());
       const trendKey = `trend:${trend.points.length}:${trend.points.at(-1)?.timestamp ?? ""}`;
@@ -787,7 +823,7 @@ export default function ChartView({
           {loading
             ? "加载中…"
             : mode === "trend"
-              ? "黄线现价 · 蓝线均价 · 下图 MACDFS(12,26,9，接昨尾盘1分钟EMA) · 先底后顶；9:45后相对1.5%/ETF0.5%也可先标底 · 9:30到10:00开盘急拉回落不标顶底 · 顶可信度看高位，底可信度看低位，70以上才标 · 14:45到14:52若只有底没有70顶且现价比底高则标顶 · 14:50现价仍低于日线MA4和MA7则标清仓离场"
+              ? "黄线现价 · 蓝线均价 · 下图 MACDFS(12,26,9，接昨尾盘1分钟EMA) · 先底后顶做T：底做T买、配成对的顶做T卖，不成对的顶不卖 · 9:45后相对1.5%/ETF0.5%也可先标底 · 9:30到10:00开盘急拉回落不标顶底、也不做T · 顶可信度看高位，底可信度看低位，70以上才标 · 14:00后的底不开新T · 14:45到14:52补顶和14:50清仓离场都不做成T"
               : mode === "day"
                 ? "红MA4 · 青MA7 · 黄MA20 · 近5日收盘斜率仍向上但变弱为顶，仍向下但变弱为底 · 收盘低于下降的20日线超过8%不算底"
                 : `红MA4 · 青MA7 · 黄MA20 · 4上穿7且站上20买 · 4下穿7或跌破20卖 · 买 ${ribbonCounts.buy} 卖 ${ribbonCounts.sell}`}
