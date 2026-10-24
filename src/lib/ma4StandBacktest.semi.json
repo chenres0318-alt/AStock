@@ -5,25 +5,25 @@
   "indexTo": "2026-10-23",
   "memberCount": 100,
   "stockCount": 95,
-  "fetchedAt": "2026-10-24T17:39:40.777Z",
+  "fetchedAt": "2026-10-24T17:48:06.880Z",
   "results": [
     {
-      "label": "2020.1.1–2023.10.1",
+      "label": "2020.1.1–2023.6.1",
       "entryMode": "box-first-day",
       "sameDayReentry": false,
       "start": "2020-01-01",
-      "end": "2023-10-01",
-      "boxes": 82,
-      "trades": 7,
-      "skippedNoMa4": 57,
+      "end": "2023-06-01",
+      "boxes": 75,
+      "trades": 6,
+      "skippedNoMa4": 54,
       "skippedNoStock": 0,
       "skippedNoCash": 0,
-      "skippedOneDay": 18,
+      "skippedOneDay": 15,
       "capital": 100000,
-      "finalEquity": 105979,
-      "returnPct": 0.05979000000000001,
+      "finalEquity": 105407,
+      "returnPct": 0.05407000000000006,
       "maxDrawdownPct": 0.007986663048113829,
-      "wins": 7,
+      "wins": 6,
       "losses": 0,
       "tradePnls": [
         {
@@ -114,22 +114,7 @@
           "returnPct": 0.10032362459546929,
           "reason": "index-ma4",
           "boxStart": "2023-05-15",
-          "boxEnd": "2023-05-31"
-        },
-        {
-          "name": "*ST闻泰",
-          "code": "sh600745",
-          "standDays": 1,
-          "entry": "2023-06-09",
-          "exit": "2023-06-15",
-          "entryPrice": 49.49,
-          "exitPrice": 50.92,
-          "shares": 400,
-          "pnl": 572,
-          "returnPct": 0.028894726207314703,
-          "reason": "index-ma4",
-          "boxStart": "2023-06-09",
-          "boxEnd": "2023-06-19"
+          "boxEnd": "2023-06-01"
         }
       ],
       "monthlyEquity": [
@@ -298,41 +283,29 @@
           "equity": 105407
         },
         {
-          "time": "2023-06-30",
-          "equity": 105979
-        },
-        {
-          "time": "2023-07-31",
-          "equity": 105979
-        },
-        {
-          "time": "2023-08-31",
-          "equity": 105979
-        },
-        {
-          "time": "2023-09-28",
-          "equity": 105979
+          "time": "2023-06-01",
+          "equity": 105407
         }
       ]
     },
     {
-      "label": "2020.1.1–2023.10.1",
+      "label": "2020.1.1–2023.6.1",
       "entryMode": "first-on-ma4",
       "sameDayReentry": false,
       "start": "2020-01-01",
-      "end": "2023-10-01",
-      "boxes": 82,
-      "trades": 58,
+      "end": "2023-06-01",
+      "boxes": 75,
+      "trades": 54,
       "skippedNoMa4": 1,
       "skippedNoStock": 5,
       "skippedNoCash": 0,
-      "skippedOneDay": 18,
+      "skippedOneDay": 15,
       "capital": 100000,
-      "finalEquity": 129251,
-      "returnPct": 0.29251000000000005,
+      "finalEquity": 124970,
+      "returnPct": 0.24970000000000003,
       "maxDrawdownPct": 0.010313712745416658,
-      "wins": 35,
-      "losses": 23,
+      "wins": 32,
+      "losses": 22,
       "tradePnls": [
         {
           "name": "*ST闻泰",
@@ -1142,67 +1115,7 @@
           "returnPct": 0.10032362459546929,
           "reason": "index-ma4",
           "boxStart": "2023-05-15",
-          "boxEnd": "2023-05-31"
-        },
-        {
-          "name": "*ST闻泰",
-          "code": "sh600745",
-          "standDays": 1,
-          "entry": "2023-06-09",
-          "exit": "2023-06-15",
-          "entryPrice": 49.49,
-          "exitPrice": 50.92,
-          "shares": 400,
-          "pnl": 572,
-          "returnPct": 0.028894726207314703,
-          "reason": "index-ma4",
-          "boxStart": "2023-06-09",
-          "boxEnd": "2023-06-19"
-        },
-        {
-          "name": "德明利",
-          "code": "sz001309",
-          "standDays": 1,
-          "entry": "2023-06-29",
-          "exit": "2023-07-03",
-          "entryPrice": 89.6,
-          "exitPrice": 90.27,
-          "shares": 200,
-          "pnl": 134,
-          "returnPct": 0.007477678571428559,
-          "reason": "stock-ma4",
-          "boxStart": "2023-06-28",
-          "boxEnd": "2023-07-06"
-        },
-        {
-          "name": "*ST闻泰",
-          "code": "sh600745",
-          "standDays": 1,
-          "entry": "2023-07-11",
-          "exit": "2023-07-11",
-          "entryPrice": 50.75,
-          "exitPrice": 50.75,
-          "shares": 300,
-          "pnl": 0,
-          "returnPct": 0,
-          "reason": "box-end",
-          "boxStart": "2023-07-10",
-          "boxEnd": "2023-07-11"
-        },
-        {
-          "name": "大港股份",
-          "code": "sz002077",
-          "standDays": 1,
-          "entry": "2023-08-29",
-          "exit": "2023-09-06",
-          "entryPrice": 14.44,
-          "exitPrice": 17.19,
-          "shares": 1300,
-          "pnl": 3575,
-          "returnPct": 0.19044321329639913,
-          "reason": "box-end",
-          "boxStart": "2023-08-25",
-          "boxEnd": "2023-09-06"
+          "boxEnd": "2023-06-01"
         }
       ],
       "monthlyEquity": [
@@ -1371,40 +1284,28 @@
           "equity": 124970
         },
         {
-          "time": "2023-06-30",
-          "equity": 126222
-        },
-        {
-          "time": "2023-07-31",
-          "equity": 125676
-        },
-        {
-          "time": "2023-08-31",
-          "equity": 128224
-        },
-        {
-          "time": "2023-09-28",
-          "equity": 129251
+          "time": "2023-06-01",
+          "equity": 124970
         }
       ]
     },
     {
-      "label": "2020.1.1–2023.10.1",
+      "label": "2020.1.1–2023.6.1",
       "entryMode": "in-box-on-ma4",
       "sameDayReentry": true,
       "start": "2020-01-01",
-      "end": "2023-10-01",
-      "boxes": 83,
-      "trades": 111,
-      "skippedNoMa4": 10,
+      "end": "2023-06-01",
+      "boxes": 76,
+      "trades": 106,
+      "skippedNoMa4": 9,
       "skippedNoStock": 1,
       "skippedNoCash": 0,
-      "skippedOneDay": 18,
+      "skippedOneDay": 15,
       "capital": 100000,
-      "finalEquity": 4875775,
-      "returnPct": 47.75775,
+      "finalEquity": 3798976,
+      "returnPct": 36.98976,
       "maxDrawdownPct": 0.16404961175908728,
-      "wins": 69,
+      "wins": 64,
       "losses": 42,
       "tradePnls": [
         {
@@ -2980,97 +2881,22 @@
           "returnPct": 0.10032362459546929,
           "reason": "index-ma4",
           "boxStart": "2023-05-15",
-          "boxEnd": "2023-05-31"
+          "boxEnd": "2023-06-01"
         },
         {
           "name": "豪威集团",
           "code": "sh603501",
           "standDays": 1,
           "entry": "2023-05-25",
-          "exit": "2023-05-31",
+          "exit": "2023-06-01",
           "entryPrice": 96.85,
-          "exitPrice": 99.89,
+          "exitPrice": 99.5,
           "shares": 38100,
-          "pnl": 115824,
-          "returnPct": 0.031388745482705316,
+          "pnl": 100965,
+          "returnPct": 0.027361899845121274,
           "reason": "box-end",
           "boxStart": "2023-05-15",
-          "boxEnd": "2023-05-31"
-        },
-        {
-          "name": "*ST闻泰",
-          "code": "sh600745",
-          "standDays": 1,
-          "entry": "2023-06-09",
-          "exit": "2023-06-15",
-          "entryPrice": 49.49,
-          "exitPrice": 50.92,
-          "shares": 77000,
-          "pnl": 110110,
-          "returnPct": 0.028894726207314703,
-          "reason": "index-ma4",
-          "boxStart": "2023-06-09",
-          "boxEnd": "2023-06-19"
-        },
-        {
-          "name": "大港股份",
-          "code": "sz002077",
-          "standDays": 1,
-          "entry": "2023-06-16",
-          "exit": "2023-06-19",
-          "entryPrice": 15.53,
-          "exitPrice": 15.97,
-          "shares": 252600,
-          "pnl": 111144,
-          "returnPct": 0.028332260141661347,
-          "reason": "box-end",
-          "boxStart": "2023-06-09",
-          "boxEnd": "2023-06-19"
-        },
-        {
-          "name": "德明利",
-          "code": "sz001309",
-          "standDays": 1,
-          "entry": "2023-06-29",
-          "exit": "2023-07-03",
-          "entryPrice": 89.6,
-          "exitPrice": 90.27,
-          "shares": 45000,
-          "pnl": 30150,
-          "returnPct": 0.007477678571428559,
-          "reason": "stock-ma4",
-          "boxStart": "2023-06-28",
-          "boxEnd": "2023-07-06"
-        },
-        {
-          "name": "*ST闻泰",
-          "code": "sh600745",
-          "standDays": 1,
-          "entry": "2023-07-03",
-          "exit": "2023-07-06",
-          "entryPrice": 49.05,
-          "exitPrice": 49.42,
-          "shares": 82800,
-          "pnl": 30636,
-          "returnPct": 0.007543323139653557,
-          "reason": "stock-ma4",
-          "boxStart": "2023-06-28",
-          "boxEnd": "2023-07-06"
-        },
-        {
-          "name": "大港股份",
-          "code": "sz002077",
-          "standDays": 1,
-          "entry": "2023-08-29",
-          "exit": "2023-09-06",
-          "entryPrice": 14.44,
-          "exitPrice": 17.19,
-          "shares": 283600,
-          "pnl": 779900,
-          "returnPct": 0.19044321329639913,
-          "reason": "box-end",
-          "boxStart": "2023-08-25",
-          "boxEnd": "2023-09-06"
+          "boxEnd": "2023-06-01"
         }
       ],
       "monthlyEquity": [
@@ -3239,41 +3065,29 @@
           "equity": 3813835
         },
         {
-          "time": "2023-06-30",
-          "equity": 4188089
-        },
-        {
-          "time": "2023-07-31",
-          "equity": 4095875
-        },
-        {
-          "time": "2023-08-31",
-          "equity": 4651731
-        },
-        {
-          "time": "2023-09-28",
-          "equity": 4875775
+          "time": "2023-06-01",
+          "equity": 3798976
         }
       ]
     },
     {
-      "label": "2020.1.1–2023.10.1",
+      "label": "2020.1.1–2023.6.1",
       "entryMode": "in-box-on-ma4",
       "sameDayReentry": false,
       "start": "2020-01-01",
-      "end": "2023-10-01",
-      "boxes": 83,
-      "trades": 102,
-      "skippedNoMa4": 10,
+      "end": "2023-06-01",
+      "boxes": 76,
+      "trades": 97,
+      "skippedNoMa4": 9,
       "skippedNoStock": 1,
       "skippedNoCash": 0,
-      "skippedOneDay": 18,
+      "skippedOneDay": 15,
       "capital": 100000,
-      "finalEquity": 1311927,
-      "returnPct": 12.11927,
+      "finalEquity": 1056639,
+      "returnPct": 9.56639,
       "maxDrawdownPct": 0.13851801129734756,
-      "wins": 62,
-      "losses": 40,
+      "wins": 58,
+      "losses": 39,
       "tradePnls": [
         {
           "name": "*ST闻泰",
@@ -4713,97 +4527,22 @@
           "returnPct": 0.10032362459546929,
           "reason": "index-ma4",
           "boxStart": "2023-05-15",
-          "boxEnd": "2023-05-31"
+          "boxEnd": "2023-06-01"
         },
         {
           "name": "豪威集团",
           "code": "sh603501",
           "standDays": 1,
           "entry": "2023-05-25",
-          "exit": "2023-05-31",
+          "exit": "2023-06-01",
           "entryPrice": 96.85,
-          "exitPrice": 99.89,
+          "exitPrice": 99.5,
           "shares": 10600,
-          "pnl": 32224,
-          "returnPct": 0.031388745482705316,
+          "pnl": 28090,
+          "returnPct": 0.027361899845121274,
           "reason": "box-end",
           "boxStart": "2023-05-15",
-          "boxEnd": "2023-05-31"
-        },
-        {
-          "name": "*ST闻泰",
-          "code": "sh600745",
-          "standDays": 1,
-          "entry": "2023-06-09",
-          "exit": "2023-06-15",
-          "entryPrice": 49.49,
-          "exitPrice": 50.92,
-          "shares": 21400,
-          "pnl": 30602,
-          "returnPct": 0.028894726207314703,
-          "reason": "index-ma4",
-          "boxStart": "2023-06-09",
-          "boxEnd": "2023-06-19"
-        },
-        {
-          "name": "大港股份",
-          "code": "sz002077",
-          "standDays": 1,
-          "entry": "2023-06-16",
-          "exit": "2023-06-19",
-          "entryPrice": 15.53,
-          "exitPrice": 15.97,
-          "shares": 70200,
-          "pnl": 30888,
-          "returnPct": 0.028332260141661347,
-          "reason": "box-end",
-          "boxStart": "2023-06-09",
-          "boxEnd": "2023-06-19"
-        },
-        {
-          "name": "德明利",
-          "code": "sz001309",
-          "standDays": 1,
-          "entry": "2023-06-29",
-          "exit": "2023-07-03",
-          "entryPrice": 89.6,
-          "exitPrice": 90.27,
-          "shares": 12500,
-          "pnl": 8375,
-          "returnPct": 0.007477678571428559,
-          "reason": "stock-ma4",
-          "boxStart": "2023-06-28",
-          "boxEnd": "2023-07-06"
-        },
-        {
-          "name": "大为股份",
-          "code": "sz002213",
-          "standDays": 1,
-          "entry": "2023-07-04",
-          "exit": "2023-07-05",
-          "entryPrice": 16.23,
-          "exitPrice": 15.82,
-          "shares": 69600,
-          "pnl": -28536,
-          "returnPct": -0.025261860751694454,
-          "reason": "stock-ma4",
-          "boxStart": "2023-06-28",
-          "boxEnd": "2023-07-06"
-        },
-        {
-          "name": "大港股份",
-          "code": "sz002077",
-          "standDays": 1,
-          "entry": "2023-08-29",
-          "exit": "2023-09-06",
-          "entryPrice": 14.44,
-          "exitPrice": 17.19,
-          "shares": 76300,
-          "pnl": 209825,
-          "returnPct": 0.19044321329639913,
-          "reason": "box-end",
-          "boxStart": "2023-08-25",
-          "boxEnd": "2023-09-06"
+          "boxEnd": "2023-06-01"
         }
       ],
       "monthlyEquity": [
@@ -4972,87 +4711,30 @@
           "equity": 1060773
         },
         {
-          "time": "2023-06-30",
-          "equity": 1164763
-        },
-        {
-          "time": "2023-07-31",
-          "equity": 1102102
-        },
-        {
-          "time": "2023-08-31",
-          "equity": 1251650
-        },
-        {
-          "time": "2023-09-28",
-          "equity": 1311927
+          "time": "2023-06-01",
+          "equity": 1056639
         }
       ]
     },
     {
-      "label": "2023.1.1–2026.10.1",
+      "label": "2023.10.25–2026.10.25",
       "entryMode": "box-first-day",
       "sameDayReentry": false,
-      "start": "2023-01-01",
-      "end": "2026-10-01",
-      "boxes": 53,
-      "trades": 6,
-      "skippedNoMa4": 33,
+      "start": "2023-10-25",
+      "end": "2026-10-25",
+      "boxes": 37,
+      "trades": 3,
+      "skippedNoMa4": 25,
       "skippedNoStock": 0,
       "skippedNoCash": 0,
-      "skippedOneDay": 14,
+      "skippedOneDay": 9,
       "capital": 100000,
-      "finalEquity": 108959,
-      "returnPct": 0.08959000000000006,
-      "maxDrawdownPct": 0.019699693156853132,
-      "wins": 6,
+      "finalEquity": 105812,
+      "returnPct": 0.05811999999999995,
+      "maxDrawdownPct": 0.02027904716513873,
+      "wins": 3,
       "losses": 0,
       "tradePnls": [
-        {
-          "name": "*ST闻泰",
-          "code": "sh600745",
-          "standDays": 1,
-          "entry": "2023-01-03",
-          "exit": "2023-01-10",
-          "entryPrice": 53.81,
-          "exitPrice": 55.78,
-          "shares": 300,
-          "pnl": 591,
-          "returnPct": 0.036610295484110766,
-          "reason": "box-end",
-          "boxStart": "2023-01-03",
-          "boxEnd": "2023-01-10"
-        },
-        {
-          "name": "大为股份",
-          "code": "sz002213",
-          "standDays": 1,
-          "entry": "2023-05-15",
-          "exit": "2023-05-23",
-          "entryPrice": 12.36,
-          "exitPrice": 13.6,
-          "shares": 1600,
-          "pnl": 1984,
-          "returnPct": 0.10032362459546929,
-          "reason": "index-ma4",
-          "boxStart": "2023-05-15",
-          "boxEnd": "2023-05-31"
-        },
-        {
-          "name": "*ST闻泰",
-          "code": "sh600745",
-          "standDays": 1,
-          "entry": "2023-06-09",
-          "exit": "2023-06-15",
-          "entryPrice": 49.49,
-          "exitPrice": 50.92,
-          "shares": 400,
-          "pnl": 572,
-          "returnPct": 0.028894726207314703,
-          "reason": "index-ma4",
-          "boxStart": "2023-06-09",
-          "boxEnd": "2023-06-19"
-        },
         {
           "name": "*ST闻泰",
           "code": "sh600745",
@@ -5101,386 +4783,174 @@
       ],
       "monthlyEquity": [
         {
-          "time": "2023-01-31",
-          "equity": 100591
-        },
-        {
-          "time": "2023-02-28",
-          "equity": 100591
-        },
-        {
-          "time": "2023-03-31",
-          "equity": 100591
-        },
-        {
-          "time": "2023-04-28",
-          "equity": 100591
-        },
-        {
-          "time": "2023-05-31",
-          "equity": 102575
-        },
-        {
-          "time": "2023-06-30",
-          "equity": 103147
-        },
-        {
-          "time": "2023-07-31",
-          "equity": 103147
-        },
-        {
-          "time": "2023-08-31",
-          "equity": 103147
-        },
-        {
-          "time": "2023-09-28",
-          "equity": 103147
-        },
-        {
           "time": "2023-10-31",
-          "equity": 103147
+          "equity": 100000
         },
         {
           "time": "2023-11-30",
-          "equity": 103147
+          "equity": 100000
         },
         {
           "time": "2023-12-29",
-          "equity": 103147
+          "equity": 100000
         },
         {
           "time": "2024-01-31",
-          "equity": 103147
+          "equity": 100000
         },
         {
           "time": "2024-02-29",
-          "equity": 103147
+          "equity": 100000
         },
         {
           "time": "2024-03-29",
-          "equity": 103147
+          "equity": 100000
         },
         {
           "time": "2024-04-30",
-          "equity": 103147
+          "equity": 100000
         },
         {
           "time": "2024-05-31",
-          "equity": 103147
+          "equity": 100000
         },
         {
           "time": "2024-06-28",
-          "equity": 103147
+          "equity": 100000
         },
         {
           "time": "2024-07-31",
-          "equity": 103147
+          "equity": 100000
         },
         {
           "time": "2024-08-30",
-          "equity": 103147
+          "equity": 100000
         },
         {
           "time": "2024-09-30",
-          "equity": 107865
+          "equity": 104718
         },
         {
           "time": "2024-10-31",
-          "equity": 107984
+          "equity": 104837
         },
         {
           "time": "2024-11-29",
-          "equity": 107984
+          "equity": 104837
         },
         {
           "time": "2024-12-31",
-          "equity": 108419
+          "equity": 105272
         },
         {
           "time": "2025-01-27",
-          "equity": 108419
+          "equity": 105272
         },
         {
           "time": "2025-02-28",
-          "equity": 108419
+          "equity": 105272
         },
         {
           "time": "2025-03-31",
-          "equity": 108419
+          "equity": 105272
         },
         {
           "time": "2025-04-30",
-          "equity": 108419
+          "equity": 105272
         },
         {
           "time": "2025-05-30",
-          "equity": 108419
+          "equity": 105272
         },
         {
           "time": "2025-06-30",
-          "equity": 108419
+          "equity": 105272
         },
         {
           "time": "2025-07-31",
-          "equity": 108419
+          "equity": 105272
         },
         {
           "time": "2025-08-29",
-          "equity": 108419
+          "equity": 105272
         },
         {
           "time": "2025-09-30",
-          "equity": 108419
+          "equity": 105272
         },
         {
           "time": "2025-10-31",
-          "equity": 108419
+          "equity": 105272
         },
         {
           "time": "2025-11-28",
-          "equity": 108419
+          "equity": 105272
         },
         {
           "time": "2025-12-31",
-          "equity": 108419
+          "equity": 105272
         },
         {
           "time": "2026-01-30",
-          "equity": 108419
+          "equity": 105272
         },
         {
           "time": "2026-02-27",
-          "equity": 108419
+          "equity": 105272
         },
         {
           "time": "2026-03-31",
-          "equity": 108419
+          "equity": 105272
         },
         {
           "time": "2026-04-30",
-          "equity": 108419
+          "equity": 105272
         },
         {
           "time": "2026-05-29",
-          "equity": 108419
+          "equity": 105272
         },
         {
           "time": "2026-06-30",
-          "equity": 108419
+          "equity": 105272
         },
         {
           "time": "2026-07-31",
-          "equity": 108419
+          "equity": 105272
         },
         {
           "time": "2026-08-31",
-          "equity": 108959
+          "equity": 105812
         },
         {
           "time": "2026-09-30",
-          "equity": 108959
+          "equity": 105812
+        },
+        {
+          "time": "2026-10-23",
+          "equity": 105812
         }
       ]
     },
     {
-      "label": "2023.1.1–2026.10.1",
+      "label": "2023.10.25–2026.10.25",
       "entryMode": "first-on-ma4",
       "sameDayReentry": false,
-      "start": "2023-01-01",
-      "end": "2026-10-01",
-      "boxes": 53,
-      "trades": 37,
+      "start": "2023-10-25",
+      "end": "2026-10-25",
+      "boxes": 37,
+      "trades": 26,
       "skippedNoMa4": 1,
       "skippedNoStock": 1,
       "skippedNoCash": 0,
-      "skippedOneDay": 14,
+      "skippedOneDay": 9,
       "capital": 100000,
-      "finalEquity": 124159,
-      "returnPct": 0.24158999999999997,
-      "maxDrawdownPct": 0.028709296112181613,
-      "wins": 27,
-      "losses": 10,
+      "finalEquity": 111875,
+      "returnPct": 0.11874999999999991,
+      "maxDrawdownPct": 0.031912595845782786,
+      "wins": 19,
+      "losses": 7,
       "tradePnls": [
-        {
-          "name": "*ST闻泰",
-          "code": "sh600745",
-          "standDays": 1,
-          "entry": "2023-01-03",
-          "exit": "2023-01-10",
-          "entryPrice": 53.81,
-          "exitPrice": 55.78,
-          "shares": 300,
-          "pnl": 591,
-          "returnPct": 0.036610295484110766,
-          "reason": "box-end",
-          "boxStart": "2023-01-03",
-          "boxEnd": "2023-01-10"
-        },
-        {
-          "name": "大为股份",
-          "code": "sz002213",
-          "standDays": 1,
-          "entry": "2023-01-16",
-          "exit": "2023-01-31",
-          "entryPrice": 15.79,
-          "exitPrice": 16.29,
-          "shares": 1200,
-          "pnl": 600,
-          "returnPct": 0.03166561114629518,
-          "reason": "index-ma4",
-          "boxStart": "2023-01-13",
-          "boxEnd": "2023-02-15"
-        },
-        {
-          "name": "豪威集团",
-          "code": "sh603501",
-          "standDays": 1,
-          "entry": "2023-03-01",
-          "exit": "2023-03-06",
-          "entryPrice": 86.54,
-          "exitPrice": 86,
-          "shares": 200,
-          "pnl": -108,
-          "returnPct": -0.006239889068638815,
-          "reason": "stock-ma4",
-          "boxStart": "2023-02-28",
-          "boxEnd": "2023-03-06"
-        },
-        {
-          "name": "汇顶科技",
-          "code": "sh603160",
-          "standDays": 1,
-          "entry": "2023-03-09",
-          "exit": "2023-03-09",
-          "entryPrice": 53.36,
-          "exitPrice": 53.36,
-          "shares": 300,
-          "pnl": 0,
-          "returnPct": 0,
-          "reason": "box-end",
-          "boxStart": "2023-03-08",
-          "boxEnd": "2023-03-09"
-        },
-        {
-          "name": "*ST闻泰",
-          "code": "sh600745",
-          "standDays": 1,
-          "entry": "2023-03-30",
-          "exit": "2023-04-07",
-          "entryPrice": 55.57,
-          "exitPrice": 58.99,
-          "shares": 300,
-          "pnl": 1026,
-          "returnPct": 0.06154399856037429,
-          "reason": "box-end",
-          "boxStart": "2023-03-29",
-          "boxEnd": "2023-04-07"
-        },
-        {
-          "name": "大为股份",
-          "code": "sz002213",
-          "standDays": 1,
-          "entry": "2023-05-15",
-          "exit": "2023-05-23",
-          "entryPrice": 12.36,
-          "exitPrice": 13.6,
-          "shares": 1600,
-          "pnl": 1984,
-          "returnPct": 0.10032362459546929,
-          "reason": "index-ma4",
-          "boxStart": "2023-05-15",
-          "boxEnd": "2023-05-31"
-        },
-        {
-          "name": "*ST闻泰",
-          "code": "sh600745",
-          "standDays": 1,
-          "entry": "2023-06-09",
-          "exit": "2023-06-15",
-          "entryPrice": 49.49,
-          "exitPrice": 50.92,
-          "shares": 400,
-          "pnl": 572,
-          "returnPct": 0.028894726207314703,
-          "reason": "index-ma4",
-          "boxStart": "2023-06-09",
-          "boxEnd": "2023-06-19"
-        },
-        {
-          "name": "德明利",
-          "code": "sz001309",
-          "standDays": 1,
-          "entry": "2023-06-29",
-          "exit": "2023-07-03",
-          "entryPrice": 89.6,
-          "exitPrice": 90.27,
-          "shares": 200,
-          "pnl": 134,
-          "returnPct": 0.007477678571428559,
-          "reason": "stock-ma4",
-          "boxStart": "2023-06-28",
-          "boxEnd": "2023-07-06"
-        },
-        {
-          "name": "*ST闻泰",
-          "code": "sh600745",
-          "standDays": 1,
-          "entry": "2023-07-11",
-          "exit": "2023-07-11",
-          "entryPrice": 50.75,
-          "exitPrice": 50.75,
-          "shares": 300,
-          "pnl": 0,
-          "returnPct": 0,
-          "reason": "box-end",
-          "boxStart": "2023-07-10",
-          "boxEnd": "2023-07-11"
-        },
-        {
-          "name": "大港股份",
-          "code": "sz002077",
-          "standDays": 1,
-          "entry": "2023-08-29",
-          "exit": "2023-09-06",
-          "entryPrice": 14.44,
-          "exitPrice": 17.19,
-          "shares": 1300,
-          "pnl": 3575,
-          "returnPct": 0.19044321329639913,
-          "reason": "box-end",
-          "boxStart": "2023-08-25",
-          "boxEnd": "2023-09-06"
-        },
-        {
-          "name": "*ST闻泰",
-          "code": "sh600745",
-          "standDays": 1,
-          "entry": "2023-09-28",
-          "exit": "2023-10-13",
-          "entryPrice": 43.65,
-          "exitPrice": 47.36,
-          "shares": 400,
-          "pnl": 1484,
-          "returnPct": 0.08499427262313852,
-          "reason": "box-end",
-          "boxStart": "2023-09-27",
-          "boxEnd": "2023-10-13"
-        },
-        {
-          "name": "*ST闻泰",
-          "code": "sh600745",
-          "standDays": 1,
-          "entry": "2023-10-25",
-          "exit": "2023-10-30",
-          "entryPrice": 43.69,
-          "exitPrice": 50.04,
-          "shares": 400,
-          "pnl": 2540,
-          "returnPct": 0.14534218356603357,
-          "reason": "box-end",
-          "boxStart": "2023-10-24",
-          "boxEnd": "2023-10-30"
-        },
         {
           "name": "*ST闻泰",
           "code": "sh600745",
@@ -5855,435 +5325,193 @@
           "reason": "stock-ma4",
           "boxStart": "2026-09-11",
           "boxEnd": "2026-09-23"
+        },
+        {
+          "name": "豪威集团",
+          "code": "sh603501",
+          "standDays": 1,
+          "entry": "2026-10-20",
+          "exit": "2026-10-21",
+          "entryPrice": 76.91,
+          "exitPrice": 77.48,
+          "shares": 200,
+          "pnl": 114,
+          "returnPct": 0.007411259914185564,
+          "reason": "box-end",
+          "boxStart": "2026-10-19",
+          "boxEnd": "2026-10-21"
         }
       ],
       "monthlyEquity": [
         {
-          "time": "2023-01-31",
-          "equity": 101191
-        },
-        {
-          "time": "2023-02-28",
-          "equity": 101191
-        },
-        {
-          "time": "2023-03-31",
-          "equity": 100987
-        },
-        {
-          "time": "2023-04-28",
-          "equity": 102109
-        },
-        {
-          "time": "2023-05-31",
-          "equity": 104093
-        },
-        {
-          "time": "2023-06-30",
-          "equity": 105345
-        },
-        {
-          "time": "2023-07-31",
-          "equity": 104799
-        },
-        {
-          "time": "2023-08-31",
-          "equity": 107347
-        },
-        {
-          "time": "2023-09-28",
-          "equity": 108374
-        },
-        {
           "time": "2023-10-31",
-          "equity": 112398
+          "equity": 100000
         },
         {
           "time": "2023-11-30",
-          "equity": 113142
+          "equity": 100744
         },
         {
           "time": "2023-12-29",
-          "equity": 113500
+          "equity": 101102
         },
         {
           "time": "2024-01-31",
-          "equity": 113500
+          "equity": 101102
         },
         {
           "time": "2024-02-29",
-          "equity": 114340
+          "equity": 101942
         },
         {
           "time": "2024-03-29",
-          "equity": 114340
+          "equity": 101942
         },
         {
           "time": "2024-04-30",
-          "equity": 114804
+          "equity": 102406
         },
         {
           "time": "2024-05-31",
-          "equity": 115332
+          "equity": 102934
         },
         {
           "time": "2024-06-28",
-          "equity": 115398
+          "equity": 103000
         },
         {
           "time": "2024-07-31",
-          "equity": 115248
+          "equity": 102850
         },
         {
           "time": "2024-08-30",
-          "equity": 116507
+          "equity": 104109
         },
         {
           "time": "2024-09-30",
-          "equity": 121225
+          "equity": 108827
         },
         {
           "time": "2024-10-31",
-          "equity": 121344
+          "equity": 108946
         },
         {
           "time": "2024-11-29",
-          "equity": 121576
+          "equity": 109178
         },
         {
           "time": "2024-12-31",
-          "equity": 120735
+          "equity": 108337
         },
         {
           "time": "2025-01-27",
-          "equity": 119968
+          "equity": 107570
         },
         {
           "time": "2025-02-28",
-          "equity": 119968
+          "equity": 107570
         },
         {
           "time": "2025-03-31",
-          "equity": 120553
+          "equity": 108155
         },
         {
           "time": "2025-04-30",
-          "equity": 123895
+          "equity": 111497
         },
         {
           "time": "2025-05-30",
-          "equity": 123895
+          "equity": 111497
         },
         {
           "time": "2025-06-30",
-          "equity": 123895
+          "equity": 111497
         },
         {
           "time": "2025-07-31",
-          "equity": 123895
+          "equity": 111497
         },
         {
           "time": "2025-08-29",
-          "equity": 123895
+          "equity": 111497
         },
         {
           "time": "2025-09-30",
-          "equity": 123895
+          "equity": 111497
         },
         {
           "time": "2025-10-31",
-          "equity": 123895
+          "equity": 111497
         },
         {
           "time": "2025-11-28",
-          "equity": 123895
+          "equity": 111497
         },
         {
           "time": "2025-12-31",
-          "equity": 123895
+          "equity": 111497
         },
         {
           "time": "2026-01-30",
-          "equity": 123895
+          "equity": 111497
         },
         {
           "time": "2026-02-27",
-          "equity": 123895
+          "equity": 111497
         },
         {
           "time": "2026-03-31",
-          "equity": 123895
+          "equity": 111497
         },
         {
           "time": "2026-04-30",
-          "equity": 123895
+          "equity": 111497
         },
         {
           "time": "2026-05-29",
-          "equity": 123895
+          "equity": 111497
         },
         {
           "time": "2026-06-30",
-          "equity": 123895
+          "equity": 111497
         },
         {
           "time": "2026-07-31",
-          "equity": 123895
+          "equity": 111497
         },
         {
           "time": "2026-08-31",
-          "equity": 124771
+          "equity": 112373
         },
         {
           "time": "2026-09-30",
-          "equity": 124159
+          "equity": 111761
+        },
+        {
+          "time": "2026-10-23",
+          "equity": 111875
         }
       ]
     },
     {
-      "label": "2023.1.1–2026.10.1",
+      "label": "2023.10.25–2026.10.25",
       "entryMode": "in-box-on-ma4",
       "sameDayReentry": true,
-      "start": "2023-01-01",
-      "end": "2026-10-01",
-      "boxes": 53,
-      "trades": 121,
-      "skippedNoMa4": 7,
+      "start": "2023-10-25",
+      "end": "2026-10-25",
+      "boxes": 38,
+      "trades": 107,
+      "skippedNoMa4": 5,
       "skippedNoStock": 0,
       "skippedNoCash": 0,
-      "skippedOneDay": 14,
+      "skippedOneDay": 9,
       "capital": 100000,
-      "finalEquity": 2439421,
-      "returnPct": 23.39421,
-      "maxDrawdownPct": 0.12595676171305564,
-      "wins": 75,
-      "losses": 46,
+      "finalEquity": 1442828,
+      "returnPct": 13.42828,
+      "maxDrawdownPct": 0.1258570743172253,
+      "wins": 65,
+      "losses": 42,
       "tradePnls": [
-        {
-          "name": "*ST闻泰",
-          "code": "sh600745",
-          "standDays": 1,
-          "entry": "2023-01-03",
-          "exit": "2023-01-10",
-          "entryPrice": 53.81,
-          "exitPrice": 55.78,
-          "shares": 1800,
-          "pnl": 3546,
-          "returnPct": 0.036610295484110766,
-          "reason": "box-end",
-          "boxStart": "2023-01-03",
-          "boxEnd": "2023-01-10"
-        },
-        {
-          "name": "大为股份",
-          "code": "sz002213",
-          "standDays": 1,
-          "entry": "2023-01-16",
-          "exit": "2023-01-31",
-          "entryPrice": 15.79,
-          "exitPrice": 16.29,
-          "shares": 6500,
-          "pnl": 3250,
-          "returnPct": 0.03166561114629518,
-          "reason": "index-ma4",
-          "boxStart": "2023-01-13",
-          "boxEnd": "2023-02-15"
-        },
-        {
-          "name": "*ST闻泰",
-          "code": "sh600745",
-          "standDays": 1,
-          "entry": "2023-02-01",
-          "exit": "2023-02-06",
-          "entryPrice": 59.93,
-          "exitPrice": 59.04,
-          "shares": 1700,
-          "pnl": -1513,
-          "returnPct": -0.014850659102286001,
-          "reason": "stock-ma4",
-          "boxStart": "2023-01-13",
-          "boxEnd": "2023-02-15"
-        },
-        {
-          "name": "*ST闻泰",
-          "code": "sh600745",
-          "standDays": 1,
-          "entry": "2023-02-09",
-          "exit": "2023-02-14",
-          "entryPrice": 60.77,
-          "exitPrice": 59.44,
-          "shares": 1700,
-          "pnl": -2261,
-          "returnPct": -0.021885798913937937,
-          "reason": "stock-ma4",
-          "boxStart": "2023-01-13",
-          "boxEnd": "2023-02-15"
-        },
-        {
-          "name": "大港股份",
-          "code": "sz002077",
-          "standDays": 2,
-          "entry": "2023-02-14",
-          "exit": "2023-02-15",
-          "entryPrice": 20.35,
-          "exitPrice": 20.05,
-          "shares": 5000,
-          "pnl": -1500,
-          "returnPct": -0.014742014742014753,
-          "reason": "stock-ma4",
-          "boxStart": "2023-01-13",
-          "boxEnd": "2023-02-15"
-        },
-        {
-          "name": "豪威集团",
-          "code": "sh603501",
-          "standDays": 1,
-          "entry": "2023-03-01",
-          "exit": "2023-03-06",
-          "entryPrice": 86.54,
-          "exitPrice": 86,
-          "shares": 1100,
-          "pnl": -594,
-          "returnPct": -0.006239889068638815,
-          "reason": "stock-ma4",
-          "boxStart": "2023-02-28",
-          "boxEnd": "2023-03-06"
-        },
-        {
-          "name": "*ST闻泰",
-          "code": "sh600745",
-          "standDays": 1,
-          "entry": "2023-03-30",
-          "exit": "2023-04-07",
-          "entryPrice": 55.57,
-          "exitPrice": 58.99,
-          "shares": 1800,
-          "pnl": 6156,
-          "returnPct": 0.06154399856037429,
-          "reason": "box-end",
-          "boxStart": "2023-03-29",
-          "boxEnd": "2023-04-07"
-        },
-        {
-          "name": "大为股份",
-          "code": "sz002213",
-          "standDays": 1,
-          "entry": "2023-05-15",
-          "exit": "2023-05-23",
-          "entryPrice": 12.36,
-          "exitPrice": 13.6,
-          "shares": 8600,
-          "pnl": 10664,
-          "returnPct": 0.10032362459546929,
-          "reason": "index-ma4",
-          "boxStart": "2023-05-15",
-          "boxEnd": "2023-05-31"
-        },
-        {
-          "name": "豪威集团",
-          "code": "sh603501",
-          "standDays": 1,
-          "entry": "2023-05-25",
-          "exit": "2023-05-31",
-          "entryPrice": 96.85,
-          "exitPrice": 99.89,
-          "shares": 1200,
-          "pnl": 3648,
-          "returnPct": 0.031388745482705316,
-          "reason": "box-end",
-          "boxStart": "2023-05-15",
-          "boxEnd": "2023-05-31"
-        },
-        {
-          "name": "*ST闻泰",
-          "code": "sh600745",
-          "standDays": 1,
-          "entry": "2023-06-09",
-          "exit": "2023-06-15",
-          "entryPrice": 49.49,
-          "exitPrice": 50.92,
-          "shares": 2400,
-          "pnl": 3432,
-          "returnPct": 0.028894726207314703,
-          "reason": "index-ma4",
-          "boxStart": "2023-06-09",
-          "boxEnd": "2023-06-19"
-        },
-        {
-          "name": "大港股份",
-          "code": "sz002077",
-          "standDays": 1,
-          "entry": "2023-06-16",
-          "exit": "2023-06-19",
-          "entryPrice": 15.53,
-          "exitPrice": 15.97,
-          "shares": 8000,
-          "pnl": 3520,
-          "returnPct": 0.028332260141661347,
-          "reason": "box-end",
-          "boxStart": "2023-06-09",
-          "boxEnd": "2023-06-19"
-        },
-        {
-          "name": "德明利",
-          "code": "sz001309",
-          "standDays": 1,
-          "entry": "2023-06-29",
-          "exit": "2023-07-03",
-          "entryPrice": 89.6,
-          "exitPrice": 90.27,
-          "shares": 1400,
-          "pnl": 938,
-          "returnPct": 0.007477678571428559,
-          "reason": "stock-ma4",
-          "boxStart": "2023-06-28",
-          "boxEnd": "2023-07-06"
-        },
-        {
-          "name": "*ST闻泰",
-          "code": "sh600745",
-          "standDays": 1,
-          "entry": "2023-07-03",
-          "exit": "2023-07-06",
-          "entryPrice": 49.05,
-          "exitPrice": 49.42,
-          "shares": 2600,
-          "pnl": 962,
-          "returnPct": 0.007543323139653557,
-          "reason": "stock-ma4",
-          "boxStart": "2023-06-28",
-          "boxEnd": "2023-07-06"
-        },
-        {
-          "name": "大港股份",
-          "code": "sz002077",
-          "standDays": 1,
-          "entry": "2023-08-29",
-          "exit": "2023-09-06",
-          "entryPrice": 14.44,
-          "exitPrice": 17.19,
-          "shares": 9000,
-          "pnl": 24750,
-          "returnPct": 0.19044321329639913,
-          "reason": "box-end",
-          "boxStart": "2023-08-25",
-          "boxEnd": "2023-09-06"
-        },
-        {
-          "name": "*ST闻泰",
-          "code": "sh600745",
-          "standDays": 1,
-          "entry": "2023-09-28",
-          "exit": "2023-10-13",
-          "entryPrice": 43.65,
-          "exitPrice": 47.36,
-          "shares": 3500,
-          "pnl": 12985,
-          "returnPct": 0.08499427262313852,
-          "reason": "box-end",
-          "boxStart": "2023-09-27",
-          "boxEnd": "2023-10-13"
-        },
         {
           "name": "*ST闻泰",
           "code": "sh600745",
@@ -6292,8 +5520,8 @@
           "exit": "2023-10-30",
           "entryPrice": 43.69,
           "exitPrice": 50.04,
-          "shares": 3800,
-          "pnl": 24130,
+          "shares": 2200,
+          "pnl": 13970,
           "returnPct": 0.14534218356603357,
           "reason": "box-end",
           "boxStart": "2023-10-24",
@@ -6307,8 +5535,8 @@
           "exit": "2023-11-09",
           "entryPrice": 50.05,
           "exitPrice": 51.93,
-          "shares": 3800,
-          "pnl": 7144,
+          "shares": 2200,
+          "pnl": 4136,
           "returnPct": 0.03756243756243771,
           "reason": "stock-ma4",
           "boxStart": "2023-11-02",
@@ -6322,8 +5550,8 @@
           "exit": "2023-11-16",
           "entryPrice": 9.19,
           "exitPrice": 9.23,
-          "shares": 21600,
-          "pnl": 864,
+          "shares": 12800,
+          "pnl": 512,
           "returnPct": 0.0043525571273124175,
           "reason": "stock-ma4",
           "boxStart": "2023-11-02",
@@ -6337,8 +5565,8 @@
           "exit": "2023-11-20",
           "entryPrice": 76.19,
           "exitPrice": 74.11,
-          "shares": 2600,
-          "pnl": -5408,
+          "shares": 1500,
+          "pnl": -3120,
           "returnPct": -0.027300170626066378,
           "reason": "stock-ma4",
           "boxStart": "2023-11-02",
@@ -6352,8 +5580,8 @@
           "exit": "2023-11-28",
           "entryPrice": 89.96,
           "exitPrice": 90.86,
-          "shares": 2100,
-          "pnl": 1890,
+          "shares": 1200,
+          "pnl": 1080,
           "returnPct": 0.010004446420631474,
           "reason": "box-end",
           "boxStart": "2023-11-24",
@@ -6367,8 +5595,8 @@
           "exit": "2023-12-11",
           "entryPrice": 44.55,
           "exitPrice": 44.67,
-          "shares": 4400,
-          "pnl": 528,
+          "shares": 2600,
+          "pnl": 312,
           "returnPct": 0.002693602693602859,
           "reason": "box-end",
           "boxStart": "2023-12-07",
@@ -6382,8 +5610,8 @@
           "exit": "2023-12-29",
           "entryPrice": 67.55,
           "exitPrice": 69.1,
-          "shares": 2900,
-          "pnl": 4495,
+          "shares": 1700,
+          "pnl": 2635,
           "returnPct": 0.022945965951147285,
           "reason": "box-end",
           "boxStart": "2023-12-26",
@@ -6397,8 +5625,8 @@
           "exit": "2024-02-28",
           "entryPrice": 13.47,
           "exitPrice": 14.07,
-          "shares": 14900,
-          "pnl": 8940,
+          "shares": 8800,
+          "pnl": 5280,
           "returnPct": 0.04454342984409787,
           "reason": "stock-ma4",
           "boxStart": "2024-02-06",
@@ -6412,8 +5640,8 @@
           "exit": "2024-03-05",
           "entryPrice": 38.15,
           "exitPrice": 40.92,
-          "shares": 5500,
-          "pnl": 15235,
+          "shares": 3200,
+          "pnl": 8864,
           "returnPct": 0.07260812581913512,
           "reason": "index-ma4",
           "boxStart": "2024-02-06",
@@ -6427,8 +5655,8 @@
           "exit": "2024-03-14",
           "entryPrice": 90.87,
           "exitPrice": 96.15,
-          "shares": 2400,
-          "pnl": 12672,
+          "shares": 1400,
+          "pnl": 7392,
           "returnPct": 0.05810498514361173,
           "reason": "index-ma4",
           "boxStart": "2024-02-06",
@@ -6442,8 +5670,8 @@
           "exit": "2024-03-20",
           "entryPrice": 160.9,
           "exitPrice": 160.92,
-          "shares": 1400,
-          "pnl": 28,
+          "shares": 800,
+          "pnl": 16,
           "returnPct": 0.00012430080795522436,
           "reason": "stock-ma4",
           "boxStart": "2024-02-06",
@@ -6457,8 +5685,8 @@
           "exit": "2024-04-01",
           "entryPrice": 12.2,
           "exitPrice": 12.18,
-          "shares": 19500,
-          "pnl": -390,
+          "shares": 11500,
+          "pnl": -230,
           "returnPct": -0.0016393442622950616,
           "reason": "box-end",
           "boxStart": "2024-03-28",
@@ -6472,8 +5700,8 @@
           "exit": "2024-04-30",
           "entryPrice": 12.46,
           "exitPrice": 12.77,
-          "shares": 19100,
-          "pnl": 5921,
+          "shares": 11300,
+          "pnl": 3503,
           "returnPct": 0.024879614767255198,
           "reason": "stock-ma4",
           "boxStart": "2024-04-22",
@@ -6487,8 +5715,8 @@
           "exit": "2024-05-08",
           "entryPrice": 31.5,
           "exitPrice": 31.92,
-          "shares": 7700,
-          "pnl": 3234,
+          "shares": 4500,
+          "pnl": 1890,
           "returnPct": 0.01333333333333342,
           "reason": "stock-ma4",
           "boxStart": "2024-04-22",
@@ -6502,8 +5730,8 @@
           "exit": "2024-05-22",
           "entryPrice": 8.13,
           "exitPrice": 8.35,
-          "shares": 30400,
-          "pnl": 6688,
+          "shares": 17900,
+          "pnl": 3938,
           "returnPct": 0.027060270602705883,
           "reason": "box-end",
           "boxStart": "2024-05-15",
@@ -6517,8 +5745,8 @@
           "exit": "2024-06-14",
           "entryPrice": 29.85,
           "exitPrice": 29.96,
-          "shares": 8500,
-          "pnl": 935,
+          "shares": 5000,
+          "pnl": 550,
           "returnPct": 0.003685092127303058,
           "reason": "stock-ma4",
           "boxStart": "2024-06-04",
@@ -6532,8 +5760,8 @@
           "exit": "2024-06-20",
           "entryPrice": 68.1,
           "exitPrice": 68.44,
-          "shares": 3700,
-          "pnl": 1258,
+          "shares": 2200,
+          "pnl": 748,
           "returnPct": 0.004992657856093929,
           "reason": "stock-ma4",
           "boxStart": "2024-06-04",
@@ -6547,8 +5775,8 @@
           "exit": "2024-07-15",
           "entryPrice": 29.01,
           "exitPrice": 29.06,
-          "shares": 8800,
-          "pnl": 440,
+          "shares": 5200,
+          "pnl": 260,
           "returnPct": 0.0017235436056530773,
           "reason": "stock-ma4",
           "boxStart": "2024-07-05",
@@ -6562,8 +5790,8 @@
           "exit": "2024-07-17",
           "entryPrice": 8.72,
           "exitPrice": 8.81,
-          "shares": 29400,
-          "pnl": 2646,
+          "shares": 17400,
+          "pnl": 1566,
           "returnPct": 0.010321100917431103,
           "reason": "index-ma4",
           "boxStart": "2024-07-05",
@@ -6577,8 +5805,8 @@
           "exit": "2024-07-22",
           "entryPrice": 30.61,
           "exitPrice": 30.72,
-          "shares": 8400,
-          "pnl": 924,
+          "shares": 5000,
+          "pnl": 550,
           "returnPct": 0.003593596863769921,
           "reason": "box-end",
           "boxStart": "2024-07-05",
@@ -6592,8 +5820,8 @@
           "exit": "2024-08-01",
           "entryPrice": 12.92,
           "exitPrice": 13.01,
-          "shares": 20100,
-          "pnl": 1809,
+          "shares": 11900,
+          "pnl": 1071,
           "returnPct": 0.006965944272445901,
           "reason": "box-end",
           "boxStart": "2024-07-26",
@@ -6607,8 +5835,8 @@
           "exit": "2024-08-30",
           "entryPrice": 24.92,
           "exitPrice": 26.1,
-          "shares": 10500,
-          "pnl": 12390,
+          "shares": 6200,
+          "pnl": 7316,
           "returnPct": 0.047351524879614804,
           "reason": "box-end",
           "boxStart": "2024-08-28",
@@ -6622,8 +5850,8 @@
           "exit": "2024-10-10",
           "entryPrice": 25.99,
           "exitPrice": 32.9,
-          "shares": 10500,
-          "pnl": 72555,
+          "shares": 6200,
+          "pnl": 42842,
           "returnPct": 0.26587148903424396,
           "reason": "stock-ma4",
           "boxStart": "2024-09-24",
@@ -6637,8 +5865,8 @@
           "exit": "2024-10-29",
           "entryPrice": 32.71,
           "exitPrice": 42.18,
-          "shares": 10600,
-          "pnl": 100382,
+          "shares": 6200,
+          "pnl": 58714,
           "returnPct": 0.28951391011922945,
           "reason": "index-ma4",
           "boxStart": "2024-09-24",
@@ -6652,8 +5880,8 @@
           "exit": "2024-11-01",
           "entryPrice": 90.17,
           "exitPrice": 86.3,
-          "shares": 4900,
-          "pnl": -18963,
+          "shares": 2900,
+          "pnl": -11223,
           "returnPct": -0.04291893090828436,
           "reason": "stock-ma4",
           "boxStart": "2024-09-24",
@@ -6667,8 +5895,8 @@
           "exit": "2024-11-11",
           "entryPrice": 14.62,
           "exitPrice": 17.9,
-          "shares": 29200,
-          "pnl": 95776,
+          "shares": 17200,
+          "pnl": 56416,
           "returnPct": 0.22435020519835835,
           "reason": "box-end",
           "boxStart": "2024-09-24",
@@ -6682,8 +5910,8 @@
           "exit": "2024-11-21",
           "entryPrice": 16.19,
           "exitPrice": 16.51,
-          "shares": 32300,
-          "pnl": 10336,
+          "shares": 19000,
+          "pnl": 6080,
           "returnPct": 0.019765287214329907,
           "reason": "box-end",
           "boxStart": "2024-11-18",
@@ -6697,8 +5925,8 @@
           "exit": "2024-12-02",
           "entryPrice": 41.07,
           "exitPrice": 37.5,
-          "shares": 13000,
-          "pnl": -46410,
+          "shares": 7600,
+          "pnl": -27132,
           "returnPct": -0.08692476260043824,
           "reason": "stock-ma4",
           "boxStart": "2024-11-25",
@@ -6712,8 +5940,8 @@
           "exit": "2024-12-04",
           "entryPrice": 11.75,
           "exitPrice": 13.13,
-          "shares": 41500,
-          "pnl": 57270,
+          "shares": 24500,
+          "pnl": 33810,
           "returnPct": 0.11744680851063838,
           "reason": "index-ma4",
           "boxStart": "2024-11-25",
@@ -6727,8 +5955,8 @@
           "exit": "2024-12-09",
           "entryPrice": 36.99,
           "exitPrice": 36.58,
-          "shares": 14700,
-          "pnl": -6027,
+          "shares": 8600,
+          "pnl": -3526,
           "returnPct": -0.011084076777507557,
           "reason": "stock-ma4",
           "boxStart": "2024-11-25",
@@ -6742,8 +5970,8 @@
           "exit": "2024-12-11",
           "entryPrice": 11.95,
           "exitPrice": 12.07,
-          "shares": 45100,
-          "pnl": 5412,
+          "shares": 26600,
+          "pnl": 3192,
           "returnPct": 0.01004184100418426,
           "reason": "box-end",
           "boxStart": "2024-11-25",
@@ -6757,8 +5985,8 @@
           "exit": "2024-12-20",
           "entryPrice": 35.38,
           "exitPrice": 36.25,
-          "shares": 15300,
-          "pnl": 13311,
+          "shares": 9000,
+          "pnl": 7830,
           "returnPct": 0.024590163934426146,
           "reason": "box-end",
           "boxStart": "2024-12-18",
@@ -6772,8 +6000,8 @@
           "exit": "2025-01-10",
           "entryPrice": 14.59,
           "exitPrice": 14,
-          "shares": 38200,
-          "pnl": -22538,
+          "shares": 22500,
+          "pnl": -13275,
           "returnPct": -0.04043865661411927,
           "reason": "stock-ma4",
           "boxStart": "2025-01-06",
@@ -6787,8 +6015,8 @@
           "exit": "2025-01-22",
           "entryPrice": 33.16,
           "exitPrice": 33.15,
-          "shares": 16100,
-          "pnl": -161,
+          "shares": 9500,
+          "pnl": -95,
           "returnPct": -0.00030156815440285367,
           "reason": "stock-ma4",
           "boxStart": "2025-01-06",
@@ -6802,8 +6030,8 @@
           "exit": "2025-01-23",
           "entryPrice": 108.27,
           "exitPrice": 106.36,
-          "shares": 4900,
-          "pnl": -9359,
+          "shares": 2900,
+          "pnl": -5539,
           "returnPct": -0.017641082478987657,
           "reason": "stock-ma4",
           "boxStart": "2025-01-06",
@@ -6817,8 +6045,8 @@
           "exit": "2025-01-27",
           "entryPrice": 34.88,
           "exitPrice": 33.66,
-          "shares": 15000,
-          "pnl": -18300,
+          "shares": 8800,
+          "pnl": -10736,
           "returnPct": -0.03497706422018365,
           "reason": "stock-ma4",
           "boxStart": "2025-01-06",
@@ -6832,8 +6060,8 @@
           "exit": "2025-02-11",
           "entryPrice": 34.32,
           "exitPrice": 35.62,
-          "shares": 14700,
-          "pnl": 19110,
+          "shares": 8700,
+          "pnl": 11310,
           "returnPct": 0.037878787878787845,
           "reason": "stock-ma4",
           "boxStart": "2025-01-06",
@@ -6847,8 +6075,8 @@
           "exit": "2025-02-13",
           "entryPrice": 36.67,
           "exitPrice": 35.64,
-          "shares": 14300,
-          "pnl": -14729,
+          "shares": 8400,
+          "pnl": -8652,
           "returnPct": -0.028088355604035997,
           "reason": "stock-ma4",
           "boxStart": "2025-01-06",
@@ -6862,8 +6090,8 @@
           "exit": "2025-02-26",
           "entryPrice": 35.53,
           "exitPrice": 37.11,
-          "shares": 14400,
-          "pnl": 22752,
+          "shares": 8500,
+          "pnl": 13430,
           "returnPct": 0.04446946242611882,
           "reason": "stock-ma4",
           "boxStart": "2025-01-06",
@@ -6877,8 +6105,8 @@
           "exit": "2025-03-18",
           "entryPrice": 14.93,
           "exitPrice": 15.38,
-          "shares": 35800,
-          "pnl": 16110,
+          "shares": 21100,
+          "pnl": 9495,
           "returnPct": 0.030140656396517196,
           "reason": "box-end",
           "boxStart": "2025-03-13",
@@ -6892,8 +6120,8 @@
           "exit": "2025-04-16",
           "entryPrice": 31.15,
           "exitPrice": 36.72,
-          "shares": 17600,
-          "pnl": 98032,
+          "shares": 10400,
+          "pnl": 57928,
           "returnPct": 0.17881219903691825,
           "reason": "index-ma4",
           "boxStart": "2025-04-07",
@@ -6907,8 +6135,8 @@
           "exit": "2025-04-18",
           "entryPrice": 85.33,
           "exitPrice": 84.27,
-          "shares": 7600,
-          "pnl": -8056,
+          "shares": 4400,
+          "pnl": -4664,
           "returnPct": -0.012422360248447228,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -6922,8 +6150,8 @@
           "exit": "2025-04-24",
           "entryPrice": 31.9,
           "exitPrice": 31.83,
-          "shares": 20000,
-          "pnl": -1400,
+          "shares": 11800,
+          "pnl": -826,
           "returnPct": -0.0021943573667712046,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -6937,8 +6165,8 @@
           "exit": "2025-05-09",
           "entryPrice": 13.89,
           "exitPrice": 14.31,
-          "shares": 46000,
-          "pnl": 19320,
+          "shares": 27100,
+          "pnl": 11382,
           "returnPct": 0.030237580993520474,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -6952,8 +6180,8 @@
           "exit": "2025-05-21",
           "entryPrice": 13.98,
           "exitPrice": 14.09,
-          "shares": 47100,
-          "pnl": 5181,
+          "shares": 27800,
+          "pnl": 3058,
           "returnPct": 0.007868383404864066,
           "reason": "index-ma4",
           "boxStart": "2025-04-07",
@@ -6967,8 +6195,8 @@
           "exit": "2025-05-30",
           "entryPrice": 34.64,
           "exitPrice": 33.96,
-          "shares": 19100,
-          "pnl": -12988,
+          "shares": 11300,
+          "pnl": -7684,
           "returnPct": -0.019630484988452657,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -6982,8 +6210,8 @@
           "exit": "2025-06-10",
           "entryPrice": 14.21,
           "exitPrice": 15.62,
-          "shares": 45800,
-          "pnl": 64578,
+          "shares": 27000,
+          "pnl": 38070,
           "returnPct": 0.09922589725545383,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -6997,8 +6225,8 @@
           "exit": "2025-06-19",
           "entryPrice": 13.39,
           "exitPrice": 13.29,
-          "shares": 53400,
-          "pnl": -5340,
+          "shares": 31500,
+          "pnl": -3150,
           "returnPct": -0.007468259895444418,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -7012,8 +6240,8 @@
           "exit": "2025-06-20",
           "entryPrice": 25.87,
           "exitPrice": 25.77,
-          "shares": 27400,
-          "pnl": -2740,
+          "shares": 16200,
+          "pnl": -1620,
           "returnPct": -0.0038654812524159254,
           "reason": "index-ma4",
           "boxStart": "2025-04-07",
@@ -7027,8 +6255,8 @@
           "exit": "2025-07-02",
           "entryPrice": 13.81,
           "exitPrice": 14.2,
-          "shares": 51200,
-          "pnl": 19968,
+          "shares": 30200,
+          "pnl": 11778,
           "returnPct": 0.028240405503258348,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -7042,8 +6270,8 @@
           "exit": "2025-07-09",
           "entryPrice": 34.11,
           "exitPrice": 34.55,
-          "shares": 21300,
-          "pnl": 9372,
+          "shares": 12500,
+          "pnl": 5500,
           "returnPct": 0.012899442978598685,
           "reason": "index-ma4",
           "boxStart": "2025-04-07",
@@ -7057,8 +6285,8 @@
           "exit": "2025-07-14",
           "entryPrice": 14.18,
           "exitPrice": 14.09,
-          "shares": 51900,
-          "pnl": -4671,
+          "shares": 30600,
+          "pnl": -2754,
           "returnPct": -0.006346967559943573,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -7072,8 +6300,8 @@
           "exit": "2025-07-15",
           "entryPrice": 123.8,
           "exitPrice": 122.9,
-          "shares": 5900,
-          "pnl": -5310,
+          "shares": 3400,
+          "pnl": -3060,
           "returnPct": -0.007269789983844865,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -7087,8 +6315,8 @@
           "exit": "2025-07-29",
           "entryPrice": 9.89,
           "exitPrice": 10.21,
-          "shares": 73400,
-          "pnl": 23488,
+          "shares": 43300,
+          "pnl": 13856,
           "returnPct": 0.032355915065722884,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -7102,8 +6330,8 @@
           "exit": "2025-07-30",
           "entryPrice": 38.02,
           "exitPrice": 37.55,
-          "shares": 19700,
-          "pnl": -9259,
+          "shares": 11600,
+          "pnl": -5452,
           "returnPct": -0.012361914781694017,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -7117,8 +6345,8 @@
           "exit": "2025-07-31",
           "entryPrice": 17.87,
           "exitPrice": 17.27,
-          "shares": 41400,
-          "pnl": -24840,
+          "shares": 24400,
+          "pnl": -14640,
           "returnPct": -0.033575825405707915,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -7132,8 +6360,8 @@
           "exit": "2025-08-08",
           "entryPrice": 14.09,
           "exitPrice": 14.34,
-          "shares": 50800,
-          "pnl": 12700,
+          "shares": 30000,
+          "pnl": 7500,
           "returnPct": 0.017743080198722394,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -7147,8 +6375,8 @@
           "exit": "2025-08-14",
           "entryPrice": 14.44,
           "exitPrice": 14.22,
-          "shares": 50400,
-          "pnl": -11088,
+          "shares": 29800,
+          "pnl": -6556,
           "returnPct": -0.015235457063711877,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -7162,8 +6390,8 @@
           "exit": "2025-08-27",
           "entryPrice": 37.35,
           "exitPrice": 42.49,
-          "shares": 19200,
-          "pnl": 98688,
+          "shares": 11300,
+          "pnl": 58082,
           "returnPct": 0.13761713520749663,
           "reason": "index-ma4",
           "boxStart": "2025-04-07",
@@ -7177,8 +6405,8 @@
           "exit": "2025-09-02",
           "entryPrice": 16.18,
           "exitPrice": 16.48,
-          "shares": 50400,
-          "pnl": 15120,
+          "shares": 29700,
+          "pnl": 8910,
           "returnPct": 0.018541409147095234,
           "reason": "index-ma4",
           "boxStart": "2025-04-07",
@@ -7192,8 +6420,8 @@
           "exit": "2025-09-09",
           "entryPrice": 17.14,
           "exitPrice": 17.35,
-          "shares": 48500,
-          "pnl": 10185,
+          "shares": 28600,
+          "pnl": 6006,
           "returnPct": 0.01225204200700114,
           "reason": "index-ma4",
           "boxStart": "2025-04-07",
@@ -7207,8 +6435,8 @@
           "exit": "2025-09-23",
           "entryPrice": 42.66,
           "exitPrice": 48.28,
-          "shares": 19700,
-          "pnl": 110714,
+          "shares": 11600,
+          "pnl": 65192,
           "returnPct": 0.13173933427098006,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -7222,8 +6450,8 @@
           "exit": "2025-09-29",
           "entryPrice": 80.49,
           "exitPrice": 81.36,
-          "shares": 11800,
-          "pnl": 10266,
+          "shares": 6900,
+          "pnl": 6003,
           "returnPct": 0.010808796123742193,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -7237,8 +6465,8 @@
           "exit": "2025-10-10",
           "entryPrice": 18.69,
           "exitPrice": 21.51,
-          "shares": 51500,
-          "pnl": 145230,
+          "shares": 30300,
+          "pnl": 85446,
           "returnPct": 0.1508828250401284,
           "reason": "index-ma4",
           "boxStart": "2025-04-07",
@@ -7252,8 +6480,8 @@
           "exit": "2025-10-23",
           "entryPrice": 21.84,
           "exitPrice": 21.14,
-          "shares": 50700,
-          "pnl": -35490,
+          "shares": 29900,
+          "pnl": -20930,
           "returnPct": -0.03205128205128205,
           "reason": "index-ma4",
           "boxStart": "2025-04-07",
@@ -7267,7 +6495,7 @@
           "exit": "2025-10-30",
           "entryPrice": 84.17,
           "exitPrice": 84.17,
-          "shares": 12700,
+          "shares": 7500,
           "pnl": 0,
           "returnPct": 0,
           "reason": "stock-ma4",
@@ -7282,8 +6510,8 @@
           "exit": "2025-11-11",
           "entryPrice": 17.58,
           "exitPrice": 17.18,
-          "shares": 61000,
-          "pnl": -24400,
+          "shares": 35900,
+          "pnl": -14360,
           "returnPct": -0.022753128555176305,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -7297,8 +6525,8 @@
           "exit": "2025-11-14",
           "entryPrice": 84,
           "exitPrice": 82.72,
-          "shares": 12400,
-          "pnl": -15872,
+          "shares": 7300,
+          "pnl": -9344,
           "returnPct": -0.015238095238095273,
           "reason": "index-ma4",
           "boxStart": "2025-04-07",
@@ -7312,8 +6540,8 @@
           "exit": "2025-12-03",
           "entryPrice": 10.83,
           "exitPrice": 11.04,
-          "shares": 95300,
-          "pnl": 20013,
+          "shares": 56200,
+          "pnl": 11802,
           "returnPct": 0.01939058171745134,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -7327,8 +6555,8 @@
           "exit": "2025-12-09",
           "entryPrice": 119.98,
           "exitPrice": 120.03,
-          "shares": 8700,
-          "pnl": 435,
+          "shares": 5100,
+          "pnl": 255,
           "returnPct": 0.00041673612268700033,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -7342,8 +6570,8 @@
           "exit": "2025-12-11",
           "entryPrice": 181.51,
           "exitPrice": 181.39,
-          "shares": 5700,
-          "pnl": -684,
+          "shares": 3400,
+          "pnl": -408,
           "returnPct": -0.0006611205994160319,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -7357,8 +6585,8 @@
           "exit": "2025-12-15",
           "entryPrice": 39.12,
           "exitPrice": 38.04,
-          "shares": 26800,
-          "pnl": -28944,
+          "shares": 15800,
+          "pnl": -17064,
           "returnPct": -0.027607361963190136,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -7372,8 +6600,8 @@
           "exit": "2025-12-19",
           "entryPrice": 26.54,
           "exitPrice": 25.32,
-          "shares": 38500,
-          "pnl": -46970,
+          "shares": 22700,
+          "pnl": -27694,
           "returnPct": -0.04596834966088914,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -7387,8 +6615,8 @@
           "exit": "2025-12-29",
           "entryPrice": 200.45,
           "exitPrice": 240.76,
-          "shares": 4800,
-          "pnl": 193488,
+          "shares": 2800,
+          "pnl": 112868,
           "returnPct": 0.20109753055624857,
           "reason": "index-ma4",
           "boxStart": "2025-04-07",
@@ -7402,8 +6630,8 @@
           "exit": "2026-01-13",
           "entryPrice": 37.9,
           "exitPrice": 38.58,
-          "shares": 30800,
-          "pnl": 20944,
+          "shares": 18100,
+          "pnl": 12308,
           "returnPct": 0.017941952506596248,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -7417,8 +6645,8 @@
           "exit": "2026-01-23",
           "entryPrice": 238.98,
           "exitPrice": 278.7,
-          "shares": 4900,
-          "pnl": 194628,
+          "shares": 2900,
+          "pnl": 115188,
           "returnPct": 0.1662063771026865,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -7432,8 +6660,8 @@
           "exit": "2026-01-26",
           "entryPrice": 40.35,
           "exitPrice": 39.52,
-          "shares": 34300,
-          "pnl": -28469,
+          "shares": 20200,
+          "pnl": -16766,
           "returnPct": -0.020570012391573633,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -7447,8 +6675,8 @@
           "exit": "2026-01-29",
           "entryPrice": 14.66,
           "exitPrice": 14.8,
-          "shares": 92500,
-          "pnl": 12950,
+          "shares": 54500,
+          "pnl": 7630,
           "returnPct": 0.009549795361528002,
           "reason": "index-ma4",
           "boxStart": "2025-04-07",
@@ -7462,8 +6690,8 @@
           "exit": "2026-02-11",
           "entryPrice": 35.18,
           "exitPrice": 35.23,
-          "shares": 38900,
-          "pnl": 1945,
+          "shares": 22900,
+          "pnl": 1145,
           "returnPct": 0.001421262080727681,
           "reason": "index-ma4",
           "boxStart": "2025-04-07",
@@ -7477,8 +6705,8 @@
           "exit": "2026-03-02",
           "entryPrice": 26.09,
           "exitPrice": 27.7,
-          "shares": 52500,
-          "pnl": 84525,
+          "shares": 30900,
+          "pnl": 49749,
           "returnPct": 0.0617094672288232,
           "reason": "index-ma4",
           "boxStart": "2025-04-07",
@@ -7492,8 +6720,8 @@
           "exit": "2026-03-09",
           "entryPrice": 32.66,
           "exitPrice": 33.42,
-          "shares": 44500,
-          "pnl": 33820,
+          "shares": 26200,
+          "pnl": 19912,
           "returnPct": 0.0232700551132885,
           "reason": "index-ma4",
           "boxStart": "2025-04-07",
@@ -7507,8 +6735,8 @@
           "exit": "2026-03-12",
           "entryPrice": 114.08,
           "exitPrice": 112.82,
-          "shares": 13000,
-          "pnl": -16380,
+          "shares": 7600,
+          "pnl": -9576,
           "returnPct": -0.011044880785413769,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -7522,8 +6750,8 @@
           "exit": "2026-03-17",
           "entryPrice": 33.89,
           "exitPrice": 33.51,
-          "shares": 43400,
-          "pnl": -16492,
+          "shares": 25600,
+          "pnl": -9728,
           "returnPct": -0.011212747123045208,
           "reason": "index-ma4",
           "boxStart": "2025-04-07",
@@ -7537,8 +6765,8 @@
           "exit": "2026-03-19",
           "entryPrice": 17.1,
           "exitPrice": 17.05,
-          "shares": 85200,
-          "pnl": -4260,
+          "shares": 50200,
+          "pnl": -2510,
           "returnPct": -0.0029239766081872176,
           "reason": "index-ma4",
           "boxStart": "2025-04-07",
@@ -7552,8 +6780,8 @@
           "exit": "2026-03-26",
           "entryPrice": 32.4,
           "exitPrice": 32.49,
-          "shares": 44800,
-          "pnl": 4032,
+          "shares": 26400,
+          "pnl": 2376,
           "returnPct": 0.00277777777777799,
           "reason": "index-ma4",
           "boxStart": "2025-04-07",
@@ -7567,8 +6795,8 @@
           "exit": "2026-03-30",
           "entryPrice": 101.02,
           "exitPrice": 100.32,
-          "shares": 14400,
-          "pnl": -10080,
+          "shares": 8400,
+          "pnl": -5880,
           "returnPct": -0.006929320926549187,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -7582,8 +6810,8 @@
           "exit": "2026-03-31",
           "entryPrice": 16.95,
           "exitPrice": 16.53,
-          "shares": 85300,
-          "pnl": -35826,
+          "shares": 50200,
+          "pnl": -21084,
           "returnPct": -0.024778761061946764,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -7597,8 +6825,8 @@
           "exit": "2026-04-02",
           "entryPrice": 27.01,
           "exitPrice": 26.07,
-          "shares": 52200,
-          "pnl": -49068,
+          "shares": 30700,
+          "pnl": -28858,
           "returnPct": -0.034801925212884166,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -7612,8 +6840,8 @@
           "exit": "2026-04-21",
           "entryPrice": 378.18,
           "exitPrice": 514.6,
-          "shares": 3600,
-          "pnl": 491112,
+          "shares": 2100,
+          "pnl": 286482,
           "returnPct": 0.36072769580622976,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -7627,8 +6855,8 @@
           "exit": "2026-04-23",
           "entryPrice": 101.01,
           "exitPrice": 106,
-          "shares": 18300,
-          "pnl": 91317,
+          "shares": 10700,
+          "pnl": 53393,
           "returnPct": 0.04940104940104928,
           "reason": "index-ma4",
           "boxStart": "2025-04-07",
@@ -7642,8 +6870,8 @@
           "exit": "2026-05-13",
           "entryPrice": 35.64,
           "exitPrice": 43.57,
-          "shares": 54500,
-          "pnl": 432185,
+          "shares": 32000,
+          "pnl": 253760,
           "returnPct": 0.22250280583613913,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -7657,8 +6885,8 @@
           "exit": "2026-05-14",
           "entryPrice": 33.66,
           "exitPrice": 32.76,
-          "shares": 70600,
-          "pnl": -63540,
+          "shares": 41400,
+          "pnl": -37260,
           "returnPct": -0.0267379679144385,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -7672,8 +6900,8 @@
           "exit": "2026-05-18",
           "entryPrice": 124.46,
           "exitPrice": 123.6,
-          "shares": 18500,
-          "pnl": -15910,
+          "shares": 10900,
+          "pnl": -9374,
           "returnPct": -0.0069098505543949695,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -7687,8 +6915,8 @@
           "exit": "2026-05-21",
           "entryPrice": 14.69,
           "exitPrice": 15.19,
-          "shares": 156300,
-          "pnl": 78150,
+          "shares": 91800,
+          "pnl": 45900,
           "returnPct": 0.03403675970047648,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -7702,8 +6930,8 @@
           "exit": "2026-05-27",
           "entryPrice": 17.01,
           "exitPrice": 18.75,
-          "shares": 139600,
-          "pnl": 242904,
+          "shares": 82000,
+          "pnl": 142680,
           "returnPct": 0.10229276895943551,
           "reason": "index-ma4",
           "boxStart": "2025-04-07",
@@ -7717,8 +6945,8 @@
           "exit": "2026-05-29",
           "entryPrice": 18.64,
           "exitPrice": 17,
-          "shares": 140400,
-          "pnl": -230256,
+          "shares": 82500,
+          "pnl": -135300,
           "returnPct": -0.08798283261802575,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -7732,8 +6960,8 @@
           "exit": "2026-06-05",
           "entryPrice": 17.06,
           "exitPrice": 16.66,
-          "shares": 139900,
-          "pnl": -55960,
+          "shares": 82200,
+          "pnl": -32880,
           "returnPct": -0.023446658851113633,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -7747,8 +6975,8 @@
           "exit": "2026-06-12",
           "entryPrice": 54.53,
           "exitPrice": 55.99,
-          "shares": 42700,
-          "pnl": 62342,
+          "shares": 25100,
+          "pnl": 36646,
           "returnPct": 0.026774252704933055,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -7762,8 +6990,8 @@
           "exit": "2026-06-17",
           "entryPrice": 18.23,
           "exitPrice": 17.76,
-          "shares": 131300,
-          "pnl": -61711,
+          "shares": 77100,
+          "pnl": -36237,
           "returnPct": -0.02578167855183755,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -7777,8 +7005,8 @@
           "exit": "2026-06-23",
           "entryPrice": 59.74,
           "exitPrice": 59.06,
-          "shares": 39000,
-          "pnl": -26520,
+          "shares": 22900,
+          "pnl": -15572,
           "returnPct": -0.011382658185470351,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -7792,8 +7020,8 @@
           "exit": "2026-06-26",
           "entryPrice": 18.22,
           "exitPrice": 18.53,
-          "shares": 126500,
-          "pnl": 39215,
+          "shares": 74300,
+          "pnl": 23033,
           "returnPct": 0.01701427003293099,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -7807,8 +7035,8 @@
           "exit": "2026-06-30",
           "entryPrice": 16.87,
           "exitPrice": 16.82,
-          "shares": 139000,
-          "pnl": -6950,
+          "shares": 81600,
+          "pnl": -4080,
           "returnPct": -0.0029638411381149865,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -7822,8 +7050,8 @@
           "exit": "2026-08-18",
           "entryPrice": 12.7,
           "exitPrice": 13.06,
-          "shares": 184100,
-          "pnl": 66276,
+          "shares": 108100,
+          "pnl": 38916,
           "returnPct": 0.02834645669291347,
           "reason": "box-end",
           "boxStart": "2026-08-14",
@@ -7837,8 +7065,8 @@
           "exit": "2026-08-31",
           "entryPrice": 12.48,
           "exitPrice": 12.69,
-          "shares": 192600,
-          "pnl": 40446,
+          "shares": 113100,
+          "pnl": 23751,
           "returnPct": 0.016826923076922906,
           "reason": "box-end",
           "boxStart": "2026-08-25",
@@ -7852,8 +7080,8 @@
           "exit": "2026-09-17",
           "entryPrice": 29.49,
           "exitPrice": 28.47,
-          "shares": 82900,
-          "pnl": -84558,
+          "shares": 48700,
+          "pnl": -49674,
           "returnPct": -0.034587995930823956,
           "reason": "stock-ma4",
           "boxStart": "2026-09-11",
@@ -7867,426 +7095,199 @@
           "exit": "2026-09-23",
           "entryPrice": 396.93,
           "exitPrice": 410.32,
-          "shares": 5900,
-          "pnl": 79001,
+          "shares": 3400,
+          "pnl": 45526,
           "returnPct": 0.0337339077419192,
           "reason": "stock-ma4",
           "boxStart": "2026-09-11",
           "boxEnd": "2026-09-23"
+        },
+        {
+          "name": "豪威集团",
+          "code": "sh603501",
+          "standDays": 1,
+          "entry": "2026-10-20",
+          "exit": "2026-10-21",
+          "entryPrice": 76.91,
+          "exitPrice": 77.48,
+          "shares": 18600,
+          "pnl": 10602,
+          "returnPct": 0.007411259914185564,
+          "reason": "box-end",
+          "boxStart": "2026-10-19",
+          "boxEnd": "2026-10-21"
         }
       ],
       "monthlyEquity": [
         {
-          "time": "2023-01-31",
-          "equity": 106796
-        },
-        {
-          "time": "2023-02-28",
-          "equity": 101522
-        },
-        {
-          "time": "2023-03-31",
-          "equity": 100352
-        },
-        {
-          "time": "2023-04-28",
-          "equity": 107084
-        },
-        {
-          "time": "2023-05-31",
-          "equity": 121396
-        },
-        {
-          "time": "2023-06-30",
-          "equity": 133108
-        },
-        {
-          "time": "2023-07-31",
-          "equity": 130248
-        },
-        {
-          "time": "2023-08-31",
-          "equity": 147888
-        },
-        {
-          "time": "2023-09-28",
-          "equity": 154998
-        },
-        {
           "time": "2023-10-31",
-          "equity": 192113
+          "equity": 113970
         },
         {
           "time": "2023-11-30",
-          "equity": 196603
+          "equity": 116578
         },
         {
           "time": "2023-12-29",
-          "equity": 201626
+          "equity": 119525
         },
         {
           "time": "2024-01-31",
-          "equity": 201626
+          "equity": 119525
         },
         {
           "time": "2024-02-29",
-          "equity": 210566
+          "equity": 124805
         },
         {
           "time": "2024-03-29",
-          "equity": 238501
+          "equity": 141077
         },
         {
           "time": "2024-04-30",
-          "equity": 244032
+          "equity": 144350
         },
         {
           "time": "2024-05-31",
-          "equity": 253954
+          "equity": 150178
         },
         {
           "time": "2024-06-28",
-          "equity": 256147
+          "equity": 151476
         },
         {
           "time": "2024-07-31",
-          "equity": 257745
+          "equity": 152424
         },
         {
           "time": "2024-08-30",
-          "equity": 274356
+          "equity": 162239
         },
         {
           "time": "2024-09-30",
-          "equity": 345126
+          "equity": 204027
         },
         {
           "time": "2024-10-31",
-          "equity": 447293
+          "equity": 263795
         },
         {
           "time": "2024-11-29",
-          "equity": 529502
+          "equity": 312180
         },
         {
           "time": "2024-12-31",
-          "equity": 557998
+          "equity": 329242
         },
         {
           "time": "2025-01-27",
-          "equity": 507640
+          "equity": 299597
         },
         {
           "time": "2025-02-28",
-          "equity": 534773
+          "equity": 315685
         },
         {
           "time": "2025-03-31",
-          "equity": 550883
+          "equity": 325180
         },
         {
           "time": "2025-04-30",
-          "equity": 652799
+          "equity": 385477
         },
         {
           "time": "2025-05-30",
-          "equity": 650972
+          "equity": 384374
         },
         {
           "time": "2025-06-30",
-          "equity": 734606
+          "equity": 433680
         },
         {
           "time": "2025-07-31",
-          "equity": 716218
+          "equity": 422902
         },
         {
           "time": "2025-08-29",
-          "equity": 804926
+          "equity": 475097
         },
         {
           "time": "2025-09-30",
-          "equity": 1015333
+          "equity": 598945
         },
         {
           "time": "2025-10-31",
-          "equity": 1072543
+          "equity": 632555
         },
         {
           "time": "2025-11-28",
-          "equity": 1039895
+          "equity": 613347
         },
         {
           "time": "2025-12-31",
-          "equity": 1169609
+          "equity": 688610
         },
         {
           "time": "2026-01-30",
-          "equity": 1369662
+          "equity": 806970
         },
         {
           "time": "2026-02-27",
-          "equity": 1492357
+          "equity": 879185
         },
         {
           "time": "2026-03-31",
-          "equity": 1410946
+          "equity": 831374
         },
         {
           "time": "2026-04-30",
-          "equity": 2034777
+          "equity": 1195511
         },
         {
           "time": "2026-05-29",
-          "equity": 2387840
+          "equity": 1402797
         },
         {
           "time": "2026-06-30",
-          "equity": 2338256
+          "equity": 1373707
         },
         {
           "time": "2026-07-31",
-          "equity": 2338256
+          "equity": 1373707
         },
         {
           "time": "2026-08-31",
-          "equity": 2444978
+          "equity": 1436374
         },
         {
           "time": "2026-09-30",
-          "equity": 2439421
+          "equity": 1432226
+        },
+        {
+          "time": "2026-10-23",
+          "equity": 1442828
         }
       ]
     },
     {
-      "label": "2023.1.1–2026.10.1",
+      "label": "2023.10.25–2026.10.25",
       "entryMode": "in-box-on-ma4",
       "sameDayReentry": false,
-      "start": "2023-01-01",
-      "end": "2026-10-01",
-      "boxes": 53,
-      "trades": 113,
-      "skippedNoMa4": 7,
+      "start": "2023-10-25",
+      "end": "2026-10-25",
+      "boxes": 38,
+      "trades": 100,
+      "skippedNoMa4": 5,
       "skippedNoStock": 0,
       "skippedNoCash": 0,
-      "skippedOneDay": 14,
+      "skippedOneDay": 9,
       "capital": 100000,
-      "finalEquity": 2025395,
-      "returnPct": 19.25395,
-      "maxDrawdownPct": 0.14402706127684684,
-      "wins": 69,
-      "losses": 44,
+      "finalEquity": 1211028,
+      "returnPct": 11.11028,
+      "maxDrawdownPct": 0.14396472251244546,
+      "wins": 60,
+      "losses": 40,
       "tradePnls": [
-        {
-          "name": "*ST闻泰",
-          "code": "sh600745",
-          "standDays": 1,
-          "entry": "2023-01-03",
-          "exit": "2023-01-10",
-          "entryPrice": 53.81,
-          "exitPrice": 55.78,
-          "shares": 1800,
-          "pnl": 3546,
-          "returnPct": 0.036610295484110766,
-          "reason": "box-end",
-          "boxStart": "2023-01-03",
-          "boxEnd": "2023-01-10"
-        },
-        {
-          "name": "大为股份",
-          "code": "sz002213",
-          "standDays": 1,
-          "entry": "2023-01-16",
-          "exit": "2023-01-31",
-          "entryPrice": 15.79,
-          "exitPrice": 16.29,
-          "shares": 6500,
-          "pnl": 3250,
-          "returnPct": 0.03166561114629518,
-          "reason": "index-ma4",
-          "boxStart": "2023-01-13",
-          "boxEnd": "2023-02-15"
-        },
-        {
-          "name": "*ST闻泰",
-          "code": "sh600745",
-          "standDays": 1,
-          "entry": "2023-02-01",
-          "exit": "2023-02-06",
-          "entryPrice": 59.93,
-          "exitPrice": 59.04,
-          "shares": 1700,
-          "pnl": -1513,
-          "returnPct": -0.014850659102286001,
-          "reason": "stock-ma4",
-          "boxStart": "2023-01-13",
-          "boxEnd": "2023-02-15"
-        },
-        {
-          "name": "*ST闻泰",
-          "code": "sh600745",
-          "standDays": 1,
-          "entry": "2023-02-09",
-          "exit": "2023-02-14",
-          "entryPrice": 60.77,
-          "exitPrice": 59.44,
-          "shares": 1700,
-          "pnl": -2261,
-          "returnPct": -0.021885798913937937,
-          "reason": "stock-ma4",
-          "boxStart": "2023-01-13",
-          "boxEnd": "2023-02-15"
-        },
-        {
-          "name": "豪威集团",
-          "code": "sh603501",
-          "standDays": 1,
-          "entry": "2023-03-01",
-          "exit": "2023-03-06",
-          "entryPrice": 86.54,
-          "exitPrice": 86,
-          "shares": 1100,
-          "pnl": -594,
-          "returnPct": -0.006239889068638815,
-          "reason": "stock-ma4",
-          "boxStart": "2023-02-28",
-          "boxEnd": "2023-03-06"
-        },
-        {
-          "name": "*ST闻泰",
-          "code": "sh600745",
-          "standDays": 1,
-          "entry": "2023-03-30",
-          "exit": "2023-04-07",
-          "entryPrice": 55.57,
-          "exitPrice": 58.99,
-          "shares": 1800,
-          "pnl": 6156,
-          "returnPct": 0.06154399856037429,
-          "reason": "box-end",
-          "boxStart": "2023-03-29",
-          "boxEnd": "2023-04-07"
-        },
-        {
-          "name": "大为股份",
-          "code": "sz002213",
-          "standDays": 1,
-          "entry": "2023-05-15",
-          "exit": "2023-05-23",
-          "entryPrice": 12.36,
-          "exitPrice": 13.6,
-          "shares": 8700,
-          "pnl": 10788,
-          "returnPct": 0.10032362459546929,
-          "reason": "index-ma4",
-          "boxStart": "2023-05-15",
-          "boxEnd": "2023-05-31"
-        },
-        {
-          "name": "豪威集团",
-          "code": "sh603501",
-          "standDays": 1,
-          "entry": "2023-05-25",
-          "exit": "2023-05-31",
-          "entryPrice": 96.85,
-          "exitPrice": 99.89,
-          "shares": 1200,
-          "pnl": 3648,
-          "returnPct": 0.031388745482705316,
-          "reason": "box-end",
-          "boxStart": "2023-05-15",
-          "boxEnd": "2023-05-31"
-        },
-        {
-          "name": "*ST闻泰",
-          "code": "sh600745",
-          "standDays": 1,
-          "entry": "2023-06-09",
-          "exit": "2023-06-15",
-          "entryPrice": 49.49,
-          "exitPrice": 50.92,
-          "shares": 2400,
-          "pnl": 3432,
-          "returnPct": 0.028894726207314703,
-          "reason": "index-ma4",
-          "boxStart": "2023-06-09",
-          "boxEnd": "2023-06-19"
-        },
-        {
-          "name": "大港股份",
-          "code": "sz002077",
-          "standDays": 1,
-          "entry": "2023-06-16",
-          "exit": "2023-06-19",
-          "entryPrice": 15.53,
-          "exitPrice": 15.97,
-          "shares": 8100,
-          "pnl": 3564,
-          "returnPct": 0.028332260141661347,
-          "reason": "box-end",
-          "boxStart": "2023-06-09",
-          "boxEnd": "2023-06-19"
-        },
-        {
-          "name": "德明利",
-          "code": "sz001309",
-          "standDays": 1,
-          "entry": "2023-06-29",
-          "exit": "2023-07-03",
-          "entryPrice": 89.6,
-          "exitPrice": 90.27,
-          "shares": 1400,
-          "pnl": 938,
-          "returnPct": 0.007477678571428559,
-          "reason": "stock-ma4",
-          "boxStart": "2023-06-28",
-          "boxEnd": "2023-07-06"
-        },
-        {
-          "name": "大为股份",
-          "code": "sz002213",
-          "standDays": 1,
-          "entry": "2023-07-04",
-          "exit": "2023-07-05",
-          "entryPrice": 16.23,
-          "exitPrice": 15.82,
-          "shares": 8000,
-          "pnl": -3280,
-          "returnPct": -0.025261860751694454,
-          "reason": "stock-ma4",
-          "boxStart": "2023-06-28",
-          "boxEnd": "2023-07-06"
-        },
-        {
-          "name": "大港股份",
-          "code": "sz002077",
-          "standDays": 1,
-          "entry": "2023-08-29",
-          "exit": "2023-09-06",
-          "entryPrice": 14.44,
-          "exitPrice": 17.19,
-          "shares": 8800,
-          "pnl": 24200,
-          "returnPct": 0.19044321329639913,
-          "reason": "box-end",
-          "boxStart": "2023-08-25",
-          "boxEnd": "2023-09-06"
-        },
-        {
-          "name": "*ST闻泰",
-          "code": "sh600745",
-          "standDays": 1,
-          "entry": "2023-09-28",
-          "exit": "2023-10-13",
-          "entryPrice": 43.65,
-          "exitPrice": 47.36,
-          "shares": 3400,
-          "pnl": 12614,
-          "returnPct": 0.08499427262313852,
-          "reason": "box-end",
-          "boxStart": "2023-09-27",
-          "boxEnd": "2023-10-13"
-        },
         {
           "name": "*ST闻泰",
           "code": "sh600745",
@@ -8295,8 +7296,8 @@
           "exit": "2023-10-30",
           "entryPrice": 43.69,
           "exitPrice": 50.04,
-          "shares": 3700,
-          "pnl": 23495,
+          "shares": 2200,
+          "pnl": 13970,
           "returnPct": 0.14534218356603357,
           "reason": "box-end",
           "boxStart": "2023-10-24",
@@ -8310,8 +7311,8 @@
           "exit": "2023-11-09",
           "entryPrice": 50.05,
           "exitPrice": 51.93,
-          "shares": 3700,
-          "pnl": 6956,
+          "shares": 2200,
+          "pnl": 4136,
           "returnPct": 0.03756243756243771,
           "reason": "stock-ma4",
           "boxStart": "2023-11-02",
@@ -8325,8 +7326,8 @@
           "exit": "2023-11-16",
           "entryPrice": 9.19,
           "exitPrice": 9.23,
-          "shares": 21200,
-          "pnl": 848,
+          "shares": 12800,
+          "pnl": 512,
           "returnPct": 0.0043525571273124175,
           "reason": "stock-ma4",
           "boxStart": "2023-11-02",
@@ -8340,8 +7341,8 @@
           "exit": "2023-11-20",
           "entryPrice": 76.19,
           "exitPrice": 74.11,
-          "shares": 2500,
-          "pnl": -5200,
+          "shares": 1500,
+          "pnl": -3120,
           "returnPct": -0.027300170626066378,
           "reason": "stock-ma4",
           "boxStart": "2023-11-02",
@@ -8355,8 +7356,8 @@
           "exit": "2023-11-28",
           "entryPrice": 89.96,
           "exitPrice": 90.86,
-          "shares": 2100,
-          "pnl": 1890,
+          "shares": 1200,
+          "pnl": 1080,
           "returnPct": 0.010004446420631474,
           "reason": "box-end",
           "boxStart": "2023-11-24",
@@ -8370,8 +7371,8 @@
           "exit": "2023-12-11",
           "entryPrice": 44.55,
           "exitPrice": 44.67,
-          "shares": 4300,
-          "pnl": 516,
+          "shares": 2600,
+          "pnl": 312,
           "returnPct": 0.002693602693602859,
           "reason": "box-end",
           "boxStart": "2023-12-07",
@@ -8385,8 +7386,8 @@
           "exit": "2023-12-29",
           "entryPrice": 67.55,
           "exitPrice": 69.1,
-          "shares": 2800,
-          "pnl": 4340,
+          "shares": 1700,
+          "pnl": 2635,
           "returnPct": 0.022945965951147285,
           "reason": "box-end",
           "boxStart": "2023-12-26",
@@ -8400,8 +7401,8 @@
           "exit": "2024-02-28",
           "entryPrice": 13.47,
           "exitPrice": 14.07,
-          "shares": 14600,
-          "pnl": 8760,
+          "shares": 8800,
+          "pnl": 5280,
           "returnPct": 0.04454342984409787,
           "reason": "stock-ma4",
           "boxStart": "2024-02-06",
@@ -8415,8 +7416,8 @@
           "exit": "2024-03-05",
           "entryPrice": 38.15,
           "exitPrice": 40.92,
-          "shares": 5400,
-          "pnl": 14958,
+          "shares": 3200,
+          "pnl": 8864,
           "returnPct": 0.07260812581913512,
           "reason": "index-ma4",
           "boxStart": "2024-02-06",
@@ -8430,8 +7431,8 @@
           "exit": "2024-03-14",
           "entryPrice": 90.87,
           "exitPrice": 96.15,
-          "shares": 2400,
-          "pnl": 12672,
+          "shares": 1400,
+          "pnl": 7392,
           "returnPct": 0.05810498514361173,
           "reason": "index-ma4",
           "boxStart": "2024-02-06",
@@ -8445,8 +7446,8 @@
           "exit": "2024-03-20",
           "entryPrice": 160.9,
           "exitPrice": 160.92,
-          "shares": 1400,
-          "pnl": 28,
+          "shares": 800,
+          "pnl": 16,
           "returnPct": 0.00012430080795522436,
           "reason": "stock-ma4",
           "boxStart": "2024-02-06",
@@ -8460,8 +7461,8 @@
           "exit": "2024-04-01",
           "entryPrice": 12.2,
           "exitPrice": 12.18,
-          "shares": 19100,
-          "pnl": -382,
+          "shares": 11500,
+          "pnl": -230,
           "returnPct": -0.0016393442622950616,
           "reason": "box-end",
           "boxStart": "2024-03-28",
@@ -8475,8 +7476,8 @@
           "exit": "2024-04-30",
           "entryPrice": 12.46,
           "exitPrice": 12.77,
-          "shares": 18700,
-          "pnl": 5797,
+          "shares": 11300,
+          "pnl": 3503,
           "returnPct": 0.024879614767255198,
           "reason": "stock-ma4",
           "boxStart": "2024-04-22",
@@ -8490,8 +7491,8 @@
           "exit": "2024-05-07",
           "entryPrice": 11.29,
           "exitPrice": 11.14,
-          "shares": 21100,
-          "pnl": -3165,
+          "shares": 12700,
+          "pnl": -1905,
           "returnPct": -0.013286093888396633,
           "reason": "stock-ma4",
           "boxStart": "2024-04-22",
@@ -8505,8 +7506,8 @@
           "exit": "2024-05-22",
           "entryPrice": 8.13,
           "exitPrice": 8.35,
-          "shares": 29000,
-          "pnl": 6380,
+          "shares": 17500,
+          "pnl": 3850,
           "returnPct": 0.027060270602705883,
           "reason": "box-end",
           "boxStart": "2024-05-15",
@@ -8520,8 +7521,8 @@
           "exit": "2024-06-14",
           "entryPrice": 29.85,
           "exitPrice": 29.96,
-          "shares": 8100,
-          "pnl": 891,
+          "shares": 4900,
+          "pnl": 539,
           "returnPct": 0.003685092127303058,
           "reason": "stock-ma4",
           "boxStart": "2024-06-04",
@@ -8535,8 +7536,8 @@
           "exit": "2024-06-20",
           "entryPrice": 31.58,
           "exitPrice": 30.33,
-          "shares": 7700,
-          "pnl": -9625,
+          "shares": 4600,
+          "pnl": -5750,
           "returnPct": -0.039582013932868865,
           "reason": "stock-ma4",
           "boxStart": "2024-06-04",
@@ -8550,8 +7551,8 @@
           "exit": "2024-07-15",
           "entryPrice": 29.01,
           "exitPrice": 29.06,
-          "shares": 8000,
-          "pnl": 400,
+          "shares": 4800,
+          "pnl": 240,
           "returnPct": 0.0017235436056530773,
           "reason": "stock-ma4",
           "boxStart": "2024-07-05",
@@ -8565,8 +7566,8 @@
           "exit": "2024-07-17",
           "entryPrice": 30.26,
           "exitPrice": 29.9,
-          "shares": 7700,
-          "pnl": -2772,
+          "shares": 4600,
+          "pnl": -1656,
           "returnPct": -0.01189689358889634,
           "reason": "index-ma4",
           "boxStart": "2024-07-05",
@@ -8580,8 +7581,8 @@
           "exit": "2024-07-22",
           "entryPrice": 30.61,
           "exitPrice": 30.72,
-          "shares": 7500,
-          "pnl": 825,
+          "shares": 4500,
+          "pnl": 495,
           "returnPct": 0.003593596863769921,
           "reason": "box-end",
           "boxStart": "2024-07-05",
@@ -8595,8 +7596,8 @@
           "exit": "2024-08-01",
           "entryPrice": 12.92,
           "exitPrice": 13.01,
-          "shares": 17900,
-          "pnl": 1611,
+          "shares": 10800,
+          "pnl": 972,
           "returnPct": 0.006965944272445901,
           "reason": "box-end",
           "boxStart": "2024-07-26",
@@ -8610,8 +7611,8 @@
           "exit": "2024-08-30",
           "entryPrice": 24.92,
           "exitPrice": 26.1,
-          "shares": 9300,
-          "pnl": 10974,
+          "shares": 5600,
+          "pnl": 6608,
           "returnPct": 0.047351524879614804,
           "reason": "box-end",
           "boxStart": "2024-08-28",
@@ -8625,8 +7626,8 @@
           "exit": "2024-10-10",
           "entryPrice": 25.99,
           "exitPrice": 32.9,
-          "shares": 9400,
-          "pnl": 64954,
+          "shares": 5600,
+          "pnl": 38696,
           "returnPct": 0.26587148903424396,
           "reason": "stock-ma4",
           "boxStart": "2024-09-24",
@@ -8640,8 +7641,8 @@
           "exit": "2024-10-29",
           "entryPrice": 32.71,
           "exitPrice": 42.18,
-          "shares": 9400,
-          "pnl": 89018,
+          "shares": 5600,
+          "pnl": 53032,
           "returnPct": 0.28951391011922945,
           "reason": "index-ma4",
           "boxStart": "2024-09-24",
@@ -8655,8 +7656,8 @@
           "exit": "2024-11-01",
           "entryPrice": 90.17,
           "exitPrice": 86.3,
-          "shares": 4400,
-          "pnl": -17028,
+          "shares": 2600,
+          "pnl": -10062,
           "returnPct": -0.04291893090828436,
           "reason": "stock-ma4",
           "boxStart": "2024-09-24",
@@ -8670,8 +7671,8 @@
           "exit": "2024-11-11",
           "entryPrice": 14.62,
           "exitPrice": 17.9,
-          "shares": 26100,
-          "pnl": 85608,
+          "shares": 15600,
+          "pnl": 51168,
           "returnPct": 0.22435020519835835,
           "reason": "box-end",
           "boxStart": "2024-09-24",
@@ -8685,8 +7686,8 @@
           "exit": "2024-11-21",
           "entryPrice": 16.19,
           "exitPrice": 16.51,
-          "shares": 28800,
-          "pnl": 9216,
+          "shares": 17300,
+          "pnl": 5536,
           "returnPct": 0.019765287214329907,
           "reason": "box-end",
           "boxStart": "2024-11-18",
@@ -8700,8 +7701,8 @@
           "exit": "2024-12-02",
           "entryPrice": 41.07,
           "exitPrice": 37.5,
-          "shares": 11600,
-          "pnl": -41412,
+          "shares": 6900,
+          "pnl": -24633,
           "returnPct": -0.08692476260043824,
           "reason": "stock-ma4",
           "boxStart": "2024-11-25",
@@ -8715,8 +7716,8 @@
           "exit": "2024-12-04",
           "entryPrice": 11.94,
           "exitPrice": 13.13,
-          "shares": 36400,
-          "pnl": 43316,
+          "shares": 21800,
+          "pnl": 25942,
           "returnPct": 0.0996649916247907,
           "reason": "index-ma4",
           "boxStart": "2024-11-25",
@@ -8730,8 +7731,8 @@
           "exit": "2024-12-09",
           "entryPrice": 36.99,
           "exitPrice": 36.58,
-          "shares": 12900,
-          "pnl": -5289,
+          "shares": 7700,
+          "pnl": -3157,
           "returnPct": -0.011084076777507557,
           "reason": "stock-ma4",
           "boxStart": "2024-11-25",
@@ -8745,8 +7746,8 @@
           "exit": "2024-12-11",
           "entryPrice": 11.95,
           "exitPrice": 12.07,
-          "shares": 39500,
-          "pnl": 4740,
+          "shares": 23700,
+          "pnl": 2844,
           "returnPct": 0.01004184100418426,
           "reason": "box-end",
           "boxStart": "2024-11-25",
@@ -8760,8 +7761,8 @@
           "exit": "2024-12-20",
           "entryPrice": 35.38,
           "exitPrice": 36.25,
-          "shares": 13500,
-          "pnl": 11745,
+          "shares": 8100,
+          "pnl": 7047,
           "returnPct": 0.024590163934426146,
           "reason": "box-end",
           "boxStart": "2024-12-18",
@@ -8775,8 +7776,8 @@
           "exit": "2025-01-10",
           "entryPrice": 14.59,
           "exitPrice": 14,
-          "shares": 33500,
-          "pnl": -19765,
+          "shares": 20100,
+          "pnl": -11859,
           "returnPct": -0.04043865661411927,
           "reason": "stock-ma4",
           "boxStart": "2025-01-06",
@@ -8790,8 +7791,8 @@
           "exit": "2025-01-22",
           "entryPrice": 33.16,
           "exitPrice": 33.15,
-          "shares": 14100,
-          "pnl": -141,
+          "shares": 8500,
+          "pnl": -85,
           "returnPct": -0.00030156815440285367,
           "reason": "stock-ma4",
           "boxStart": "2025-01-06",
@@ -8805,8 +7806,8 @@
           "exit": "2025-01-27",
           "entryPrice": 34.88,
           "exitPrice": 33.66,
-          "shares": 13400,
-          "pnl": -16348,
+          "shares": 8000,
+          "pnl": -9760,
           "returnPct": -0.03497706422018365,
           "reason": "stock-ma4",
           "boxStart": "2025-01-06",
@@ -8820,8 +7821,8 @@
           "exit": "2025-02-11",
           "entryPrice": 34.32,
           "exitPrice": 35.62,
-          "shares": 13200,
-          "pnl": 17160,
+          "shares": 7900,
+          "pnl": 10270,
           "returnPct": 0.037878787878787845,
           "reason": "stock-ma4",
           "boxStart": "2025-01-06",
@@ -8835,8 +7836,8 @@
           "exit": "2025-02-13",
           "entryPrice": 36.67,
           "exitPrice": 35.64,
-          "shares": 12800,
-          "pnl": -13184,
+          "shares": 7700,
+          "pnl": -7931,
           "returnPct": -0.028088355604035997,
           "reason": "stock-ma4",
           "boxStart": "2025-01-06",
@@ -8850,8 +7851,8 @@
           "exit": "2025-02-26",
           "entryPrice": 35.53,
           "exitPrice": 37.11,
-          "shares": 12800,
-          "pnl": 20224,
+          "shares": 7700,
+          "pnl": 12166,
           "returnPct": 0.04446946242611882,
           "reason": "stock-ma4",
           "boxStart": "2025-01-06",
@@ -8865,8 +7866,8 @@
           "exit": "2025-03-18",
           "entryPrice": 14.93,
           "exitPrice": 15.38,
-          "shares": 31900,
-          "pnl": 14355,
+          "shares": 19200,
+          "pnl": 8640,
           "returnPct": 0.030140656396517196,
           "reason": "box-end",
           "boxStart": "2025-03-13",
@@ -8880,8 +7881,8 @@
           "exit": "2025-04-16",
           "entryPrice": 31.15,
           "exitPrice": 36.72,
-          "shares": 15700,
-          "pnl": 87449,
+          "shares": 9400,
+          "pnl": 52358,
           "returnPct": 0.17881219903691825,
           "reason": "index-ma4",
           "boxStart": "2025-04-07",
@@ -8895,8 +7896,8 @@
           "exit": "2025-04-18",
           "entryPrice": 85.33,
           "exitPrice": 84.27,
-          "shares": 6700,
-          "pnl": -7102,
+          "shares": 4000,
+          "pnl": -4240,
           "returnPct": -0.012422360248447228,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -8910,8 +7911,8 @@
           "exit": "2025-04-24",
           "entryPrice": 31.9,
           "exitPrice": 31.83,
-          "shares": 17900,
-          "pnl": -1253,
+          "shares": 10700,
+          "pnl": -749,
           "returnPct": -0.0021943573667712046,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -8925,8 +7926,8 @@
           "exit": "2025-05-09",
           "entryPrice": 13.89,
           "exitPrice": 14.31,
-          "shares": 41100,
-          "pnl": 17262,
+          "shares": 24600,
+          "pnl": 10332,
           "returnPct": 0.030237580993520474,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -8940,8 +7941,8 @@
           "exit": "2025-05-21",
           "entryPrice": 13.98,
           "exitPrice": 14.09,
-          "shares": 42000,
-          "pnl": 4620,
+          "shares": 25200,
+          "pnl": 2772,
           "returnPct": 0.007868383404864066,
           "reason": "index-ma4",
           "boxStart": "2025-04-07",
@@ -8955,8 +7956,8 @@
           "exit": "2025-05-30",
           "entryPrice": 34.64,
           "exitPrice": 33.96,
-          "shares": 17100,
-          "pnl": -11628,
+          "shares": 10200,
+          "pnl": -6936,
           "returnPct": -0.019630484988452657,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -8970,8 +7971,8 @@
           "exit": "2025-06-10",
           "entryPrice": 14.21,
           "exitPrice": 15.62,
-          "shares": 40900,
-          "pnl": 57669,
+          "shares": 24500,
+          "pnl": 34545,
           "returnPct": 0.09922589725545383,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -8985,8 +7986,8 @@
           "exit": "2025-06-19",
           "entryPrice": 13.39,
           "exitPrice": 13.29,
-          "shares": 47700,
-          "pnl": -4770,
+          "shares": 28600,
+          "pnl": -2860,
           "returnPct": -0.007468259895444418,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -9000,8 +8001,8 @@
           "exit": "2025-07-02",
           "entryPrice": 13.81,
           "exitPrice": 14.2,
-          "shares": 45900,
-          "pnl": 17901,
+          "shares": 27500,
+          "pnl": 10725,
           "returnPct": 0.028240405503258348,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -9015,8 +8016,8 @@
           "exit": "2025-07-09",
           "entryPrice": 34.11,
           "exitPrice": 34.55,
-          "shares": 19100,
-          "pnl": 8404,
+          "shares": 11400,
+          "pnl": 5016,
           "returnPct": 0.012899442978598685,
           "reason": "index-ma4",
           "boxStart": "2025-04-07",
@@ -9030,8 +8031,8 @@
           "exit": "2025-07-14",
           "entryPrice": 14.18,
           "exitPrice": 14.09,
-          "shares": 46500,
-          "pnl": -4185,
+          "shares": 27900,
+          "pnl": -2511,
           "returnPct": -0.006346967559943573,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -9045,8 +8046,8 @@
           "exit": "2025-07-29",
           "entryPrice": 9.89,
           "exitPrice": 10.21,
-          "shares": 66300,
-          "pnl": 21216,
+          "shares": 39800,
+          "pnl": 12736,
           "returnPct": 0.032355915065722884,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -9060,8 +8061,8 @@
           "exit": "2025-07-31",
           "entryPrice": 17.87,
           "exitPrice": 17.27,
-          "shares": 37900,
-          "pnl": -22740,
+          "shares": 22700,
+          "pnl": -13620,
           "returnPct": -0.033575825405707915,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -9075,8 +8076,8 @@
           "exit": "2025-08-08",
           "entryPrice": 14.09,
           "exitPrice": 14.34,
-          "shares": 46400,
-          "pnl": 11600,
+          "shares": 27900,
+          "pnl": 6975,
           "returnPct": 0.017743080198722394,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -9090,8 +8091,8 @@
           "exit": "2025-08-14",
           "entryPrice": 14.44,
           "exitPrice": 14.22,
-          "shares": 46100,
-          "pnl": -10142,
+          "shares": 27700,
+          "pnl": -6094,
           "returnPct": -0.015235457063711877,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -9105,8 +8106,8 @@
           "exit": "2025-08-27",
           "entryPrice": 37.35,
           "exitPrice": 42.49,
-          "shares": 17500,
-          "pnl": 89950,
+          "shares": 10500,
+          "pnl": 53970,
           "returnPct": 0.13761713520749663,
           "reason": "index-ma4",
           "boxStart": "2025-04-07",
@@ -9120,8 +8121,8 @@
           "exit": "2025-09-02",
           "entryPrice": 16.18,
           "exitPrice": 16.48,
-          "shares": 46100,
-          "pnl": 13830,
+          "shares": 27600,
+          "pnl": 8280,
           "returnPct": 0.018541409147095234,
           "reason": "index-ma4",
           "boxStart": "2025-04-07",
@@ -9135,8 +8136,8 @@
           "exit": "2025-09-09",
           "entryPrice": 17.14,
           "exitPrice": 17.35,
-          "shares": 44300,
-          "pnl": 9303,
+          "shares": 26600,
+          "pnl": 5586,
           "returnPct": 0.01225204200700114,
           "reason": "index-ma4",
           "boxStart": "2025-04-07",
@@ -9150,8 +8151,8 @@
           "exit": "2025-09-23",
           "entryPrice": 42.66,
           "exitPrice": 48.28,
-          "shares": 18000,
-          "pnl": 101160,
+          "shares": 10800,
+          "pnl": 60696,
           "returnPct": 0.13173933427098006,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -9165,8 +8166,8 @@
           "exit": "2025-09-26",
           "entryPrice": 48.72,
           "exitPrice": 48.2,
-          "shares": 17800,
-          "pnl": -9256,
+          "shares": 10700,
+          "pnl": -5564,
           "returnPct": -0.010673234811165777,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -9180,8 +8181,8 @@
           "exit": "2025-10-10",
           "entryPrice": 18.69,
           "exitPrice": 21.51,
-          "shares": 46000,
-          "pnl": 129720,
+          "shares": 27600,
+          "pnl": 77832,
           "returnPct": 0.1508828250401284,
           "reason": "index-ma4",
           "boxStart": "2025-04-07",
@@ -9195,8 +8196,8 @@
           "exit": "2025-10-23",
           "entryPrice": 21.84,
           "exitPrice": 21.14,
-          "shares": 45300,
-          "pnl": -31710,
+          "shares": 27200,
+          "pnl": -19040,
           "returnPct": -0.03205128205128205,
           "reason": "index-ma4",
           "boxStart": "2025-04-07",
@@ -9210,7 +8211,7 @@
           "exit": "2025-10-30",
           "entryPrice": 84.17,
           "exitPrice": 84.17,
-          "shares": 11300,
+          "shares": 6800,
           "pnl": 0,
           "returnPct": 0,
           "reason": "stock-ma4",
@@ -9225,8 +8226,8 @@
           "exit": "2025-11-11",
           "entryPrice": 17.58,
           "exitPrice": 17.18,
-          "shares": 54500,
-          "pnl": -21800,
+          "shares": 32700,
+          "pnl": -13080,
           "returnPct": -0.022753128555176305,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -9240,8 +8241,8 @@
           "exit": "2025-11-14",
           "entryPrice": 84,
           "exitPrice": 82.72,
-          "shares": 11100,
-          "pnl": -14208,
+          "shares": 6600,
+          "pnl": -8448,
           "returnPct": -0.015238095238095273,
           "reason": "index-ma4",
           "boxStart": "2025-04-07",
@@ -9255,8 +8256,8 @@
           "exit": "2025-12-03",
           "entryPrice": 10.83,
           "exitPrice": 11.04,
-          "shares": 85200,
-          "pnl": 17892,
+          "shares": 51100,
+          "pnl": 10731,
           "returnPct": 0.01939058171745134,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -9270,8 +8271,8 @@
           "exit": "2025-12-09",
           "entryPrice": 119.98,
           "exitPrice": 120.03,
-          "shares": 7800,
-          "pnl": 390,
+          "shares": 4700,
+          "pnl": 235,
           "returnPct": 0.00041673612268700033,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -9285,8 +8286,8 @@
           "exit": "2025-12-11",
           "entryPrice": 123.7,
           "exitPrice": 121.77,
-          "shares": 7600,
-          "pnl": -14668,
+          "shares": 4500,
+          "pnl": -8685,
           "returnPct": -0.015602263540824612,
           "reason": "index-ma4",
           "boxStart": "2025-04-07",
@@ -9300,8 +8301,8 @@
           "exit": "2025-12-15",
           "entryPrice": 39.12,
           "exitPrice": 38.04,
-          "shares": 23600,
-          "pnl": -25488,
+          "shares": 14200,
+          "pnl": -15336,
           "returnPct": -0.027607361963190136,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -9315,8 +8316,8 @@
           "exit": "2025-12-19",
           "entryPrice": 26.54,
           "exitPrice": 25.32,
-          "shares": 33900,
-          "pnl": -41358,
+          "shares": 20300,
+          "pnl": -24766,
           "returnPct": -0.04596834966088914,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -9330,8 +8331,8 @@
           "exit": "2025-12-29",
           "entryPrice": 200.45,
           "exitPrice": 240.76,
-          "shares": 4200,
-          "pnl": 169302,
+          "shares": 2500,
+          "pnl": 100775,
           "returnPct": 0.20109753055624857,
           "reason": "index-ma4",
           "boxStart": "2025-04-07",
@@ -9345,8 +8346,8 @@
           "exit": "2026-01-13",
           "entryPrice": 37.9,
           "exitPrice": 38.58,
-          "shares": 27100,
-          "pnl": 18428,
+          "shares": 16200,
+          "pnl": 11016,
           "returnPct": 0.017941952506596248,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -9360,8 +8361,8 @@
           "exit": "2026-01-23",
           "entryPrice": 238.98,
           "exitPrice": 278.7,
-          "shares": 4300,
-          "pnl": 170796,
+          "shares": 2600,
+          "pnl": 103272,
           "returnPct": 0.1662063771026865,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -9375,8 +8376,8 @@
           "exit": "2026-01-29",
           "entryPrice": 14.66,
           "exitPrice": 14.8,
-          "shares": 83100,
-          "pnl": 11634,
+          "shares": 49800,
+          "pnl": 6972,
           "returnPct": 0.009549795361528002,
           "reason": "index-ma4",
           "boxStart": "2025-04-07",
@@ -9390,8 +8391,8 @@
           "exit": "2026-02-11",
           "entryPrice": 35.18,
           "exitPrice": 35.23,
-          "shares": 34900,
-          "pnl": 1745,
+          "shares": 20900,
+          "pnl": 1045,
           "returnPct": 0.001421262080727681,
           "reason": "index-ma4",
           "boxStart": "2025-04-07",
@@ -9405,8 +8406,8 @@
           "exit": "2026-03-02",
           "entryPrice": 26.09,
           "exitPrice": 27.7,
-          "shares": 47200,
-          "pnl": 75992,
+          "shares": 28300,
+          "pnl": 45563,
           "returnPct": 0.0617094672288232,
           "reason": "index-ma4",
           "boxStart": "2025-04-07",
@@ -9420,8 +8421,8 @@
           "exit": "2026-03-09",
           "entryPrice": 32.66,
           "exitPrice": 33.42,
-          "shares": 40000,
-          "pnl": 30400,
+          "shares": 24000,
+          "pnl": 18240,
           "returnPct": 0.0232700551132885,
           "reason": "index-ma4",
           "boxStart": "2025-04-07",
@@ -9435,8 +8436,8 @@
           "exit": "2026-03-12",
           "entryPrice": 114.08,
           "exitPrice": 112.82,
-          "shares": 11700,
-          "pnl": -14742,
+          "shares": 7000,
+          "pnl": -8820,
           "returnPct": -0.011044880785413769,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -9450,8 +8451,8 @@
           "exit": "2026-03-17",
           "entryPrice": 33.89,
           "exitPrice": 33.51,
-          "shares": 39000,
-          "pnl": -14820,
+          "shares": 23400,
+          "pnl": -8892,
           "returnPct": -0.011212747123045208,
           "reason": "index-ma4",
           "boxStart": "2025-04-07",
@@ -9465,8 +8466,8 @@
           "exit": "2026-03-19",
           "entryPrice": 17.1,
           "exitPrice": 17.05,
-          "shares": 76500,
-          "pnl": -3825,
+          "shares": 45900,
+          "pnl": -2295,
           "returnPct": -0.0029239766081872176,
           "reason": "index-ma4",
           "boxStart": "2025-04-07",
@@ -9480,8 +8481,8 @@
           "exit": "2026-03-26",
           "entryPrice": 32.4,
           "exitPrice": 32.49,
-          "shares": 40200,
-          "pnl": 3618,
+          "shares": 24100,
+          "pnl": 2169,
           "returnPct": 0.00277777777777799,
           "reason": "index-ma4",
           "boxStart": "2025-04-07",
@@ -9495,8 +8496,8 @@
           "exit": "2026-03-30",
           "entryPrice": 101.02,
           "exitPrice": 100.32,
-          "shares": 12900,
-          "pnl": -9030,
+          "shares": 7700,
+          "pnl": -5390,
           "returnPct": -0.006929320926549187,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -9510,8 +8511,8 @@
           "exit": "2026-04-02",
           "entryPrice": 27.01,
           "exitPrice": 26.07,
-          "shares": 48100,
-          "pnl": -45214,
+          "shares": 28800,
+          "pnl": -27072,
           "returnPct": -0.034801925212884166,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -9525,8 +8526,8 @@
           "exit": "2026-04-21",
           "entryPrice": 378.18,
           "exitPrice": 514.6,
-          "shares": 3300,
-          "pnl": 450186,
+          "shares": 1900,
+          "pnl": 259198,
           "returnPct": 0.36072769580622976,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -9540,8 +8541,8 @@
           "exit": "2026-04-23",
           "entryPrice": 525,
           "exitPrice": 494.69,
-          "shares": 3200,
-          "pnl": -96992,
+          "shares": 1900,
+          "pnl": -57589,
           "returnPct": -0.0577333333333333,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -9555,8 +8556,8 @@
           "exit": "2026-05-13",
           "entryPrice": 35.64,
           "exitPrice": 43.57,
-          "shares": 45100,
-          "pnl": 357643,
+          "shares": 26700,
+          "pnl": 211731,
           "returnPct": 0.22250280583613913,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -9570,8 +8571,8 @@
           "exit": "2026-05-18",
           "entryPrice": 124.46,
           "exitPrice": 123.6,
-          "shares": 15700,
-          "pnl": -13502,
+          "shares": 9300,
+          "pnl": -7998,
           "returnPct": -0.0069098505543949695,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -9585,8 +8586,8 @@
           "exit": "2026-05-21",
           "entryPrice": 17.45,
           "exitPrice": 17.79,
-          "shares": 111800,
-          "pnl": 38012,
+          "shares": 66300,
+          "pnl": 22542,
           "returnPct": 0.019484240687679177,
           "reason": "index-ma4",
           "boxStart": "2025-04-07",
@@ -9600,8 +8601,8 @@
           "exit": "2026-05-27",
           "entryPrice": 17.01,
           "exitPrice": 18.75,
-          "shares": 116900,
-          "pnl": 203406,
+          "shares": 69400,
+          "pnl": 120756,
           "returnPct": 0.10229276895943551,
           "reason": "index-ma4",
           "boxStart": "2025-04-07",
@@ -9615,8 +8616,8 @@
           "exit": "2026-05-29",
           "entryPrice": 18.64,
           "exitPrice": 17,
-          "shares": 117600,
-          "pnl": -192864,
+          "shares": 69800,
+          "pnl": -114472,
           "returnPct": -0.08798283261802575,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -9630,8 +8631,8 @@
           "exit": "2026-06-05",
           "entryPrice": 17.06,
           "exitPrice": 16.66,
-          "shares": 117200,
-          "pnl": -46880,
+          "shares": 69500,
+          "pnl": -27800,
           "returnPct": -0.023446658851113633,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -9645,8 +8646,8 @@
           "exit": "2026-06-12",
           "entryPrice": 54.53,
           "exitPrice": 55.99,
-          "shares": 35800,
-          "pnl": 52268,
+          "shares": 21200,
+          "pnl": 30952,
           "returnPct": 0.026774252704933055,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -9660,8 +8661,8 @@
           "exit": "2026-06-17",
           "entryPrice": 18.23,
           "exitPrice": 17.76,
-          "shares": 110000,
-          "pnl": -51700,
+          "shares": 65200,
+          "pnl": -30644,
           "returnPct": -0.02578167855183755,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -9675,8 +8676,8 @@
           "exit": "2026-06-23",
           "entryPrice": 59.04,
           "exitPrice": 59.06,
-          "shares": 33000,
-          "pnl": 660,
+          "shares": 19600,
+          "pnl": 392,
           "returnPct": 0.0003387533875338633,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -9690,8 +8691,8 @@
           "exit": "2026-06-26",
           "entryPrice": 90.3,
           "exitPrice": 86.72,
-          "shares": 21600,
-          "pnl": -77328,
+          "shares": 12800,
+          "pnl": -45824,
           "returnPct": -0.039645625692137254,
           "reason": "stock-ma4",
           "boxStart": "2025-04-07",
@@ -9705,8 +8706,8 @@
           "exit": "2026-06-30",
           "entryPrice": 139.04,
           "exitPrice": 152.94,
-          "shares": 13500,
-          "pnl": 187650,
+          "shares": 8000,
+          "pnl": 111200,
           "returnPct": 0.09997123130034535,
           "reason": "box-end",
           "boxStart": "2025-04-07",
@@ -9720,8 +8721,8 @@
           "exit": "2026-08-18",
           "entryPrice": 12.7,
           "exitPrice": 13.06,
-          "shares": 162500,
-          "pnl": 58500,
+          "shares": 96400,
+          "pnl": 34704,
           "returnPct": 0.02834645669291347,
           "reason": "box-end",
           "boxStart": "2026-08-14",
@@ -9735,8 +8736,8 @@
           "exit": "2026-08-31",
           "entryPrice": 12.48,
           "exitPrice": 12.69,
-          "shares": 170100,
-          "pnl": 35721,
+          "shares": 100900,
+          "pnl": 21189,
           "returnPct": 0.016826923076922906,
           "reason": "box-end",
           "boxStart": "2026-08-25",
@@ -9750,8 +8751,8 @@
           "exit": "2026-09-17",
           "entryPrice": 29.49,
           "exitPrice": 28.47,
-          "shares": 73200,
-          "pnl": -74664,
+          "shares": 43400,
+          "pnl": -44268,
           "returnPct": -0.034587995930823956,
           "reason": "stock-ma4",
           "boxStart": "2026-09-11",
@@ -9765,194 +8766,177 @@
           "exit": "2026-09-22",
           "entryPrice": 14.5,
           "exitPrice": 14.09,
-          "shares": 143700,
-          "pnl": -58917,
+          "shares": 85300,
+          "pnl": -34973,
           "returnPct": -0.028275862068965485,
           "reason": "stock-ma4",
           "boxStart": "2026-09-11",
           "boxEnd": "2026-09-23"
+        },
+        {
+          "name": "豪威集团",
+          "code": "sh603501",
+          "standDays": 1,
+          "entry": "2026-10-20",
+          "exit": "2026-10-21",
+          "entryPrice": 76.91,
+          "exitPrice": 77.48,
+          "shares": 15600,
+          "pnl": 8892,
+          "returnPct": 0.007411259914185564,
+          "reason": "box-end",
+          "boxStart": "2026-10-19",
+          "boxEnd": "2026-10-21"
         }
       ],
       "monthlyEquity": [
         {
-          "time": "2023-01-31",
-          "equity": 106796
-        },
-        {
-          "time": "2023-02-28",
-          "equity": 103022
-        },
-        {
-          "time": "2023-03-31",
-          "equity": 101852
-        },
-        {
-          "time": "2023-04-28",
-          "equity": 108584
-        },
-        {
-          "time": "2023-05-31",
-          "equity": 123020
-        },
-        {
-          "time": "2023-06-30",
-          "equity": 134776
-        },
-        {
-          "time": "2023-07-31",
-          "equity": 127674
-        },
-        {
-          "time": "2023-08-31",
-          "equity": 144922
-        },
-        {
-          "time": "2023-09-28",
-          "equity": 151874
-        },
-        {
           "time": "2023-10-31",
-          "equity": 187983
+          "equity": 113970
         },
         {
           "time": "2023-11-30",
-          "equity": 192477
+          "equity": 116578
         },
         {
           "time": "2023-12-29",
-          "equity": 197333
+          "equity": 119525
         },
         {
           "time": "2024-01-31",
-          "equity": 197333
+          "equity": 119525
         },
         {
           "time": "2024-02-29",
-          "equity": 206093
+          "equity": 124805
         },
         {
           "time": "2024-03-29",
-          "equity": 233751
+          "equity": 141077
         },
         {
           "time": "2024-04-30",
-          "equity": 239166
+          "equity": 144350
         },
         {
           "time": "2024-05-31",
-          "equity": 242381
+          "equity": 146295
         },
         {
           "time": "2024-06-28",
-          "equity": 233647
+          "equity": 141084
         },
         {
           "time": "2024-07-31",
-          "equity": 229952
+          "equity": 138867
         },
         {
           "time": "2024-08-30",
-          "equity": 244685
+          "equity": 147743
         },
         {
           "time": "2024-09-30",
-          "equity": 308041
+          "equity": 185487
         },
         {
           "time": "2024-10-31",
-          "equity": 398657
+          "equity": 239471
         },
         {
           "time": "2024-11-29",
-          "equity": 472045
+          "equity": 283491
         },
         {
           "time": "2024-12-31",
-          "equity": 489553
+          "equity": 294156
         },
         {
           "time": "2025-01-27",
-          "equity": 453299
+          "equity": 272452
         },
         {
           "time": "2025-02-28",
-          "equity": 477499
+          "equity": 286957
         },
         {
           "time": "2025-03-31",
-          "equity": 491854
+          "equity": 295597
         },
         {
           "time": "2025-04-30",
-          "equity": 582867
+          "equity": 350100
         },
         {
           "time": "2025-05-30",
-          "equity": 581202
+          "equity": 349134
         },
         {
           "time": "2025-06-30",
-          "equity": 658428
+          "equity": 395394
         },
         {
           "time": "2025-07-31",
-          "equity": 654697
+          "equity": 393165
         },
         {
           "time": "2025-08-29",
-          "equity": 735502
+          "equity": 441668
         },
         {
           "time": "2025-09-30",
-          "equity": 908062
+          "equity": 545166
         },
         {
           "time": "2025-10-31",
-          "equity": 959152
+          "equity": 575806
         },
         {
           "time": "2025-11-28",
-          "equity": 929960
+          "equity": 558366
         },
         {
           "time": "2025-12-31",
-          "equity": 1029214
+          "equity": 617232
         },
         {
           "time": "2026-01-30",
-          "equity": 1230072
+          "equity": 738492
         },
         {
           "time": "2026-02-27",
-          "equity": 1340377
+          "equity": 804627
         },
         {
           "time": "2026-03-31",
-          "equity": 1299410
+          "equity": 780112
         },
         {
           "time": "2026-04-30",
-          "equity": 1682256
+          "equity": 998971
         },
         {
           "time": "2026-05-29",
-          "equity": 2000085
+          "equity": 1187208
         },
         {
           "time": "2026-06-30",
-          "equity": 2064755
+          "equity": 1225484
         },
         {
           "time": "2026-07-31",
-          "equity": 2064755
+          "equity": 1225484
         },
         {
           "time": "2026-08-31",
-          "equity": 2158976
+          "equity": 1281377
         },
         {
           "time": "2026-09-30",
-          "equity": 2025395
+          "equity": 1202136
+        },
+        {
+          "time": "2026-10-23",
+          "equity": 1211028
         }
       ]
     }

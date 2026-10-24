@@ -9,8 +9,8 @@ const MEMBER_LIMIT = 100;
 const SINA_BARS = 2048;
 const TENCENT_BARS = 800;
 const PERIODS = [
-  { label: "2020.1.1–2023.10.1", start: "2020-01-01", end: "2023-10-01" },
-  { label: "2023.1.1–2026.10.1", start: "2023-01-01", end: "2026-10-01" },
+  { label: "2020.1.1–2023.6.1", start: "2020-01-01", end: "2023-06-01" },
+  { label: "2023.10.25–2026.10.25", start: "2023-10-25", end: "2026-10-25" },
 ] as const;
 
 const UA =
