@@ -129,6 +129,8 @@ export type ScreenerHit = {
   dif: number;
   dea: number;
   hist: number;
+  /** 连续收盘站上 MA4 的交易日数（含当天）。 */
+  standDays: number;
   reasons: string[];
   sector: string | null;
   sectorCode: string | null;

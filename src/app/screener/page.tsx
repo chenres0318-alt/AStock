@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "选股 · AStock 看盘",
-  description: "当天收盘站上4日、7日均线，两条均线拐头向上，且连续成立不超过2日",
+  description: "红框行业且指数站上MA4，成分股按站上MA4持续时间从短到长",
 };
 
 export default function ScreenerPage() {

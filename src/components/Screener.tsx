@@ -13,6 +13,7 @@ import { EmptyHint, PanelTitle } from "./ui";
 type StockResponse = {
   scanned: number;
   universe?: number;
+  liveBoards?: number;
   items: ScreenerHit[];
   elapsedMs?: number;
   source?: string;
@@ -20,7 +21,7 @@ type StockResponse = {
 };
 
 async function readJson<T>(url: string): Promise<T> {
-  const res = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(120_000) });
+  const res = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(180_000) });
   const data = (await res.json()) as T & { error?: string };
   if (!res.ok) throw new Error(data.error || "请求失败");
   return data;
@@ -36,15 +37,14 @@ function HitTable({
   if (!items.length) return <EmptyHint text="没有符合条件的结果" />;
   return (
     <div className="overflow-auto scroll-thin">
-      <table className="w-full min-w-[960px] text-left text-sm">
+      <table className="w-full min-w-[880px] text-left text-sm">
         <thead className="text-[11px] text-mute">
           <tr className="border-b border-line">
             <th className="px-3 py-2 font-normal">股票</th>
             <th className="px-3 py-2 font-normal">所属板块</th>
-            <th className="px-3 py-2 font-normal text-right">现价 / MA4·MA7</th>
+            <th className="px-3 py-2 font-normal text-right">现价</th>
             <th className="px-3 py-2 font-normal text-right">涨跌幅</th>
-            <th className="px-3 py-2 font-normal text-right">DIF</th>
-            <th className="px-3 py-2 font-normal text-right">DEA</th>
+            <th className="px-3 py-2 font-normal text-right">站上MA4</th>
             <th className="px-3 py-2 font-normal">条件</th>
             <th className="px-3 py-2 font-normal"></th>
           </tr>
@@ -67,15 +67,11 @@ function HitTable({
                   <span className="text-mute">{item.sector ?? "--"}</span>
                 )}
               </td>
-              <td className="px-3 py-2 text-right">
-                <div className={`num ${toneClass(item.pct)}`}>{formatPrice(item.price, priceDigits(item.code, item.name))}</div>
-                <div className="num text-[11px] text-mute">
-                  {formatPrice(item.ma4, priceDigits(item.code, item.name))} / {formatPrice(item.ma7, priceDigits(item.code, item.name))}
-                </div>
+              <td className={`num px-3 py-2 text-right ${toneClass(item.pct)}`}>
+                {formatPrice(item.price, priceDigits(item.code, item.name))}
               </td>
               <td className={`num px-3 py-2 text-right ${toneClass(item.pct)}`}>{formatPct(item.pct)}</td>
-              <td className={`num px-3 py-2 text-right ${toneClass(item.dif)}`}>{item.dif.toFixed(3)}</td>
-              <td className={`num px-3 py-2 text-right ${toneClass(item.dea)}`}>{item.dea.toFixed(3)}</td>
+              <td className="num px-3 py-2 text-right">{item.standDays}日</td>
               <td className="px-3 py-2">
                 <div className="flex flex-wrap gap-1">
                   {item.reasons.map((reason) => (
@@ -108,6 +104,7 @@ export default function Screener() {
   const [meta, setMeta] = useState<{
     scanned: number;
     universe?: number;
+    liveBoards?: number;
     elapsedMs?: number;
     source?: string;
   } | null>(null);
@@ -123,6 +120,7 @@ export default function Screener() {
       setMeta({
         scanned: data.scanned,
         universe: data.universe,
+        liveBoards: data.liveBoards,
         elapsedMs: data.elapsedMs,
         source: data.source,
       });
@@ -149,10 +147,11 @@ export default function Screener() {
       <AppHeader />
 
       <section className="panel px-4 py-3">
-        <div className="text-sm">选股：当天收盘站上 4 日均线和 7 日均线，且 4 日、7 日均线都拐头向上，并且这套条件连续成立不超过 2 日</div>
+        <div className="text-sm">
+          选股：板块处于趋势红色区间（不限第几天），板块指数站上 MA4，成分股收盘站上 MA4，按连续站上天数从短到长
+        </div>
         <div className="mt-2 max-w-4xl text-xs leading-5 text-mute">
-          用当日收盘计算均线。收盘价高于 4 日均线和 7 日均线，同时 4 日、7 日均线都比前一日高。从当天往前数，这四条连续成立只能是第 1 日或第 2 日，第 3 日起排除。结果里带这只股票的所属板块。扫描成交额靠前的沪深
-          A 股，不含 ST / 北交所。
+          先找当前红框、且指数收盘站上 4 日线的同花顺行业，再列出里面收盘站上 MA4 的股票。不区分红框第几天。持续时间越短越靠前。不含科创板、创业板、北交所。同一只股票只出现一次。结果带所属板块，可点进板块页核对红框。
         </div>
       </section>
 
@@ -167,8 +166,8 @@ export default function Screener() {
             <div className="flex flex-wrap items-center justify-end gap-2">
               {meta ? (
                 <span className="text-[10px] text-mute">
-                  池 {meta.universe ?? meta.scanned} · 扫描 {meta.scanned} · 命中 {hits.length}
-                  {meta.source === "sina" ? " · 新浪成交额" : meta.source === "eastmoney" ? " · 东财成交额" : ""}
+                  红框行业 {meta.liveBoards ?? "--"} · 站上MA4 {meta.universe ?? meta.scanned} · 扫描 {meta.scanned} · 命中 {hits.length}
+                  {meta.source === "ths-industry" ? " · 同花顺行业" : ""}
                   {meta.elapsedMs ? ` · ${Math.round(meta.elapsedMs / 1000)}s` : ""}
                 </span>
               ) : null}
@@ -185,7 +184,7 @@ export default function Screener() {
         />
         {loading ? (
           <div className="px-4 py-8 text-center text-sm text-mute">
-            正在拉取沪深 A 股日线，匹配收盘站上 4 日、7 日均线、两条均线都拐头向上、且连续成立不超过 2 日的股票，大约需要一分钟。
+            正在扫描红框且指数站上 MA4 的行业成分股，按站上 MA4 持续时间从短到长排列，大约需要一分钟。
           </div>
         ) : (
           <HitTable items={hits} onOpen={openStock} />

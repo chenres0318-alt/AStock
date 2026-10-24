@@ -1,138 +1,82 @@
-import { listAllIndustryBoards } from "./boards";
-import { cached } from "./cache";
-import { isHsAShare } from "./codes";
-import { analyzeBars, passesScreen, screenReasons, type ScreenFlags } from "./indicators";
+import { marketOf, toTencentCode } from "./codes";
+import { getSectorTrend, listBoardsInTrend } from "./sectorTrendData";
+import { collectMa4StandHits, type SectorMa4Screen } from "./screenerLogic";
 import { mapPool } from "./pool";
-import { fetchEastMoneyAmountRank, fetchEastMoneyIndustry } from "./sources/eastmoney";
-import { fetchSinaHsAByAmount, fetchSinaKline } from "./sources/sina";
-import { fetchTencentKline } from "./sources/tencent";
-import { matchIndustryBoard } from "./screenerLogic";
-import type { KBar, RankItem, ScreenerHit, SectorItem } from "./types";
+import type { ScreenerHit } from "./types";
 
-const SCAN_DEADLINE_MS = 95_000;
-const UNIVERSE_SIZE = 360;
-const KLINE_CONCURRENCY = 8;
-const MIN_BARS = 40;
+const SCAN_DEADLINE_MS = 150_000;
+const BOARD_CONCURRENCY = 3;
 
-async function stockKline(code: string): Promise<KBar[]> {
-  try {
-    return await cached(`screener-kline:${code}`, 10 * 60_000, async () => {
-      try {
-        const bars = await fetchTencentKline(code, "day", 90);
-        if (bars.length >= MIN_BARS) return bars;
-      } catch {
-        // try Sina
-      }
-      const bars = await fetchSinaKline(code, 90);
-      if (bars.length >= MIN_BARS) return bars;
-      throw new Error(`kline unavailable: ${code}`);
-    });
-  } catch {
-    return [];
-  }
-}
-
-async function liquidUniverse(limit: number): Promise<{ items: RankItem[]; source: string }> {
-  try {
-    const rows = await fetchSinaHsAByAmount(limit);
-    if (rows.length >= 80) return { items: rows, source: "sina" };
-  } catch {
-    // fall through
-  }
-  try {
-    const rows = await fetchEastMoneyAmountRank(limit);
-    if (rows.length) return { items: rows, source: "eastmoney" };
-  } catch {
-    // empty
-  }
-  return { items: [], source: "unknown" };
-}
-
-function toHit(
-  tech: ScreenFlags,
-  meta: { code: string; name: string; price?: number | null; pct: number | null; turnover: number | null },
-): ScreenerHit {
+function toHit(row: ReturnType<typeof collectMa4StandHits>[number]): ScreenerHit {
+  const code = toTencentCode(row.code);
   return {
-    code: meta.code,
-    name: meta.name,
-    price: meta.price ?? tech.close,
-    pct: meta.pct ?? tech.dayPct,
-    turnover: meta.turnover,
-    amplitudePct: tech.amplitudePct,
-    ma4: tech.ma4,
-    ma7: tech.ma7,
-    ma5: tech.ma5,
-    dif: tech.dif,
-    dea: tech.dea,
-    hist: tech.hist,
-    reasons: screenReasons(tech),
-    sector: null,
-    sectorCode: null,
+    code,
+    name: row.name,
+    price: row.price ?? 0,
+    pct: row.pct,
+    turnover: row.turnover,
+    amplitudePct: null,
+    ma4: 0,
+    ma7: 0,
+    ma5: 0,
+    dif: 0,
+    dea: 0,
+    hist: 0,
+    standDays: row.days,
+    reasons: [`站上MA4共${row.days}日`, "板块红框", "板块指数站上MA4"],
+    sector: row.sector,
+    sectorCode: row.sectorCode,
   };
-}
-
-async function attachSectors(items: ScreenerHit[]): Promise<void> {
-  if (!items.length) return;
-  const boards = await listAllIndustryBoards().catch(() => [] as SectorItem[]);
-  await mapPool(items, 5, async (item) => {
-    try {
-      const industry = await cached(`screener-industry:${item.code}`, 6 * 60_000, () => fetchEastMoneyIndustry(item.code));
-      if (!industry) return;
-      const board = matchIndustryBoard(industry, boards);
-      item.sector = board?.name ?? industry;
-      item.sectorCode = board?.code ?? null;
-    } catch {
-      // keep the hit even if the board name is missing
-    }
-  });
 }
 
 export async function screenStocks(): Promise<{
   scanned: number;
   universe: number;
+  liveBoards: number;
   items: ScreenerHit[];
   source: string;
 }> {
-  const { items: ranked, source } = await liquidUniverse(UNIVERSE_SIZE);
-  const candidates = ranked.filter((item) => isHsAShare(item.code, item.name));
+  const { codes, offMa4 } = await listBoardsInTrend();
+  const off = new Set(offMa4);
+  const liveOnMa4 = codes.filter((code) => !off.has(code));
   const deadline = Date.now() + SCAN_DEADLINE_MS;
+  let scanned = 0;
+  const sectors: SectorMa4Screen[] = [];
 
-  await mapPool(candidates, KLINE_CONCURRENCY, async (item) => {
+  await mapPool(liveOnMa4, BOARD_CONCURRENCY, async (code) => {
     if (Date.now() > deadline) return;
     try {
-      await stockKline(item.code);
+      const report = await getSectorTrend(code);
+      scanned += 1;
+      const lastTime = report.bars.at(-1)?.time;
+      const open = report.trends.find((trend) => trend.status === "open" && trend.end === lastTime) ?? null;
+      sectors.push({
+        code: report.board.code,
+        name: report.board.name,
+        onMa4: report.onMa4,
+        lastTime,
+        openTrend: open ? { start: open.start, end: open.end, status: open.status } : null,
+        crosses: open?.maCrosses ?? [],
+        members: report.roster.map((item) => ({
+          code: item.code,
+          name: item.name,
+          price: item.price,
+          pct: item.pct,
+          turnover: item.turnover,
+        })),
+      });
     } catch {
-      // skip
+      // skip board
     }
   });
 
-  const items: ScreenerHit[] = [];
-  let scanned = 0;
-  for (const item of candidates) {
-    if (Date.now() > deadline) break;
-    scanned += 1;
-    try {
-      const bars = await stockKline(item.code);
-      if (bars.length < MIN_BARS) continue;
-      const last = bars[bars.length - 1];
-      if (!last.volume) continue;
-      const tech = analyzeBars(bars);
-      if (!tech || !passesScreen(tech)) continue;
-      items.push(
-        toHit(tech, {
-          code: item.code,
-          name: item.name,
-          price: item.price ?? tech.close,
-          pct: item.pct ?? tech.dayPct,
-          turnover: item.turnover,
-        }),
-      );
-    } catch {
-      // skip stock
-    }
-  }
-
-  items.sort((a, b) => (b.hist ?? -Infinity) - (a.hist ?? -Infinity));
-  await attachSectors(items);
-  return { scanned, universe: candidates.length, items, source };
+  return {
+    scanned,
+    universe: liveOnMa4.length,
+    liveBoards: codes.length,
+    items: collectMa4StandHits(sectors)
+      .filter((row) => marketOf(row.code) !== "BJ")
+      .map(toHit),
+    source: "ths-industry",
+  };
 }
