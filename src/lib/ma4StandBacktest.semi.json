@@ -1,0 +1,2427 @@
+{
+  "board": "881121",
+  "boardName": "半导体",
+  "indexFrom": "2019-01-02",
+  "indexTo": "2026-10-23",
+  "memberCount": 100,
+  "stockCount": 95,
+  "fetchedAt": "2026-10-24T17:09:39.126Z",
+  "results": [
+    {
+      "label": "2020.1.1–2023.10.1",
+      "entryMode": "box-first-day",
+      "boxes": 82,
+      "trades": 7,
+      "skippedNoMa4": 57,
+      "skippedNoStock": 0,
+      "skippedOneDay": 18,
+      "capital": 100000,
+      "finalEquity": 105979,
+      "returnPct": 0.05979000000000001,
+      "maxDrawdownPct": 0.007986663048113829,
+      "wins": 7,
+      "losses": 0,
+      "tradePnls": [
+        {
+          "name": "华天科技",
+          "code": "sz002185",
+          "standDays": 1,
+          "entry": "2021-05-24",
+          "exit": "2021-05-28",
+          "entryPrice": 12.12,
+          "exitPrice": 12.71,
+          "shares": 1600,
+          "pnl": 944,
+          "returnPct": 0.0486798679867988,
+          "reason": "stock-ma4",
+          "boxStart": "2021-05-24",
+          "boxEnd": "2021-07-30"
+        },
+        {
+          "name": "*ST闻泰",
+          "code": "sh600745",
+          "standDays": 1,
+          "entry": "2022-01-14",
+          "exit": "2022-01-18",
+          "entryPrice": 119.2,
+          "exitPrice": 121.08,
+          "shares": 100,
+          "pnl": 188,
+          "returnPct": 0.015771812080536796,
+          "reason": "box-end",
+          "boxStart": "2022-01-14",
+          "boxEnd": "2022-01-18"
+        },
+        {
+          "name": "*ST闻泰",
+          "code": "sh600745",
+          "standDays": 1,
+          "entry": "2022-05-10",
+          "exit": "2022-05-16",
+          "entryPrice": 62.46,
+          "exitPrice": 67.54,
+          "shares": 300,
+          "pnl": 1524,
+          "returnPct": 0.08133205251360875,
+          "reason": "stock-ma4",
+          "boxStart": "2022-05-10",
+          "boxEnd": "2022-05-23"
+        },
+        {
+          "name": "*ST闻泰",
+          "code": "sh600745",
+          "standDays": 1,
+          "entry": "2022-10-12",
+          "exit": "2022-10-19",
+          "entryPrice": 47.06,
+          "exitPrice": 47.5,
+          "shares": 400,
+          "pnl": 176,
+          "returnPct": 0.009349766255843495,
+          "reason": "stock-ma4",
+          "boxStart": "2022-10-12",
+          "boxEnd": "2022-11-17"
+        },
+        {
+          "name": "*ST闻泰",
+          "code": "sh600745",
+          "standDays": 1,
+          "entry": "2023-01-03",
+          "exit": "2023-01-10",
+          "entryPrice": 53.81,
+          "exitPrice": 55.78,
+          "shares": 300,
+          "pnl": 591,
+          "returnPct": 0.036610295484110766,
+          "reason": "box-end",
+          "boxStart": "2023-01-03",
+          "boxEnd": "2023-01-10"
+        },
+        {
+          "name": "大为股份",
+          "code": "sz002213",
+          "standDays": 1,
+          "entry": "2023-05-15",
+          "exit": "2023-05-23",
+          "entryPrice": 12.36,
+          "exitPrice": 13.6,
+          "shares": 1600,
+          "pnl": 1984,
+          "returnPct": 0.10032362459546929,
+          "reason": "index-ma4",
+          "boxStart": "2023-05-15",
+          "boxEnd": "2023-05-31"
+        },
+        {
+          "name": "*ST闻泰",
+          "code": "sh600745",
+          "standDays": 1,
+          "entry": "2023-06-09",
+          "exit": "2023-06-15",
+          "entryPrice": 49.49,
+          "exitPrice": 50.92,
+          "shares": 400,
+          "pnl": 572,
+          "returnPct": 0.028894726207314703,
+          "reason": "index-ma4",
+          "boxStart": "2023-06-09",
+          "boxEnd": "2023-06-19"
+        }
+      ],
+      "monthlyEquity": [
+        {
+          "time": "2020-01-23",
+          "equity": 100000
+        },
+        {
+          "time": "2020-02-28",
+          "equity": 100000
+        },
+        {
+          "time": "2020-03-31",
+          "equity": 100000
+        },
+        {
+          "time": "2020-04-30",
+          "equity": 100000
+        },
+        {
+          "time": "2020-05-29",
+          "equity": 100000
+        },
+        {
+          "time": "2020-06-30",
+          "equity": 100000
+        },
+        {
+          "time": "2020-07-31",
+          "equity": 100000
+        },
+        {
+          "time": "2020-08-31",
+          "equity": 100000
+        },
+        {
+          "time": "2020-09-30",
+          "equity": 100000
+        },
+        {
+          "time": "2020-10-30",
+          "equity": 100000
+        },
+        {
+          "time": "2020-11-30",
+          "equity": 100000
+        },
+        {
+          "time": "2020-12-31",
+          "equity": 100000
+        },
+        {
+          "time": "2021-01-29",
+          "equity": 100000
+        },
+        {
+          "time": "2021-02-26",
+          "equity": 100000
+        },
+        {
+          "time": "2021-03-31",
+          "equity": 100000
+        },
+        {
+          "time": "2021-04-30",
+          "equity": 100000
+        },
+        {
+          "time": "2021-05-31",
+          "equity": 100944
+        },
+        {
+          "time": "2021-06-30",
+          "equity": 100944
+        },
+        {
+          "time": "2021-07-30",
+          "equity": 100944
+        },
+        {
+          "time": "2021-08-31",
+          "equity": 100944
+        },
+        {
+          "time": "2021-09-30",
+          "equity": 100944
+        },
+        {
+          "time": "2021-10-29",
+          "equity": 100944
+        },
+        {
+          "time": "2021-11-30",
+          "equity": 100944
+        },
+        {
+          "time": "2021-12-31",
+          "equity": 100944
+        },
+        {
+          "time": "2022-01-28",
+          "equity": 101132
+        },
+        {
+          "time": "2022-02-28",
+          "equity": 101132
+        },
+        {
+          "time": "2022-03-31",
+          "equity": 101132
+        },
+        {
+          "time": "2022-04-29",
+          "equity": 101132
+        },
+        {
+          "time": "2022-05-31",
+          "equity": 102656
+        },
+        {
+          "time": "2022-06-30",
+          "equity": 102656
+        },
+        {
+          "time": "2022-07-29",
+          "equity": 102656
+        },
+        {
+          "time": "2022-08-31",
+          "equity": 102656
+        },
+        {
+          "time": "2022-09-30",
+          "equity": 102656
+        },
+        {
+          "time": "2022-10-31",
+          "equity": 102832
+        },
+        {
+          "time": "2022-11-30",
+          "equity": 102832
+        },
+        {
+          "time": "2022-12-30",
+          "equity": 102832
+        },
+        {
+          "time": "2023-01-31",
+          "equity": 103423
+        },
+        {
+          "time": "2023-02-28",
+          "equity": 103423
+        },
+        {
+          "time": "2023-03-31",
+          "equity": 103423
+        },
+        {
+          "time": "2023-04-28",
+          "equity": 103423
+        },
+        {
+          "time": "2023-05-31",
+          "equity": 105407
+        },
+        {
+          "time": "2023-06-30",
+          "equity": 105979
+        },
+        {
+          "time": "2023-07-31",
+          "equity": 105979
+        },
+        {
+          "time": "2023-08-31",
+          "equity": 105979
+        },
+        {
+          "time": "2023-09-28",
+          "equity": 105979
+        }
+      ]
+    },
+    {
+      "label": "2020.1.1–2023.10.1",
+      "entryMode": "first-on-ma4",
+      "boxes": 82,
+      "trades": 58,
+      "skippedNoMa4": 1,
+      "skippedNoStock": 5,
+      "skippedOneDay": 18,
+      "capital": 100000,
+      "finalEquity": 129251,
+      "returnPct": 0.29251000000000005,
+      "maxDrawdownPct": 0.010313712745416658,
+      "wins": 35,
+      "losses": 23,
+      "tradePnls": [
+        {
+          "name": "*ST闻泰",
+          "code": "sh600745",
+          "standDays": 1,
+          "entry": "2020-02-06",
+          "exit": "2020-02-10",
+          "entryPrice": 118.3,
+          "exitPrice": 117.56,
+          "shares": 100,
+          "pnl": -74,
+          "returnPct": -0.006255283178360105,
+          "reason": "stock-ma4",
+          "boxStart": "2020-02-04",
+          "boxEnd": "2020-02-25"
+        },
+        {
+          "name": "大港股份",
+          "code": "sz002077",
+          "standDays": 1,
+          "entry": "2020-03-25",
+          "exit": "2020-03-25",
+          "entryPrice": 6.19,
+          "exitPrice": 6.19,
+          "shares": 3200,
+          "pnl": 0,
+          "returnPct": 0,
+          "reason": "box-end",
+          "boxStart": "2020-03-24",
+          "boxEnd": "2020-03-25"
+        },
+        {
+          "name": "大为股份",
+          "code": "sz002213",
+          "standDays": 1,
+          "entry": "2020-04-01",
+          "exit": "2020-04-08",
+          "entryPrice": 15.14,
+          "exitPrice": 17.08,
+          "shares": 1300,
+          "pnl": 2522,
+          "returnPct": 0.12813738441215317,
+          "reason": "box-end",
+          "boxStart": "2020-03-30",
+          "boxEnd": "2020-04-08"
+        },
+        {
+          "name": "豪威集团",
+          "code": "sh603501",
+          "standDays": 1,
+          "entry": "2020-04-14",
+          "exit": "2020-04-21",
+          "entryPrice": 157.3,
+          "exitPrice": 171.77,
+          "shares": 100,
+          "pnl": 1447,
+          "returnPct": 0.09198982835346481,
+          "reason": "stock-ma4",
+          "boxStart": "2020-04-13",
+          "boxEnd": "2020-04-22"
+        },
+        {
+          "name": "大为股份",
+          "code": "sz002213",
+          "standDays": 1,
+          "entry": "2020-04-29",
+          "exit": "2020-05-08",
+          "entryPrice": 17.78,
+          "exitPrice": 17.85,
+          "shares": 1100,
+          "pnl": 77,
+          "returnPct": 0.003937007874015741,
+          "reason": "stock-ma4",
+          "boxStart": "2020-04-28",
+          "boxEnd": "2020-05-19"
+        },
+        {
+          "name": "*ST闻泰",
+          "code": "sh600745",
+          "standDays": 1,
+          "entry": "2020-05-26",
+          "exit": "2020-05-26",
+          "entryPrice": 100.37,
+          "exitPrice": 100.37,
+          "shares": 100,
+          "pnl": 0,
+          "returnPct": 0,
+          "reason": "box-end",
+          "boxStart": "2020-05-25",
+          "boxEnd": "2020-05-26"
+        },
+        {
+          "name": "*ST闻泰",
+          "code": "sh600745",
+          "standDays": 1,
+          "entry": "2020-06-01",
+          "exit": "2020-06-02",
+          "entryPrice": 103,
+          "exitPrice": 103.15,
+          "shares": 100,
+          "pnl": 15,
+          "returnPct": 0.0014563106796117165,
+          "reason": "box-end",
+          "boxStart": "2020-05-28",
+          "boxEnd": "2020-06-02"
+        },
+        {
+          "name": "*ST闻泰",
+          "code": "sh600745",
+          "standDays": 1,
+          "entry": "2020-06-16",
+          "exit": "2020-06-17",
+          "entryPrice": 110,
+          "exitPrice": 107.07,
+          "shares": 100,
+          "pnl": -293,
+          "returnPct": -0.02663636363636368,
+          "reason": "stock-ma4",
+          "boxStart": "2020-06-15",
+          "boxEnd": "2020-07-13"
+        },
+        {
+          "name": "*ST闻泰",
+          "code": "sh600745",
+          "standDays": 1,
+          "entry": "2020-07-20",
+          "exit": "2020-07-22",
+          "entryPrice": 142.94,
+          "exitPrice": 145.96,
+          "shares": 100,
+          "pnl": 302,
+          "returnPct": 0.021127745907373763,
+          "reason": "box-end",
+          "boxStart": "2020-07-17",
+          "boxEnd": "2020-07-22"
+        },
+        {
+          "name": "*ST闻泰",
+          "code": "sh600745",
+          "standDays": 1,
+          "entry": "2020-07-29",
+          "exit": "2020-08-04",
+          "entryPrice": 147.42,
+          "exitPrice": 148,
+          "shares": 100,
+          "pnl": 58,
+          "returnPct": 0.003934337267670784,
+          "reason": "stock-ma4",
+          "boxStart": "2020-07-27",
+          "boxEnd": "2020-08-06"
+        },
+        {
+          "name": "*ST闻泰",
+          "code": "sh600745",
+          "standDays": 1,
+          "entry": "2020-08-14",
+          "exit": "2020-08-17",
+          "entryPrice": 136.4,
+          "exitPrice": 139.99,
+          "shares": 100,
+          "pnl": 359,
+          "returnPct": 0.026319648093841685,
+          "reason": "box-end",
+          "boxStart": "2020-08-12",
+          "boxEnd": "2020-08-17"
+        },
+        {
+          "name": "豪威集团",
+          "code": "sh603501",
+          "standDays": 1,
+          "entry": "2020-08-28",
+          "exit": "2020-08-31",
+          "entryPrice": 175.31,
+          "exitPrice": 167.83,
+          "shares": 100,
+          "pnl": -748,
+          "returnPct": -0.042667275112657554,
+          "reason": "stock-ma4",
+          "boxStart": "2020-08-27",
+          "boxEnd": "2020-09-01"
+        },
+        {
+          "name": "*ST闻泰",
+          "code": "sh600745",
+          "standDays": 1,
+          "entry": "2020-09-14",
+          "exit": "2020-09-16",
+          "entryPrice": 122.2,
+          "exitPrice": 121.92,
+          "shares": 100,
+          "pnl": -28,
+          "returnPct": -0.0022913256955809924,
+          "reason": "stock-ma4",
+          "boxStart": "2020-09-11",
+          "boxEnd": "2020-09-18"
+        },
+        {
+          "name": "华天科技",
+          "code": "sz002185",
+          "standDays": 1,
+          "entry": "2020-09-29",
+          "exit": "2020-10-13",
+          "entryPrice": 13.77,
+          "exitPrice": 14.48,
+          "shares": 1400,
+          "pnl": 994,
+          "returnPct": 0.05156136528685562,
+          "reason": "box-end",
+          "boxStart": "2020-09-28",
+          "boxEnd": "2020-10-13"
+        },
+        {
+          "name": "上海贝岭",
+          "code": "sh600171",
+          "standDays": 1,
+          "entry": "2020-11-03",
+          "exit": "2020-11-04",
+          "entryPrice": 15.33,
+          "exitPrice": 15.25,
+          "shares": 1300,
+          "pnl": -104,
+          "returnPct": -0.005218525766470972,
+          "reason": "stock-ma4",
+          "boxStart": "2020-10-29",
+          "boxEnd": "2020-11-09"
+        },
+        {
+          "name": "*ST闻泰",
+          "code": "sh600745",
+          "standDays": 1,
+          "entry": "2020-11-30",
+          "exit": "2020-12-08",
+          "entryPrice": 105.4,
+          "exitPrice": 107.75,
+          "shares": 100,
+          "pnl": 235,
+          "returnPct": 0.022296015180265583,
+          "reason": "stock-ma4",
+          "boxStart": "2020-11-27",
+          "boxEnd": "2020-12-08"
+        },
+        {
+          "name": "大为股份",
+          "code": "sz002213",
+          "standDays": 1,
+          "entry": "2021-01-14",
+          "exit": "2021-01-18",
+          "entryPrice": 12.4,
+          "exitPrice": 13.64,
+          "shares": 1600,
+          "pnl": 1984,
+          "returnPct": 0.10000000000000009,
+          "reason": "box-end",
+          "boxStart": "2021-01-13",
+          "boxEnd": "2021-01-18"
+        },
+        {
+          "name": "大港股份",
+          "code": "sz002077",
+          "standDays": 1,
+          "entry": "2021-02-09",
+          "exit": "2021-02-23",
+          "entryPrice": 5.05,
+          "exitPrice": 5.37,
+          "shares": 3900,
+          "pnl": 1248,
+          "returnPct": 0.06336633663366342,
+          "reason": "stock-ma4",
+          "boxStart": "2021-02-08",
+          "boxEnd": "2021-03-03"
+        },
+        {
+          "name": "*ST闻泰",
+          "code": "sh600745",
+          "standDays": 1,
+          "entry": "2021-03-17",
+          "exit": "2021-03-19",
+          "entryPrice": 103.05,
+          "exitPrice": 97.79,
+          "shares": 100,
+          "pnl": -526,
+          "returnPct": -0.051043182920912145,
+          "reason": "stock-ma4",
+          "boxStart": "2021-03-16",
+          "boxEnd": "2021-03-23"
+        },
+        {
+          "name": "*ST闻泰",
+          "code": "sh600745",
+          "standDays": 1,
+          "entry": "2021-03-26",
+          "exit": "2021-03-30",
+          "entryPrice": 99.17,
+          "exitPrice": 99.53,
+          "shares": 200,
+          "pnl": 72,
+          "returnPct": 0.0036301300796612868,
+          "reason": "index-ma4",
+          "boxStart": "2021-03-25",
+          "boxEnd": "2021-04-07"
+        },
+        {
+          "name": "华天科技",
+          "code": "sz002185",
+          "standDays": 1,
+          "entry": "2021-04-14",
+          "exit": "2021-04-19",
+          "entryPrice": 12.38,
+          "exitPrice": 12.57,
+          "shares": 1600,
+          "pnl": 304,
+          "returnPct": 0.015347334410339197,
+          "reason": "box-end",
+          "boxStart": "2021-04-13",
+          "boxEnd": "2021-04-19"
+        },
+        {
+          "name": "晶方科技",
+          "code": "sh603005",
+          "standDays": 1,
+          "entry": "2021-04-22",
+          "exit": "2021-04-26",
+          "entryPrice": 63.55,
+          "exitPrice": 62.98,
+          "shares": 300,
+          "pnl": -171,
+          "returnPct": -0.008969315499606667,
+          "reason": "stock-ma4",
+          "boxStart": "2021-04-21",
+          "boxEnd": "2021-04-26"
+        },
+        {
+          "name": "*ST闻泰",
+          "code": "sh600745",
+          "standDays": 1,
+          "entry": "2021-05-12",
+          "exit": "2021-05-19",
+          "entryPrice": 83.02,
+          "exitPrice": 86.4,
+          "shares": 200,
+          "pnl": 676,
+          "returnPct": 0.04071308118525674,
+          "reason": "box-end",
+          "boxStart": "2021-05-11",
+          "boxEnd": "2021-05-19"
+        },
+        {
+          "name": "华天科技",
+          "code": "sz002185",
+          "standDays": 1,
+          "entry": "2021-05-24",
+          "exit": "2021-05-28",
+          "entryPrice": 12.12,
+          "exitPrice": 12.71,
+          "shares": 1600,
+          "pnl": 944,
+          "returnPct": 0.0486798679867988,
+          "reason": "stock-ma4",
+          "boxStart": "2021-05-24",
+          "boxEnd": "2021-07-30"
+        },
+        {
+          "name": "大港股份",
+          "code": "sz002077",
+          "standDays": 1,
+          "entry": "2021-08-20",
+          "exit": "2021-08-24",
+          "entryPrice": 7.98,
+          "exitPrice": 8.4,
+          "shares": 2500,
+          "pnl": 1050,
+          "returnPct": 0.05263157894736836,
+          "reason": "box-end",
+          "boxStart": "2021-08-18",
+          "boxEnd": "2021-08-24"
+        },
+        {
+          "name": "华天科技",
+          "code": "sz002185",
+          "standDays": 1,
+          "entry": "2021-09-06",
+          "exit": "2021-09-07",
+          "entryPrice": 12.63,
+          "exitPrice": 12.74,
+          "shares": 1500,
+          "pnl": 165,
+          "returnPct": 0.0087094220110846,
+          "reason": "box-end",
+          "boxStart": "2021-09-01",
+          "boxEnd": "2021-09-07"
+        },
+        {
+          "name": "大为股份",
+          "code": "sz002213",
+          "standDays": 1,
+          "entry": "2021-09-30",
+          "exit": "2021-10-08",
+          "entryPrice": 13.45,
+          "exitPrice": 13.44,
+          "shares": 1400,
+          "pnl": -14,
+          "returnPct": -0.0007434944237918462,
+          "reason": "box-end",
+          "boxStart": "2021-09-29",
+          "boxEnd": "2021-10-08"
+        },
+        {
+          "name": "华天科技",
+          "code": "sz002185",
+          "standDays": 1,
+          "entry": "2021-10-22",
+          "exit": "2021-10-26",
+          "entryPrice": 12.76,
+          "exitPrice": 12.74,
+          "shares": 1500,
+          "pnl": -30,
+          "returnPct": -0.0015673981191222097,
+          "reason": "box-end",
+          "boxStart": "2021-10-21",
+          "boxEnd": "2021-10-26"
+        },
+        {
+          "name": "大港股份",
+          "code": "sz002077",
+          "standDays": 1,
+          "entry": "2021-10-29",
+          "exit": "2021-11-03",
+          "entryPrice": 6.71,
+          "exitPrice": 6.65,
+          "shares": 2900,
+          "pnl": -174,
+          "returnPct": -0.00894187779433675,
+          "reason": "stock-ma4",
+          "boxStart": "2021-10-28",
+          "boxEnd": "2021-11-25"
+        },
+        {
+          "name": "华天科技",
+          "code": "sz002185",
+          "standDays": 1,
+          "entry": "2021-12-09",
+          "exit": "2021-12-13",
+          "entryPrice": 13.48,
+          "exitPrice": 13.31,
+          "shares": 1400,
+          "pnl": -238,
+          "returnPct": -0.01261127596439171,
+          "reason": "stock-ma4",
+          "boxStart": "2021-12-07",
+          "boxEnd": "2021-12-14"
+        },
+        {
+          "name": "大港股份",
+          "code": "sz002077",
+          "standDays": 1,
+          "entry": "2021-12-30",
+          "exit": "2021-12-31",
+          "entryPrice": 7.64,
+          "exitPrice": 7.67,
+          "shares": 2600,
+          "pnl": 78,
+          "returnPct": 0.003926701570680757,
+          "reason": "box-end",
+          "boxStart": "2021-12-29",
+          "boxEnd": "2021-12-31"
+        },
+        {
+          "name": "*ST闻泰",
+          "code": "sh600745",
+          "standDays": 1,
+          "entry": "2022-01-14",
+          "exit": "2022-01-18",
+          "entryPrice": 119.2,
+          "exitPrice": 121.08,
+          "shares": 100,
+          "pnl": 188,
+          "returnPct": 0.015771812080536796,
+          "reason": "box-end",
+          "boxStart": "2022-01-14",
+          "boxEnd": "2022-01-18"
+        },
+        {
+          "name": "*ST闻泰",
+          "code": "sh600745",
+          "standDays": 1,
+          "entry": "2022-02-15",
+          "exit": "2022-02-18",
+          "entryPrice": 112.73,
+          "exitPrice": 111.75,
+          "shares": 100,
+          "pnl": -98,
+          "returnPct": -0.008693338064401757,
+          "reason": "stock-ma4",
+          "boxStart": "2022-02-14",
+          "boxEnd": "2022-02-23"
+        },
+        {
+          "name": "大港股份",
+          "code": "sz002077",
+          "standDays": 1,
+          "entry": "2022-03-17",
+          "exit": "2022-03-21",
+          "entryPrice": 6.41,
+          "exitPrice": 6.52,
+          "shares": 3100,
+          "pnl": 341,
+          "returnPct": 0.01716068642745694,
+          "reason": "box-end",
+          "boxStart": "2022-03-16",
+          "boxEnd": "2022-03-21"
+        },
+        {
+          "name": "瑞芯微",
+          "code": "sh603893",
+          "standDays": 1,
+          "entry": "2022-03-30",
+          "exit": "2022-03-30",
+          "entryPrice": 90.05,
+          "exitPrice": 90.05,
+          "shares": 200,
+          "pnl": 0,
+          "returnPct": 0,
+          "reason": "box-end",
+          "boxStart": "2022-03-29",
+          "boxEnd": "2022-03-30"
+        },
+        {
+          "name": "大港股份",
+          "code": "sz002077",
+          "standDays": 1,
+          "entry": "2022-04-18",
+          "exit": "2022-04-18",
+          "entryPrice": 5.97,
+          "exitPrice": 5.97,
+          "shares": 3300,
+          "pnl": 0,
+          "returnPct": 0,
+          "reason": "box-end",
+          "boxStart": "2022-04-15",
+          "boxEnd": "2022-04-18"
+        },
+        {
+          "name": "华天科技",
+          "code": "sz002185",
+          "standDays": 1,
+          "entry": "2022-04-28",
+          "exit": "2022-05-05",
+          "entryPrice": 8.54,
+          "exitPrice": 8.46,
+          "shares": 2300,
+          "pnl": -184,
+          "returnPct": -0.009367681498828828,
+          "reason": "stock-ma4",
+          "boxStart": "2022-04-27",
+          "boxEnd": "2022-05-05"
+        },
+        {
+          "name": "*ST闻泰",
+          "code": "sh600745",
+          "standDays": 1,
+          "entry": "2022-05-10",
+          "exit": "2022-05-16",
+          "entryPrice": 62.46,
+          "exitPrice": 67.54,
+          "shares": 300,
+          "pnl": 1524,
+          "returnPct": 0.08133205251360875,
+          "reason": "stock-ma4",
+          "boxStart": "2022-05-10",
+          "boxEnd": "2022-05-23"
+        },
+        {
+          "name": "豪威集团",
+          "code": "sh603501",
+          "standDays": 1,
+          "entry": "2022-05-30",
+          "exit": "2022-06-06",
+          "entryPrice": 159.02,
+          "exitPrice": 180.33,
+          "shares": 100,
+          "pnl": 2131,
+          "returnPct": 0.13400830084266135,
+          "reason": "box-end",
+          "boxStart": "2022-05-26",
+          "boxEnd": "2022-06-06"
+        },
+        {
+          "name": "豪威集团",
+          "code": "sh603501",
+          "standDays": 1,
+          "entry": "2022-06-16",
+          "exit": "2022-06-17",
+          "entryPrice": 161.6,
+          "exitPrice": 160.39,
+          "shares": 100,
+          "pnl": -121,
+          "returnPct": -0.0074876237623763275,
+          "reason": "stock-ma4",
+          "boxStart": "2022-06-14",
+          "boxEnd": "2022-06-20"
+        },
+        {
+          "name": "大为股份",
+          "code": "sz002213",
+          "standDays": 1,
+          "entry": "2022-06-23",
+          "exit": "2022-06-28",
+          "entryPrice": 15.01,
+          "exitPrice": 16.1,
+          "shares": 1300,
+          "pnl": 1417,
+          "returnPct": 0.07261825449700221,
+          "reason": "box-end",
+          "boxStart": "2022-06-22",
+          "boxEnd": "2022-06-28"
+        },
+        {
+          "name": "德明利",
+          "code": "sz001309",
+          "standDays": 1,
+          "entry": "2022-07-06",
+          "exit": "2022-07-08",
+          "entryPrice": 50.86,
+          "exitPrice": 61.55,
+          "shares": 300,
+          "pnl": 3207,
+          "returnPct": 0.2101848210774675,
+          "reason": "box-end",
+          "boxStart": "2022-07-05",
+          "boxEnd": "2022-07-08"
+        },
+        {
+          "name": "大为股份",
+          "code": "sz002213",
+          "standDays": 1,
+          "entry": "2022-09-02",
+          "exit": "2022-09-07",
+          "entryPrice": 15.49,
+          "exitPrice": 17.06,
+          "shares": 1200,
+          "pnl": 1884,
+          "returnPct": 0.10135571336346016,
+          "reason": "box-end",
+          "boxStart": "2022-09-01",
+          "boxEnd": "2022-09-07"
+        },
+        {
+          "name": "*ST闻泰",
+          "code": "sh600745",
+          "standDays": 1,
+          "entry": "2022-09-27",
+          "exit": "2022-09-27",
+          "entryPrice": 51.38,
+          "exitPrice": 51.38,
+          "shares": 300,
+          "pnl": 0,
+          "returnPct": 0,
+          "reason": "box-end",
+          "boxStart": "2022-09-26",
+          "boxEnd": "2022-09-27"
+        },
+        {
+          "name": "*ST闻泰",
+          "code": "sh600745",
+          "standDays": 1,
+          "entry": "2022-10-12",
+          "exit": "2022-10-19",
+          "entryPrice": 47.06,
+          "exitPrice": 47.5,
+          "shares": 400,
+          "pnl": 176,
+          "returnPct": 0.009349766255843495,
+          "reason": "stock-ma4",
+          "boxStart": "2022-10-12",
+          "boxEnd": "2022-11-17"
+        },
+        {
+          "name": "*ST闻泰",
+          "code": "sh600745",
+          "standDays": 1,
+          "entry": "2022-11-29",
+          "exit": "2022-12-02",
+          "entryPrice": 55,
+          "exitPrice": 55.49,
+          "shares": 300,
+          "pnl": 147,
+          "returnPct": 0.008909090909090978,
+          "reason": "stock-ma4",
+          "boxStart": "2022-11-28",
+          "boxEnd": "2022-12-06"
+        },
+        {
+          "name": "*ST闻泰",
+          "code": "sh600745",
+          "standDays": 1,
+          "entry": "2022-12-12",
+          "exit": "2022-12-12",
+          "entryPrice": 59.5,
+          "exitPrice": 59.5,
+          "shares": 300,
+          "pnl": 0,
+          "returnPct": 0,
+          "reason": "box-end",
+          "boxStart": "2022-12-08",
+          "boxEnd": "2022-12-12"
+        },
+        {
+          "name": "*ST闻泰",
+          "code": "sh600745",
+          "standDays": 1,
+          "entry": "2022-12-26",
+          "exit": "2022-12-27",
+          "entryPrice": 54.41,
+          "exitPrice": 54.86,
+          "shares": 300,
+          "pnl": 135,
+          "returnPct": 0.00827053850395143,
+          "reason": "box-end",
+          "boxStart": "2022-12-23",
+          "boxEnd": "2022-12-27"
+        },
+        {
+          "name": "*ST闻泰",
+          "code": "sh600745",
+          "standDays": 1,
+          "entry": "2023-01-03",
+          "exit": "2023-01-10",
+          "entryPrice": 53.81,
+          "exitPrice": 55.78,
+          "shares": 300,
+          "pnl": 591,
+          "returnPct": 0.036610295484110766,
+          "reason": "box-end",
+          "boxStart": "2023-01-03",
+          "boxEnd": "2023-01-10"
+        },
+        {
+          "name": "大为股份",
+          "code": "sz002213",
+          "standDays": 1,
+          "entry": "2023-01-16",
+          "exit": "2023-01-31",
+          "entryPrice": 15.79,
+          "exitPrice": 16.29,
+          "shares": 1200,
+          "pnl": 600,
+          "returnPct": 0.03166561114629518,
+          "reason": "index-ma4",
+          "boxStart": "2023-01-13",
+          "boxEnd": "2023-02-15"
+        },
+        {
+          "name": "豪威集团",
+          "code": "sh603501",
+          "standDays": 1,
+          "entry": "2023-03-01",
+          "exit": "2023-03-06",
+          "entryPrice": 86.54,
+          "exitPrice": 86,
+          "shares": 200,
+          "pnl": -108,
+          "returnPct": -0.006239889068638815,
+          "reason": "stock-ma4",
+          "boxStart": "2023-02-28",
+          "boxEnd": "2023-03-06"
+        },
+        {
+          "name": "汇顶科技",
+          "code": "sh603160",
+          "standDays": 1,
+          "entry": "2023-03-09",
+          "exit": "2023-03-09",
+          "entryPrice": 53.36,
+          "exitPrice": 53.36,
+          "shares": 300,
+          "pnl": 0,
+          "returnPct": 0,
+          "reason": "box-end",
+          "boxStart": "2023-03-08",
+          "boxEnd": "2023-03-09"
+        },
+        {
+          "name": "*ST闻泰",
+          "code": "sh600745",
+          "standDays": 1,
+          "entry": "2023-03-30",
+          "exit": "2023-04-07",
+          "entryPrice": 55.57,
+          "exitPrice": 58.99,
+          "shares": 300,
+          "pnl": 1026,
+          "returnPct": 0.06154399856037429,
+          "reason": "box-end",
+          "boxStart": "2023-03-29",
+          "boxEnd": "2023-04-07"
+        },
+        {
+          "name": "大为股份",
+          "code": "sz002213",
+          "standDays": 1,
+          "entry": "2023-05-15",
+          "exit": "2023-05-23",
+          "entryPrice": 12.36,
+          "exitPrice": 13.6,
+          "shares": 1600,
+          "pnl": 1984,
+          "returnPct": 0.10032362459546929,
+          "reason": "index-ma4",
+          "boxStart": "2023-05-15",
+          "boxEnd": "2023-05-31"
+        },
+        {
+          "name": "*ST闻泰",
+          "code": "sh600745",
+          "standDays": 1,
+          "entry": "2023-06-09",
+          "exit": "2023-06-15",
+          "entryPrice": 49.49,
+          "exitPrice": 50.92,
+          "shares": 400,
+          "pnl": 572,
+          "returnPct": 0.028894726207314703,
+          "reason": "index-ma4",
+          "boxStart": "2023-06-09",
+          "boxEnd": "2023-06-19"
+        },
+        {
+          "name": "德明利",
+          "code": "sz001309",
+          "standDays": 1,
+          "entry": "2023-06-29",
+          "exit": "2023-07-03",
+          "entryPrice": 89.6,
+          "exitPrice": 90.27,
+          "shares": 200,
+          "pnl": 134,
+          "returnPct": 0.007477678571428559,
+          "reason": "stock-ma4",
+          "boxStart": "2023-06-28",
+          "boxEnd": "2023-07-06"
+        },
+        {
+          "name": "*ST闻泰",
+          "code": "sh600745",
+          "standDays": 1,
+          "entry": "2023-07-11",
+          "exit": "2023-07-11",
+          "entryPrice": 50.75,
+          "exitPrice": 50.75,
+          "shares": 300,
+          "pnl": 0,
+          "returnPct": 0,
+          "reason": "box-end",
+          "boxStart": "2023-07-10",
+          "boxEnd": "2023-07-11"
+        },
+        {
+          "name": "大港股份",
+          "code": "sz002077",
+          "standDays": 1,
+          "entry": "2023-08-29",
+          "exit": "2023-09-06",
+          "entryPrice": 14.44,
+          "exitPrice": 17.19,
+          "shares": 1300,
+          "pnl": 3575,
+          "returnPct": 0.19044321329639913,
+          "reason": "box-end",
+          "boxStart": "2023-08-25",
+          "boxEnd": "2023-09-06"
+        }
+      ],
+      "monthlyEquity": [
+        {
+          "time": "2020-01-23",
+          "equity": 100000
+        },
+        {
+          "time": "2020-02-28",
+          "equity": 99926
+        },
+        {
+          "time": "2020-03-31",
+          "equity": 99926
+        },
+        {
+          "time": "2020-04-30",
+          "equity": 104467
+        },
+        {
+          "time": "2020-05-29",
+          "equity": 103972
+        },
+        {
+          "time": "2020-06-30",
+          "equity": 103694
+        },
+        {
+          "time": "2020-07-31",
+          "equity": 104459
+        },
+        {
+          "time": "2020-08-31",
+          "equity": 103665
+        },
+        {
+          "time": "2020-09-30",
+          "equity": 103539
+        },
+        {
+          "time": "2020-10-30",
+          "equity": 104631
+        },
+        {
+          "time": "2020-11-30",
+          "equity": 104527
+        },
+        {
+          "time": "2020-12-31",
+          "equity": 104762
+        },
+        {
+          "time": "2021-01-29",
+          "equity": 106746
+        },
+        {
+          "time": "2021-02-26",
+          "equity": 107994
+        },
+        {
+          "time": "2021-03-31",
+          "equity": 107540
+        },
+        {
+          "time": "2021-04-30",
+          "equity": 107673
+        },
+        {
+          "time": "2021-05-31",
+          "equity": 109293
+        },
+        {
+          "time": "2021-06-30",
+          "equity": 109293
+        },
+        {
+          "time": "2021-07-30",
+          "equity": 109293
+        },
+        {
+          "time": "2021-08-31",
+          "equity": 110343
+        },
+        {
+          "time": "2021-09-30",
+          "equity": 110508
+        },
+        {
+          "time": "2021-10-29",
+          "equity": 110464
+        },
+        {
+          "time": "2021-11-30",
+          "equity": 110290
+        },
+        {
+          "time": "2021-12-31",
+          "equity": 110130
+        },
+        {
+          "time": "2022-01-28",
+          "equity": 110318
+        },
+        {
+          "time": "2022-02-28",
+          "equity": 110220
+        },
+        {
+          "time": "2022-03-31",
+          "equity": 110561
+        },
+        {
+          "time": "2022-04-29",
+          "equity": 110584
+        },
+        {
+          "time": "2022-05-31",
+          "equity": 112399
+        },
+        {
+          "time": "2022-06-30",
+          "equity": 115328
+        },
+        {
+          "time": "2022-07-29",
+          "equity": 118535
+        },
+        {
+          "time": "2022-08-31",
+          "equity": 118535
+        },
+        {
+          "time": "2022-09-30",
+          "equity": 120419
+        },
+        {
+          "time": "2022-10-31",
+          "equity": 120595
+        },
+        {
+          "time": "2022-11-30",
+          "equity": 120619
+        },
+        {
+          "time": "2022-12-30",
+          "equity": 120877
+        },
+        {
+          "time": "2023-01-31",
+          "equity": 122068
+        },
+        {
+          "time": "2023-02-28",
+          "equity": 122068
+        },
+        {
+          "time": "2023-03-31",
+          "equity": 121864
+        },
+        {
+          "time": "2023-04-28",
+          "equity": 122986
+        },
+        {
+          "time": "2023-05-31",
+          "equity": 124970
+        },
+        {
+          "time": "2023-06-30",
+          "equity": 126222
+        },
+        {
+          "time": "2023-07-31",
+          "equity": 125676
+        },
+        {
+          "time": "2023-08-31",
+          "equity": 128224
+        },
+        {
+          "time": "2023-09-28",
+          "equity": 129251
+        }
+      ]
+    },
+    {
+      "label": "2023.1.1–2026.10.1",
+      "entryMode": "box-first-day",
+      "boxes": 53,
+      "trades": 6,
+      "skippedNoMa4": 33,
+      "skippedNoStock": 0,
+      "skippedOneDay": 14,
+      "capital": 100000,
+      "finalEquity": 108959,
+      "returnPct": 0.08959000000000006,
+      "maxDrawdownPct": 0.019699693156853132,
+      "wins": 6,
+      "losses": 0,
+      "tradePnls": [
+        {
+          "name": "*ST闻泰",
+          "code": "sh600745",
+          "standDays": 1,
+          "entry": "2023-01-03",
+          "exit": "2023-01-10",
+          "entryPrice": 53.81,
+          "exitPrice": 55.78,
+          "shares": 300,
+          "pnl": 591,
+          "returnPct": 0.036610295484110766,
+          "reason": "box-end",
+          "boxStart": "2023-01-03",
+          "boxEnd": "2023-01-10"
+        },
+        {
+          "name": "大为股份",
+          "code": "sz002213",
+          "standDays": 1,
+          "entry": "2023-05-15",
+          "exit": "2023-05-23",
+          "entryPrice": 12.36,
+          "exitPrice": 13.6,
+          "shares": 1600,
+          "pnl": 1984,
+          "returnPct": 0.10032362459546929,
+          "reason": "index-ma4",
+          "boxStart": "2023-05-15",
+          "boxEnd": "2023-05-31"
+        },
+        {
+          "name": "*ST闻泰",
+          "code": "sh600745",
+          "standDays": 1,
+          "entry": "2023-06-09",
+          "exit": "2023-06-15",
+          "entryPrice": 49.49,
+          "exitPrice": 50.92,
+          "shares": 400,
+          "pnl": 572,
+          "returnPct": 0.028894726207314703,
+          "reason": "index-ma4",
+          "boxStart": "2023-06-09",
+          "boxEnd": "2023-06-19"
+        },
+        {
+          "name": "*ST闻泰",
+          "code": "sh600745",
+          "standDays": 1,
+          "entry": "2024-09-24",
+          "exit": "2024-10-10",
+          "entryPrice": 25.99,
+          "exitPrice": 32.9,
+          "shares": 700,
+          "pnl": 4837,
+          "returnPct": 0.26587148903424396,
+          "reason": "stock-ma4",
+          "boxStart": "2024-09-24",
+          "boxEnd": "2024-11-11"
+        },
+        {
+          "name": "*ST闻泰",
+          "code": "sh600745",
+          "standDays": 1,
+          "entry": "2024-12-18",
+          "exit": "2024-12-20",
+          "entryPrice": 35.38,
+          "exitPrice": 36.25,
+          "shares": 500,
+          "pnl": 435,
+          "returnPct": 0.024590163934426146,
+          "reason": "box-end",
+          "boxStart": "2024-12-18",
+          "boxEnd": "2024-12-20"
+        },
+        {
+          "name": "大港股份",
+          "code": "sz002077",
+          "standDays": 1,
+          "entry": "2026-08-14",
+          "exit": "2026-08-18",
+          "entryPrice": 12.7,
+          "exitPrice": 13.06,
+          "shares": 1500,
+          "pnl": 540,
+          "returnPct": 0.02834645669291347,
+          "reason": "box-end",
+          "boxStart": "2026-08-14",
+          "boxEnd": "2026-08-18"
+        }
+      ],
+      "monthlyEquity": [
+        {
+          "time": "2023-01-31",
+          "equity": 100591
+        },
+        {
+          "time": "2023-02-28",
+          "equity": 100591
+        },
+        {
+          "time": "2023-03-31",
+          "equity": 100591
+        },
+        {
+          "time": "2023-04-28",
+          "equity": 100591
+        },
+        {
+          "time": "2023-05-31",
+          "equity": 102575
+        },
+        {
+          "time": "2023-06-30",
+          "equity": 103147
+        },
+        {
+          "time": "2023-07-31",
+          "equity": 103147
+        },
+        {
+          "time": "2023-08-31",
+          "equity": 103147
+        },
+        {
+          "time": "2023-09-28",
+          "equity": 103147
+        },
+        {
+          "time": "2023-10-31",
+          "equity": 103147
+        },
+        {
+          "time": "2023-11-30",
+          "equity": 103147
+        },
+        {
+          "time": "2023-12-29",
+          "equity": 103147
+        },
+        {
+          "time": "2024-01-31",
+          "equity": 103147
+        },
+        {
+          "time": "2024-02-29",
+          "equity": 103147
+        },
+        {
+          "time": "2024-03-29",
+          "equity": 103147
+        },
+        {
+          "time": "2024-04-30",
+          "equity": 103147
+        },
+        {
+          "time": "2024-05-31",
+          "equity": 103147
+        },
+        {
+          "time": "2024-06-28",
+          "equity": 103147
+        },
+        {
+          "time": "2024-07-31",
+          "equity": 103147
+        },
+        {
+          "time": "2024-08-30",
+          "equity": 103147
+        },
+        {
+          "time": "2024-09-30",
+          "equity": 107865
+        },
+        {
+          "time": "2024-10-31",
+          "equity": 107984
+        },
+        {
+          "time": "2024-11-29",
+          "equity": 107984
+        },
+        {
+          "time": "2024-12-31",
+          "equity": 108419
+        },
+        {
+          "time": "2025-01-27",
+          "equity": 108419
+        },
+        {
+          "time": "2025-02-28",
+          "equity": 108419
+        },
+        {
+          "time": "2025-03-31",
+          "equity": 108419
+        },
+        {
+          "time": "2025-04-30",
+          "equity": 108419
+        },
+        {
+          "time": "2025-05-30",
+          "equity": 108419
+        },
+        {
+          "time": "2025-06-30",
+          "equity": 108419
+        },
+        {
+          "time": "2025-07-31",
+          "equity": 108419
+        },
+        {
+          "time": "2025-08-29",
+          "equity": 108419
+        },
+        {
+          "time": "2025-09-30",
+          "equity": 108419
+        },
+        {
+          "time": "2025-10-31",
+          "equity": 108419
+        },
+        {
+          "time": "2025-11-28",
+          "equity": 108419
+        },
+        {
+          "time": "2025-12-31",
+          "equity": 108419
+        },
+        {
+          "time": "2026-01-30",
+          "equity": 108419
+        },
+        {
+          "time": "2026-02-27",
+          "equity": 108419
+        },
+        {
+          "time": "2026-03-31",
+          "equity": 108419
+        },
+        {
+          "time": "2026-04-30",
+          "equity": 108419
+        },
+        {
+          "time": "2026-05-29",
+          "equity": 108419
+        },
+        {
+          "time": "2026-06-30",
+          "equity": 108419
+        },
+        {
+          "time": "2026-07-31",
+          "equity": 108419
+        },
+        {
+          "time": "2026-08-31",
+          "equity": 108959
+        },
+        {
+          "time": "2026-09-30",
+          "equity": 108959
+        }
+      ]
+    },
+    {
+      "label": "2023.1.1–2026.10.1",
+      "entryMode": "first-on-ma4",
+      "boxes": 53,
+      "trades": 37,
+      "skippedNoMa4": 1,
+      "skippedNoStock": 1,
+      "skippedOneDay": 14,
+      "capital": 100000,
+      "finalEquity": 124159,
+      "returnPct": 0.24158999999999997,
+      "maxDrawdownPct": 0.028709296112181613,
+      "wins": 27,
+      "losses": 10,
+      "tradePnls": [
+        {
+          "name": "*ST闻泰",
+          "code": "sh600745",
+          "standDays": 1,
+          "entry": "2023-01-03",
+          "exit": "2023-01-10",
+          "entryPrice": 53.81,
+          "exitPrice": 55.78,
+          "shares": 300,
+          "pnl": 591,
+          "returnPct": 0.036610295484110766,
+          "reason": "box-end",
+          "boxStart": "2023-01-03",
+          "boxEnd": "2023-01-10"
+        },
+        {
+          "name": "大为股份",
+          "code": "sz002213",
+          "standDays": 1,
+          "entry": "2023-01-16",
+          "exit": "2023-01-31",
+          "entryPrice": 15.79,
+          "exitPrice": 16.29,
+          "shares": 1200,
+          "pnl": 600,
+          "returnPct": 0.03166561114629518,
+          "reason": "index-ma4",
+          "boxStart": "2023-01-13",
+          "boxEnd": "2023-02-15"
+        },
+        {
+          "name": "豪威集团",
+          "code": "sh603501",
+          "standDays": 1,
+          "entry": "2023-03-01",
+          "exit": "2023-03-06",
+          "entryPrice": 86.54,
+          "exitPrice": 86,
+          "shares": 200,
+          "pnl": -108,
+          "returnPct": -0.006239889068638815,
+          "reason": "stock-ma4",
+          "boxStart": "2023-02-28",
+          "boxEnd": "2023-03-06"
+        },
+        {
+          "name": "汇顶科技",
+          "code": "sh603160",
+          "standDays": 1,
+          "entry": "2023-03-09",
+          "exit": "2023-03-09",
+          "entryPrice": 53.36,
+          "exitPrice": 53.36,
+          "shares": 300,
+          "pnl": 0,
+          "returnPct": 0,
+          "reason": "box-end",
+          "boxStart": "2023-03-08",
+          "boxEnd": "2023-03-09"
+        },
+        {
+          "name": "*ST闻泰",
+          "code": "sh600745",
+          "standDays": 1,
+          "entry": "2023-03-30",
+          "exit": "2023-04-07",
+          "entryPrice": 55.57,
+          "exitPrice": 58.99,
+          "shares": 300,
+          "pnl": 1026,
+          "returnPct": 0.06154399856037429,
+          "reason": "box-end",
+          "boxStart": "2023-03-29",
+          "boxEnd": "2023-04-07"
+        },
+        {
+          "name": "大为股份",
+          "code": "sz002213",
+          "standDays": 1,
+          "entry": "2023-05-15",
+          "exit": "2023-05-23",
+          "entryPrice": 12.36,
+          "exitPrice": 13.6,
+          "shares": 1600,
+          "pnl": 1984,
+          "returnPct": 0.10032362459546929,
+          "reason": "index-ma4",
+          "boxStart": "2023-05-15",
+          "boxEnd": "2023-05-31"
+        },
+        {
+          "name": "*ST闻泰",
+          "code": "sh600745",
+          "standDays": 1,
+          "entry": "2023-06-09",
+          "exit": "2023-06-15",
+          "entryPrice": 49.49,
+          "exitPrice": 50.92,
+          "shares": 400,
+          "pnl": 572,
+          "returnPct": 0.028894726207314703,
+          "reason": "index-ma4",
+          "boxStart": "2023-06-09",
+          "boxEnd": "2023-06-19"
+        },
+        {
+          "name": "德明利",
+          "code": "sz001309",
+          "standDays": 1,
+          "entry": "2023-06-29",
+          "exit": "2023-07-03",
+          "entryPrice": 89.6,
+          "exitPrice": 90.27,
+          "shares": 200,
+          "pnl": 134,
+          "returnPct": 0.007477678571428559,
+          "reason": "stock-ma4",
+          "boxStart": "2023-06-28",
+          "boxEnd": "2023-07-06"
+        },
+        {
+          "name": "*ST闻泰",
+          "code": "sh600745",
+          "standDays": 1,
+          "entry": "2023-07-11",
+          "exit": "2023-07-11",
+          "entryPrice": 50.75,
+          "exitPrice": 50.75,
+          "shares": 300,
+          "pnl": 0,
+          "returnPct": 0,
+          "reason": "box-end",
+          "boxStart": "2023-07-10",
+          "boxEnd": "2023-07-11"
+        },
+        {
+          "name": "大港股份",
+          "code": "sz002077",
+          "standDays": 1,
+          "entry": "2023-08-29",
+          "exit": "2023-09-06",
+          "entryPrice": 14.44,
+          "exitPrice": 17.19,
+          "shares": 1300,
+          "pnl": 3575,
+          "returnPct": 0.19044321329639913,
+          "reason": "box-end",
+          "boxStart": "2023-08-25",
+          "boxEnd": "2023-09-06"
+        },
+        {
+          "name": "*ST闻泰",
+          "code": "sh600745",
+          "standDays": 1,
+          "entry": "2023-09-28",
+          "exit": "2023-10-13",
+          "entryPrice": 43.65,
+          "exitPrice": 47.36,
+          "shares": 400,
+          "pnl": 1484,
+          "returnPct": 0.08499427262313852,
+          "reason": "box-end",
+          "boxStart": "2023-09-27",
+          "boxEnd": "2023-10-13"
+        },
+        {
+          "name": "*ST闻泰",
+          "code": "sh600745",
+          "standDays": 1,
+          "entry": "2023-10-25",
+          "exit": "2023-10-30",
+          "entryPrice": 43.69,
+          "exitPrice": 50.04,
+          "shares": 400,
+          "pnl": 2540,
+          "returnPct": 0.14534218356603357,
+          "reason": "box-end",
+          "boxStart": "2023-10-24",
+          "boxEnd": "2023-10-30"
+        },
+        {
+          "name": "*ST闻泰",
+          "code": "sh600745",
+          "standDays": 1,
+          "entry": "2023-11-03",
+          "exit": "2023-11-09",
+          "entryPrice": 50.05,
+          "exitPrice": 51.93,
+          "shares": 300,
+          "pnl": 564,
+          "returnPct": 0.03756243756243771,
+          "reason": "stock-ma4",
+          "boxStart": "2023-11-02",
+          "boxEnd": "2023-11-20"
+        },
+        {
+          "name": "德明利",
+          "code": "sz001309",
+          "standDays": 1,
+          "entry": "2023-11-27",
+          "exit": "2023-11-28",
+          "entryPrice": 89.96,
+          "exitPrice": 90.86,
+          "shares": 200,
+          "pnl": 180,
+          "returnPct": 0.010004446420631474,
+          "reason": "box-end",
+          "boxStart": "2023-11-24",
+          "boxEnd": "2023-11-28"
+        },
+        {
+          "name": "*ST闻泰",
+          "code": "sh600745",
+          "standDays": 1,
+          "entry": "2023-12-08",
+          "exit": "2023-12-11",
+          "entryPrice": 44.55,
+          "exitPrice": 44.67,
+          "shares": 400,
+          "pnl": 48,
+          "returnPct": 0.002693602693602859,
+          "reason": "box-end",
+          "boxStart": "2023-12-07",
+          "boxEnd": "2023-12-11"
+        },
+        {
+          "name": "汇顶科技",
+          "code": "sh603160",
+          "standDays": 1,
+          "entry": "2023-12-27",
+          "exit": "2023-12-29",
+          "entryPrice": 67.55,
+          "exitPrice": 69.1,
+          "shares": 200,
+          "pnl": 310,
+          "returnPct": 0.022945965951147285,
+          "reason": "box-end",
+          "boxStart": "2023-12-26",
+          "boxEnd": "2023-12-29"
+        },
+        {
+          "name": "*ST闻泰",
+          "code": "sh600745",
+          "standDays": 1,
+          "entry": "2024-01-25",
+          "exit": "2024-01-25",
+          "entryPrice": 37.14,
+          "exitPrice": 37.14,
+          "shares": 500,
+          "pnl": 0,
+          "returnPct": 0,
+          "reason": "box-end",
+          "boxStart": "2024-01-24",
+          "boxEnd": "2024-01-25"
+        },
+        {
+          "name": "大港股份",
+          "code": "sz002077",
+          "standDays": 1,
+          "entry": "2024-02-07",
+          "exit": "2024-02-28",
+          "entryPrice": 13.47,
+          "exitPrice": 14.07,
+          "shares": 1400,
+          "pnl": 840,
+          "returnPct": 0.04454342984409787,
+          "reason": "stock-ma4",
+          "boxStart": "2024-02-06",
+          "boxEnd": "2024-03-20"
+        },
+        {
+          "name": "大为股份",
+          "code": "sz002213",
+          "standDays": 1,
+          "entry": "2024-03-29",
+          "exit": "2024-04-01",
+          "entryPrice": 12.2,
+          "exitPrice": 12.18,
+          "shares": 1600,
+          "pnl": -32,
+          "returnPct": -0.0016393442622950616,
+          "reason": "box-end",
+          "boxStart": "2024-03-28",
+          "boxEnd": "2024-04-01"
+        },
+        {
+          "name": "*ST闻泰",
+          "code": "sh600745",
+          "standDays": 1,
+          "entry": "2024-04-17",
+          "exit": "2024-04-17",
+          "entryPrice": 35.23,
+          "exitPrice": 35.23,
+          "shares": 500,
+          "pnl": 0,
+          "returnPct": 0,
+          "reason": "box-end",
+          "boxStart": "2024-04-16",
+          "boxEnd": "2024-04-17"
+        },
+        {
+          "name": "大港股份",
+          "code": "sz002077",
+          "standDays": 1,
+          "entry": "2024-04-23",
+          "exit": "2024-04-30",
+          "entryPrice": 12.46,
+          "exitPrice": 12.77,
+          "shares": 1600,
+          "pnl": 496,
+          "returnPct": 0.024879614767255198,
+          "reason": "stock-ma4",
+          "boxStart": "2024-04-22",
+          "boxEnd": "2024-05-09"
+        },
+        {
+          "name": "华天科技",
+          "code": "sz002185",
+          "standDays": 1,
+          "entry": "2024-05-16",
+          "exit": "2024-05-22",
+          "entryPrice": 8.13,
+          "exitPrice": 8.35,
+          "shares": 2400,
+          "pnl": 528,
+          "returnPct": 0.027060270602705883,
+          "reason": "box-end",
+          "boxStart": "2024-05-15",
+          "boxEnd": "2024-05-22"
+        },
+        {
+          "name": "*ST闻泰",
+          "code": "sh600745",
+          "standDays": 1,
+          "entry": "2024-06-11",
+          "exit": "2024-06-14",
+          "entryPrice": 29.85,
+          "exitPrice": 29.96,
+          "shares": 600,
+          "pnl": 66,
+          "returnPct": 0.003685092127303058,
+          "reason": "stock-ma4",
+          "boxStart": "2024-06-04",
+          "boxEnd": "2024-06-20"
+        },
+        {
+          "name": "*ST闻泰",
+          "code": "sh600745",
+          "standDays": 1,
+          "entry": "2024-07-09",
+          "exit": "2024-07-15",
+          "entryPrice": 29.01,
+          "exitPrice": 29.06,
+          "shares": 600,
+          "pnl": 30,
+          "returnPct": 0.0017235436056530773,
+          "reason": "stock-ma4",
+          "boxStart": "2024-07-05",
+          "boxEnd": "2024-07-22"
+        },
+        {
+          "name": "大港股份",
+          "code": "sz002077",
+          "standDays": 1,
+          "entry": "2024-07-30",
+          "exit": "2024-08-01",
+          "entryPrice": 12.92,
+          "exitPrice": 13.01,
+          "shares": 1500,
+          "pnl": 135,
+          "returnPct": 0.006965944272445901,
+          "reason": "box-end",
+          "boxStart": "2024-07-26",
+          "boxEnd": "2024-08-01"
+        },
+        {
+          "name": "*ST闻泰",
+          "code": "sh600745",
+          "standDays": 1,
+          "entry": "2024-08-29",
+          "exit": "2024-08-30",
+          "entryPrice": 24.92,
+          "exitPrice": 26.1,
+          "shares": 800,
+          "pnl": 944,
+          "returnPct": 0.047351524879614804,
+          "reason": "box-end",
+          "boxStart": "2024-08-28",
+          "boxEnd": "2024-08-30"
+        },
+        {
+          "name": "*ST闻泰",
+          "code": "sh600745",
+          "standDays": 1,
+          "entry": "2024-09-24",
+          "exit": "2024-10-10",
+          "entryPrice": 25.99,
+          "exitPrice": 32.9,
+          "shares": 700,
+          "pnl": 4837,
+          "returnPct": 0.26587148903424396,
+          "reason": "stock-ma4",
+          "boxStart": "2024-09-24",
+          "boxEnd": "2024-11-11"
+        },
+        {
+          "name": "大港股份",
+          "code": "sz002077",
+          "standDays": 1,
+          "entry": "2024-11-19",
+          "exit": "2024-11-21",
+          "entryPrice": 16.19,
+          "exitPrice": 16.51,
+          "shares": 1200,
+          "pnl": 384,
+          "returnPct": 0.019765287214329907,
+          "reason": "box-end",
+          "boxStart": "2024-11-18",
+          "boxEnd": "2024-11-21"
+        },
+        {
+          "name": "*ST闻泰",
+          "code": "sh600745",
+          "standDays": 1,
+          "entry": "2024-11-27",
+          "exit": "2024-12-02",
+          "entryPrice": 41.07,
+          "exitPrice": 37.5,
+          "shares": 400,
+          "pnl": -1428,
+          "returnPct": -0.08692476260043824,
+          "reason": "stock-ma4",
+          "boxStart": "2024-11-25",
+          "boxEnd": "2024-12-11"
+        },
+        {
+          "name": "*ST闻泰",
+          "code": "sh600745",
+          "standDays": 1,
+          "entry": "2024-12-18",
+          "exit": "2024-12-20",
+          "entryPrice": 35.38,
+          "exitPrice": 36.25,
+          "shares": 500,
+          "pnl": 435,
+          "returnPct": 0.024590163934426146,
+          "reason": "box-end",
+          "boxStart": "2024-12-18",
+          "boxEnd": "2024-12-20"
+        },
+        {
+          "name": "大港股份",
+          "code": "sz002077",
+          "standDays": 1,
+          "entry": "2025-01-07",
+          "exit": "2025-01-10",
+          "entryPrice": 14.59,
+          "exitPrice": 14,
+          "shares": 1300,
+          "pnl": -767,
+          "returnPct": -0.04043865661411927,
+          "reason": "stock-ma4",
+          "boxStart": "2025-01-06",
+          "boxEnd": "2025-02-26"
+        },
+        {
+          "name": "大港股份",
+          "code": "sz002077",
+          "standDays": 1,
+          "entry": "2025-03-17",
+          "exit": "2025-03-18",
+          "entryPrice": 14.93,
+          "exitPrice": 15.38,
+          "shares": 1300,
+          "pnl": 585,
+          "returnPct": 0.030140656396517196,
+          "reason": "box-end",
+          "boxStart": "2025-03-13",
+          "boxEnd": "2025-03-18"
+        },
+        {
+          "name": "上海贝岭",
+          "code": "sh600171",
+          "standDays": 1,
+          "entry": "2025-04-09",
+          "exit": "2025-04-16",
+          "entryPrice": 31.15,
+          "exitPrice": 36.72,
+          "shares": 600,
+          "pnl": 3342,
+          "returnPct": 0.17881219903691825,
+          "reason": "index-ma4",
+          "boxStart": "2025-04-07",
+          "boxEnd": "2026-06-30"
+        },
+        {
+          "name": "大为股份",
+          "code": "sz002213",
+          "standDays": 1,
+          "entry": "2026-07-09",
+          "exit": "2026-07-09",
+          "entryPrice": 33.59,
+          "exitPrice": 33.59,
+          "shares": 500,
+          "pnl": 0,
+          "returnPct": 0,
+          "reason": "box-end",
+          "boxStart": "2026-07-08",
+          "boxEnd": "2026-07-09"
+        },
+        {
+          "name": "大港股份",
+          "code": "sz002077",
+          "standDays": 1,
+          "entry": "2026-08-14",
+          "exit": "2026-08-18",
+          "entryPrice": 12.7,
+          "exitPrice": 13.06,
+          "shares": 1500,
+          "pnl": 540,
+          "returnPct": 0.02834645669291347,
+          "reason": "box-end",
+          "boxStart": "2026-08-14",
+          "boxEnd": "2026-08-18"
+        },
+        {
+          "name": "大港股份",
+          "code": "sz002077",
+          "standDays": 1,
+          "entry": "2026-08-27",
+          "exit": "2026-08-31",
+          "entryPrice": 12.48,
+          "exitPrice": 12.69,
+          "shares": 1600,
+          "pnl": 336,
+          "returnPct": 0.016826923076922906,
+          "reason": "box-end",
+          "boxStart": "2026-08-25",
+          "boxEnd": "2026-08-31"
+        },
+        {
+          "name": "大为股份",
+          "code": "sz002213",
+          "standDays": 1,
+          "entry": "2026-09-15",
+          "exit": "2026-09-17",
+          "entryPrice": 29.49,
+          "exitPrice": 28.47,
+          "shares": 600,
+          "pnl": -612,
+          "returnPct": -0.034587995930823956,
+          "reason": "stock-ma4",
+          "boxStart": "2026-09-11",
+          "boxEnd": "2026-09-23"
+        }
+      ],
+      "monthlyEquity": [
+        {
+          "time": "2023-01-31",
+          "equity": 101191
+        },
+        {
+          "time": "2023-02-28",
+          "equity": 101191
+        },
+        {
+          "time": "2023-03-31",
+          "equity": 100987
+        },
+        {
+          "time": "2023-04-28",
+          "equity": 102109
+        },
+        {
+          "time": "2023-05-31",
+          "equity": 104093
+        },
+        {
+          "time": "2023-06-30",
+          "equity": 105345
+        },
+        {
+          "time": "2023-07-31",
+          "equity": 104799
+        },
+        {
+          "time": "2023-08-31",
+          "equity": 107347
+        },
+        {
+          "time": "2023-09-28",
+          "equity": 108374
+        },
+        {
+          "time": "2023-10-31",
+          "equity": 112398
+        },
+        {
+          "time": "2023-11-30",
+          "equity": 113142
+        },
+        {
+          "time": "2023-12-29",
+          "equity": 113500
+        },
+        {
+          "time": "2024-01-31",
+          "equity": 113500
+        },
+        {
+          "time": "2024-02-29",
+          "equity": 114340
+        },
+        {
+          "time": "2024-03-29",
+          "equity": 114340
+        },
+        {
+          "time": "2024-04-30",
+          "equity": 114804
+        },
+        {
+          "time": "2024-05-31",
+          "equity": 115332
+        },
+        {
+          "time": "2024-06-28",
+          "equity": 115398
+        },
+        {
+          "time": "2024-07-31",
+          "equity": 115248
+        },
+        {
+          "time": "2024-08-30",
+          "equity": 116507
+        },
+        {
+          "time": "2024-09-30",
+          "equity": 121225
+        },
+        {
+          "time": "2024-10-31",
+          "equity": 121344
+        },
+        {
+          "time": "2024-11-29",
+          "equity": 121576
+        },
+        {
+          "time": "2024-12-31",
+          "equity": 120735
+        },
+        {
+          "time": "2025-01-27",
+          "equity": 119968
+        },
+        {
+          "time": "2025-02-28",
+          "equity": 119968
+        },
+        {
+          "time": "2025-03-31",
+          "equity": 120553
+        },
+        {
+          "time": "2025-04-30",
+          "equity": 123895
+        },
+        {
+          "time": "2025-05-30",
+          "equity": 123895
+        },
+        {
+          "time": "2025-06-30",
+          "equity": 123895
+        },
+        {
+          "time": "2025-07-31",
+          "equity": 123895
+        },
+        {
+          "time": "2025-08-29",
+          "equity": 123895
+        },
+        {
+          "time": "2025-09-30",
+          "equity": 123895
+        },
+        {
+          "time": "2025-10-31",
+          "equity": 123895
+        },
+        {
+          "time": "2025-11-28",
+          "equity": 123895
+        },
+        {
+          "time": "2025-12-31",
+          "equity": 123895
+        },
+        {
+          "time": "2026-01-30",
+          "equity": 123895
+        },
+        {
+          "time": "2026-02-27",
+          "equity": 123895
+        },
+        {
+          "time": "2026-03-31",
+          "equity": 123895
+        },
+        {
+          "time": "2026-04-30",
+          "equity": 123895
+        },
+        {
+          "time": "2026-05-29",
+          "equity": 123895
+        },
+        {
+          "time": "2026-06-30",
+          "equity": 123895
+        },
+        {
+          "time": "2026-07-31",
+          "equity": 123895
+        },
+        {
+          "time": "2026-08-31",
+          "equity": 124771
+        },
+        {
+          "time": "2026-09-30",
+          "equity": 124159
+        }
+      ]
+    }
+  ]
+}

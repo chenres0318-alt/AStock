@@ -1,0 +1,110 @@
+import { runMa4StandBacktest, lotsFor } from "./ma4StandBacktest.ts";
+import type { KBar } from "./types.ts";
+import type { SectorTrendSegment } from "./sectorTrend.ts";
+
+function assert(cond: unknown, message: string) {
+  if (!cond) throw new Error(message);
+}
+
+function kbars(closes: number[], start = "2020-01-02"): KBar[] {
+  const t0 = Date.parse(`${start}T00:00:00Z`);
+  return closes.map((close, i) => {
+    const time = new Date(t0 + i * 86400000).toISOString().slice(0, 10);
+    const prev = i === 0 ? close : closes[i - 1];
+    return {
+      time,
+      open: prev,
+      high: Math.max(prev, close) * 1.01,
+      low: Math.min(prev, close) * 0.99,
+      close,
+      volume: 1000,
+    };
+  });
+}
+
+const segment = (start: string, end: string): SectorTrendSegment => ({
+  start,
+  end,
+  gain: 0.05,
+  status: "closed",
+  upCount: 5,
+  memberCount: 6,
+  upRatio: 0.8,
+  leaders: [],
+});
+
+assert(lotsFor(20_000, 10) === 2000, "20k at 10 yuan is 2000 shares");
+assert(lotsFor(20_000, 210) === 0, "a name above 200 yuan cannot fill one 20k lot");
+assert(lotsFor(20_000, 15.3) === 1300, "lots round down to 100 shares");
+
+const index = kbars([
+  10, 10.2, 10.4, 10.6, 10.8, 11, 11.2, 11.4, 11.6, 11.8, 12, 12.2, 12.4, 12.6, 12.8, 13, 13.2, 13.4, 13.6, 13.8,
+]);
+const shortStand = kbars([
+  8, 8.1, 8.2, 7.0, 8.5, 8.7, 8.9, 9.1, 9.3, 9.5, 9.7, 9.9, 10.1, 10.3, 8.0, 8.1, 8.2, 8.3, 8.4, 8.5,
+]);
+const longStand = kbars([
+  20, 20.2, 20.4, 20.6, 20.8, 21, 21.2, 21.4, 21.6, 21.8, 22, 22.2, 22.4, 22.6, 22.8, 23, 23.2, 23.4, 23.6, 23.8,
+]);
+
+const box = segment(index[4].time, index[16].time);
+const result = runMa4StandBacktest({
+  label: "unit",
+  indexBars: index,
+  stocks: [
+    { code: "sh600001", name: "短站", bars: shortStand },
+    { code: "sh600002", name: "长站", bars: longStand },
+  ],
+  periodStart: index[0].time,
+  periodEnd: index[index.length - 1].time,
+  segments: [box],
+});
+
+assert(result.trades.length === 1, `expected one trade, got ${result.trades.length}`);
+assert(result.trades[0].name === "短站", "the shortest MA4 stand is bought");
+assert(result.trades[0].entry === index[4].time, "entry is the first day of the red box");
+assert(result.trades[0].reason === "stock-ma4", `exit should be stock MA4, got ${result.trades[0].reason}`);
+assert(result.trades[0].exit === index[14].time, `stock break should exit on the close below MA4 (${result.trades[0].exit})`);
+assert(result.returnPct !== 0, "the losing MA4 break should move total capital");
+assert(result.maxDrawdownPct > 0, "a losing trade from the peak creates drawdown");
+
+const belowMa4Index = kbars([12, 11, 10, 9, 8, 7.5, 7.2, 7, 6.8, 6.5, 6.3, 6.1, 6, 5.9, 5.8, 5.7]);
+const skip = runMa4StandBacktest({
+  label: "skip",
+  indexBars: belowMa4Index,
+  stocks: [{ code: "sh600001", name: "短站", bars: belowMa4Index }],
+  periodStart: belowMa4Index[0].time,
+  periodEnd: belowMa4Index[belowMa4Index.length - 1].time,
+  segments: [segment(belowMa4Index[4].time, belowMa4Index[10].time)],
+});
+assert(skip.trades.length === 0, "a box whose first day is below index MA4 is skipped");
+assert(skip.skippedNoMa4 >= 1, "that skip is counted as index not on MA4");
+
+const waitIndex = kbars([8, 7.5, 7.2, 7, 6.8, 8.5, 8.7, 8.9, 9.1, 9.3, 9.5, 9.7, 9.9, 10.1, 10.3, 10.5]);
+const waitStock = kbars([8, 7.5, 7.2, 7, 6.8, 8.5, 8.7, 8.9, 9.1, 9.3, 9.5, 9.7, 9.9, 8.0, 8.1, 8.2]);
+const waited = runMa4StandBacktest({
+  label: "wait",
+  indexBars: waitIndex,
+  stocks: [{ code: "sh600001", name: "短站", bars: waitStock }],
+  periodStart: waitIndex[0].time,
+  periodEnd: waitIndex[waitIndex.length - 1].time,
+  entryMode: "first-on-ma4",
+  segments: [segment(waitIndex[4].time, waitIndex[12].time)],
+});
+assert(waited.trades.length === 1, "first-on-ma4 waits inside the box");
+assert(waited.trades[0].entry === waitIndex[5].time, "entry is the first later day the index stands on MA4");
+
+const twoBoxes = runMa4StandBacktest({
+  label: "two",
+  indexBars: index,
+  stocks: [
+    { code: "sh600001", name: "短站", bars: shortStand },
+    { code: "sh600002", name: "长站", bars: longStand },
+  ],
+  periodStart: index[0].time,
+  periodEnd: index[index.length - 1].time,
+  segments: [box, segment(index[16].time, index[18].time)],
+});
+assert(twoBoxes.boxes === 2, "two injected boxes are both in the window");
+
+console.log("ma4StandBacktest checks passed");
