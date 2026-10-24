@@ -106,9 +106,9 @@ function pickShortestStand(stocks: StockSeries[], entryTime: string, skipCodes?:
  * 入场按 entryMode：红框第一天 / 框内指数首次站上 MA4 / 框内任意一天指数站上 MA4 /
  * 不限红框、只要指数收盘站上 MA4。
  * 买成分股里连续站上 MA4 天数最短的一只。allCash 时每次用当前现金满仓，否则固定 stake。
- * 出场：个股收盘跌破 MA4、指数收盘跌破 MA4、入场时所在趋势框结束、或区间最后一根。
+ * 出场：个股收盘跌破 MA4、指数收盘跌破 MA4、（红框模式才有）趋势框结束、或区间最后一根。
  * 同时只持有一只。sameDayReentry 为 true 时，离场当天若指数仍站上 MA4，用同一根收盘换买另一只。
- * any-on-ma4 不要求当天在红框里；框结束离场后只要指数还在 MA4 上也可以当天再买。
+ * any-on-ma4 不要求当天在红框里，也不因红框结束离场，只看个股和指数是否还在 MA4 上。
  * 不计佣金印花税。成分股用给定名单（通常是当前成分，对历史有前视）。
  */
 export function runMa4StandBacktest(input: {
@@ -273,7 +273,7 @@ export function runMa4StandBacktest(input: {
       return;
     }
     cash -= shares * price;
-    const box = anyDay ? coveringBox(time) : segment;
+    const box = anyDay ? null : segment;
     positions.push({
       code: pick.code,
       name: pick.name,

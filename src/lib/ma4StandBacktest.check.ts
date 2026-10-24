@@ -221,5 +221,9 @@ assert(
   boxed.trades.some((trade) => trade.entry < box.start),
   "any-on-ma4 can buy before the red box starts",
 );
+assert(
+  boxed.trades.every((trade) => trade.reason !== "box-end"),
+  "any-on-ma4 does not leave just because a red box ends",
+);
 
 console.log("ma4StandBacktest checks passed");
