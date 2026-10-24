@@ -135,3 +135,26 @@ export type ScreenerHit = {
   sector: string | null;
   sectorCode: string | null;
 };
+
+export type HoldingItem = {
+  code: string;
+  name: string;
+  sector: string | null;
+  sectorCode: string | null;
+};
+
+export type HoldingAdvice = {
+  action: "hold" | "exit";
+  label: "继续持仓" | "需要离场";
+  stockOnMa4: boolean;
+  sectorOnMa4: boolean;
+  sectorInRedBox: boolean;
+  notes: string[];
+};
+
+export type HoldingStatus = HoldingAdvice & {
+  code: string;
+  standDays: number;
+  sector: string | null;
+  sectorCode: string | null;
+};

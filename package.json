@@ -10,7 +10,8 @@
     "lint": "eslint",
     "check:indicators": "node --experimental-strip-types --no-warnings src/lib/indicators.check.ts",
     "check:trend": "node --experimental-strip-types --no-warnings src/lib/sectorTrend.check.ts",
-    "check:screener": "node --experimental-strip-types --no-warnings src/lib/screener.check.ts"
+    "check:screener": "node --experimental-strip-types --no-warnings src/lib/screener.check.ts",
+    "check:holdings": "node --experimental-strip-types --no-warnings src/lib/holdingAdvice.check.ts"
   },
   "dependencies": {
     "iconv-lite": "^0.7.3",
