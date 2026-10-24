@@ -40,7 +40,7 @@ export type EquityPoint = {
   equity: number;
 };
 
-export type EntryMode = "box-first-day" | "first-on-ma4";
+export type EntryMode = "box-first-day" | "first-on-ma4" | "in-box-on-ma4";
 
 export type BacktestResult = {
   label: string;
@@ -102,9 +102,10 @@ function pickShortestStand(stocks: StockSeries[], entryTime: string) {
 
 /**
  * 半导体（或任意板块）MA4 最短站上选股回测。
- * 入场：红色趋势框第一天（或框内指数首次站上 MA4），且指数收盘站上 MA4，
- * 买成分股里连续站上 MA4 天数最短的一只，2 万、100 股一手。
+ * 入场按 entryMode：红框第一天 / 框内指数首次站上 MA4 / 框内任意一天指数站上 MA4。
+ * 买成分股里连续站上 MA4 天数最短的一只。allCash 时每次用当前现金满仓，否则固定 stake。
  * 出场：个股收盘跌破 MA4、指数收盘跌破 MA4、趋势框结束、或区间最后一根。
+ * in-box-on-ma4 出场后若仍在红框且指数仍站上 MA4，同一天可以再买。
  * 不计佣金印花税。成分股用给定名单（通常是当前成分，对历史有前视）。
  */
 export function runMa4StandBacktest(input: {
@@ -115,12 +116,16 @@ export function runMa4StandBacktest(input: {
   periodEnd: string;
   capital?: number;
   stake?: number;
+  /** 每次用当前现金满仓（100 股一手），而不是固定 stake。 */
+  allCash?: boolean;
   entryMode?: EntryMode;
   segments?: SectorTrendSegment[];
 }): BacktestResult {
   const capital = input.capital ?? BACKTEST_CAPITAL;
   const stake = input.stake ?? BACKTEST_STAKE;
+  const allCash = input.allCash ?? false;
   const entryMode = input.entryMode ?? "box-first-day";
+  const reenter = entryMode === "in-box-on-ma4";
 
   const indexBars = input.indexBars.filter((bar) => bar.time <= input.periodEnd);
   const stocks = input.stocks.map((stock) => ({
@@ -129,8 +134,10 @@ export function runMa4StandBacktest(input: {
   }));
   const segments =
     input.segments ?? captureSectorTrends(indexBars, toPaths(stocks));
-  const inPeriod = segments.filter(
-    (segment) => segment.start >= input.periodStart && segment.start <= input.periodEnd,
+  const inPeriod = segments.filter((segment) =>
+    reenter
+      ? segment.end >= input.periodStart && segment.start <= input.periodEnd
+      : segment.start >= input.periodStart && segment.start <= input.periodEnd,
   );
 
   type Position = {
@@ -205,10 +212,11 @@ export function runMa4StandBacktest(input: {
   }
 
   function tryEnter(time: string, segment: SectorTrendSegment) {
-    if (entered.has(segment.start)) return;
+    if (positions.length > 0) return;
+    if (!reenter && entered.has(segment.start)) return;
     if (segment.start === segment.end) {
       skippedOneDay += 1;
-      entered.add(segment.start);
+      if (!reenter) entered.add(segment.start);
       return;
     }
     const idx = indexByTime.get(time);
@@ -222,23 +230,28 @@ export function runMa4StandBacktest(input: {
       }
       return;
     }
-    if (cash < stake) {
+    const budget = allCash ? cash : stake;
+    if (!allCash && cash < stake) {
       skippedNoCash += 1;
-      entered.add(segment.start);
+      if (!reenter) entered.add(segment.start);
+      return;
+    }
+    if (!(budget > 0)) {
+      skippedNoCash += 1;
       return;
     }
     const pick = pickShortestStand(stocks, time);
     if (!pick) {
       skippedNoStock += 1;
-      entered.add(segment.start);
+      if (!reenter) entered.add(segment.start);
       return;
     }
     const series = stockByCode.get(pick.code);
     const price = series ? closeOnDay(series.bars, time) : null;
-    const shares = price != null ? lotsFor(stake, price) : 0;
+    const shares = price != null ? lotsFor(budget, price) : 0;
     if (price == null || shares <= 0) {
       skippedNoStock += 1;
-      entered.add(segment.start);
+      if (!reenter) entered.add(segment.start);
       return;
     }
     cash -= shares * price;

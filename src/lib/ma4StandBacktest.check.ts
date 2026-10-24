@@ -107,4 +107,41 @@ const twoBoxes = runMa4StandBacktest({
 });
 assert(twoBoxes.boxes === 2, "two injected boxes are both in the window");
 
+const reentered = runMa4StandBacktest({
+  label: "reenter",
+  indexBars: index,
+  stocks: [
+    { code: "sh600001", name: "短站", bars: shortStand },
+    { code: "sh600002", name: "长站", bars: longStand },
+  ],
+  periodStart: index[0].time,
+  periodEnd: index[index.length - 1].time,
+  capital: 100_000,
+  allCash: true,
+  entryMode: "in-box-on-ma4",
+  segments: [box],
+});
+assert(reentered.trades.length >= 2, `in-box-on-ma4 should re-enter after a stock MA4 break, got ${reentered.trades.length}`);
+assert(reentered.trades[0].name === "短站", "the first fill is still the shortest stand");
+assert(reentered.trades[1].entry === index[14].time, "re-entry is the same close the first name drops MA4");
+assert(reentered.trades[1].name === "长站", "after the short name breaks, the remaining MA4 name is bought");
+assert(
+  reentered.trades[0].shares * reentered.trades[0].entryPrice > 90_000,
+  "all-cash 10w deploys most of the book",
+);
+
+const once = runMa4StandBacktest({
+  label: "once",
+  indexBars: index,
+  stocks: [
+    { code: "sh600001", name: "短站", bars: shortStand },
+    { code: "sh600002", name: "长站", bars: longStand },
+  ],
+  periodStart: index[0].time,
+  periodEnd: index[index.length - 1].time,
+  entryMode: "first-on-ma4",
+  segments: [box],
+});
+assert(once.trades.length === 1, "first-on-ma4 still enters a box only once");
+
 console.log("ma4StandBacktest checks passed");

@@ -1,5 +1,5 @@
 import iconv from "iconv-lite";
-import { writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { runMa4StandBacktest, type BacktestResult, type EntryMode } from "../src/lib/ma4StandBacktest.ts";
 import type { KBar } from "../src/lib/types.ts";
 
@@ -351,32 +351,68 @@ function monthEnds(equity: Array<{ time: string; equity: number }>) {
   return points;
 }
 
+const SERIES_CACHE = "/tmp/semi-ma4-series.json";
+
+type CachedSeries = {
+  boardName: string;
+  bars: KBar[];
+  members: Member[];
+  stocks: StockSeries[];
+};
+
+function loadSeriesCache(): CachedSeries | null {
+  if (!existsSync(SERIES_CACHE)) return null;
+  try {
+    const cached = JSON.parse(readFileSync(SERIES_CACHE, "utf8")) as CachedSeries;
+    if (!cached.bars?.length || !cached.stocks?.length) return null;
+    return cached;
+  } catch {
+    return null;
+  }
+}
+
 async function main() {
-  console.log("fetching semiconductor index…");
-  const board = await fetchBoardBars();
-  console.log(`index ${board.name} bars=${board.bars.length} ${board.bars[0]?.time} → ${board.bars.at(-1)?.time}`);
+  let boardName = BOARD_NAME;
+  let bars: KBar[] = [];
+  let members: Member[] = [];
+  let stocks: StockSeries[] = [];
+  const cached = loadSeriesCache();
+  if (cached) {
+    boardName = cached.boardName;
+    bars = cached.bars;
+    members = cached.members;
+    stocks = cached.stocks;
+    console.log(`cache ${boardName} bars=${bars.length} stocks=${stocks.length} ${bars[0]?.time} → ${bars.at(-1)?.time}`);
+  } else {
+    console.log("fetching semiconductor index…");
+    const board = await fetchBoardBars();
+    boardName = board.name;
+    bars = board.bars;
+    console.log(`index ${boardName} bars=${bars.length} ${bars[0]?.time} → ${bars.at(-1)?.time}`);
 
-  console.log("fetching members…");
-  const members = await fetchMembers();
-  console.log(`members=${members.length}`);
+    console.log("fetching members…");
+    members = await fetchMembers();
+    console.log(`members=${members.length}`);
 
-  console.log("fetching constituent dailies…");
-  const stocks = (
-    await mapPool(members, 4, async (member) => {
-      try {
-        const bars = await fetchStockBars(member.code);
-        if (bars.length < 30) {
-          console.warn(`short ${member.code} ${member.name} bars=${bars.length}`);
+    console.log("fetching constituent dailies…");
+    stocks = (
+      await mapPool(members, 4, async (member) => {
+        try {
+          const kline = await fetchStockBars(member.code);
+          if (kline.length < 30) {
+            console.warn(`short ${member.code} ${member.name} bars=${kline.length}`);
+            return null;
+          }
+          return { code: toTencent(member.code), name: member.name, bars: kline } satisfies StockSeries;
+        } catch (error) {
+          console.warn(`skip ${member.code} ${member.name}:`, error instanceof Error ? error.message : error);
           return null;
         }
-        return { code: toTencent(member.code), name: member.name, bars } satisfies StockSeries;
-      } catch (error) {
-        console.warn(`skip ${member.code} ${member.name}:`, error instanceof Error ? error.message : error);
-        return null;
-      }
-    })
-  ).filter((item): item is StockSeries => item != null);
-  console.log(`stock series=${stocks.length}`);
+      })
+    ).filter((item): item is StockSeries => item != null);
+    console.log(`stock series=${stocks.length}`);
+    writeFileSync(SERIES_CACHE, JSON.stringify({ boardName, bars, members, stocks }));
+  }
 
   const payload: {
     board: string;
@@ -389,31 +425,38 @@ async function main() {
     results: ReturnType<typeof summarize>[];
   } = {
     board: BOARD,
-    boardName: board.name || BOARD_NAME,
-    indexFrom: board.bars[0]?.time,
-    indexTo: board.bars.at(-1)?.time,
+    boardName: boardName || BOARD_NAME,
+    indexFrom: bars[0]?.time,
+    indexTo: bars.at(-1)?.time,
     memberCount: members.length,
     stockCount: stocks.length,
     fetchedAt: new Date().toISOString(),
     results: [],
   };
 
-  const modes: EntryMode[] = ["box-first-day", "first-on-ma4"];
+  const jobs: Array<{ entryMode: EntryMode; allCash: boolean; stake: number }> = [
+    { entryMode: "box-first-day", allCash: false, stake: 20_000 },
+    { entryMode: "first-on-ma4", allCash: false, stake: 20_000 },
+    { entryMode: "in-box-on-ma4", allCash: true, stake: 100_000 },
+  ];
   for (const period of PERIODS) {
-    for (const entryMode of modes) {
+    for (const job of jobs) {
       const result = runMa4StandBacktest({
         label: period.label,
-        indexBars: board.bars,
+        indexBars: bars,
         stocks,
         periodStart: period.start,
         periodEnd: period.end,
-        entryMode,
+        entryMode: job.entryMode,
+        stake: job.stake,
+        allCash: job.allCash,
       });
       payload.results.push(summarize(result));
       console.log(
         [
           period.label,
-          entryMode,
+          job.entryMode,
+          job.allCash ? "allCash" : `stake=${job.stake}`,
           `boxes=${result.boxes}`,
           `trades=${result.trades.length}`,
           `skipMa4=${result.skippedNoMa4}`,
