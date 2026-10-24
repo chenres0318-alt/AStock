@@ -307,6 +307,7 @@ function summarize(result: BacktestResult) {
   return {
     label: result.label,
     entryMode: result.entryMode,
+    sameDayReentry: result.sameDayReentry,
     start: result.start,
     end: result.end,
     boxes: result.boxes,
@@ -434,10 +435,11 @@ async function main() {
     results: [],
   };
 
-  const jobs: Array<{ entryMode: EntryMode; allCash: boolean; stake: number }> = [
+  const jobs: Array<{ entryMode: EntryMode; allCash: boolean; stake: number; sameDayReentry?: boolean }> = [
     { entryMode: "box-first-day", allCash: false, stake: 20_000 },
     { entryMode: "first-on-ma4", allCash: false, stake: 20_000 },
-    { entryMode: "in-box-on-ma4", allCash: true, stake: 100_000 },
+    { entryMode: "in-box-on-ma4", allCash: true, stake: 100_000, sameDayReentry: true },
+    { entryMode: "in-box-on-ma4", allCash: true, stake: 100_000, sameDayReentry: false },
   ];
   for (const period of PERIODS) {
     for (const job of jobs) {
@@ -450,6 +452,7 @@ async function main() {
         entryMode: job.entryMode,
         stake: job.stake,
         allCash: job.allCash,
+        sameDayReentry: job.sameDayReentry,
       });
       payload.results.push(summarize(result));
       console.log(
@@ -457,6 +460,7 @@ async function main() {
           period.label,
           job.entryMode,
           job.allCash ? "allCash" : `stake=${job.stake}`,
+          job.entryMode === "in-box-on-ma4" ? (job.sameDayReentry ? "sameDay" : "nextDay") : "",
           `boxes=${result.boxes}`,
           `trades=${result.trades.length}`,
           `skipMa4=${result.skippedNoMa4}`,

@@ -118,12 +118,13 @@ const reentered = runMa4StandBacktest({
   periodEnd: index[index.length - 1].time,
   capital: 100_000,
   allCash: true,
+  sameDayReentry: true,
   entryMode: "in-box-on-ma4",
   segments: [box],
 });
 assert(reentered.trades.length >= 2, `in-box-on-ma4 should re-enter after a stock MA4 break, got ${reentered.trades.length}`);
 assert(reentered.trades[0].name === "短站", "the first fill is still the shortest stand");
-assert(reentered.trades[1].entry === index[14].time, "re-entry is the same close the first name drops MA4");
+assert(reentered.trades[1].entry === index[14].time, "same-day re-entry is the close the first name drops MA4");
 assert(reentered.trades[1].name === "长站", "after the short name breaks, the remaining MA4 name is bought");
 assert(
   reentered.trades[0].shares * reentered.trades[0].entryPrice > 90_000,
@@ -143,5 +144,30 @@ const once = runMa4StandBacktest({
   segments: [box],
 });
 assert(once.trades.length === 1, "first-on-ma4 still enters a box only once");
+
+const nextDay = runMa4StandBacktest({
+  label: "nextday",
+  indexBars: index,
+  stocks: [
+    { code: "sh600001", name: "短站", bars: shortStand },
+    { code: "sh600002", name: "长站", bars: longStand },
+  ],
+  periodStart: index[0].time,
+  periodEnd: index[index.length - 1].time,
+  capital: 100_000,
+  allCash: true,
+  entryMode: "in-box-on-ma4",
+  segments: [box],
+});
+assert(nextDay.trades.length >= 2, `after an exit the next buy waits a bar, got ${nextDay.trades.length}`);
+assert(nextDay.trades[0].exit === index[14].time, "the first name still leaves on the MA4 break");
+assert(nextDay.trades[1].entry === index[15].time, "the next buy is the following session, not the exit close");
+assert(
+  nextDay.trades.every((trade) => trade.entry !== trade.exit || trade.pnl === 0),
+  "a held name must leave before the book buys again",
+);
+for (let i = 1; i < nextDay.trades.length; i += 1) {
+  assert(nextDay.trades[i].entry > nextDay.trades[i - 1].exit, "the next buy is after the previous exit");
+}
 
 console.log("ma4StandBacktest checks passed");

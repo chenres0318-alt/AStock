@@ -47,6 +47,7 @@ export type BacktestResult = {
   start: string;
   end: string;
   entryMode: EntryMode;
+  sameDayReentry: boolean;
   capital: number;
   finalEquity: number;
   returnPct: number;
@@ -105,7 +106,7 @@ function pickShortestStand(stocks: StockSeries[], entryTime: string) {
  * 入场按 entryMode：红框第一天 / 框内指数首次站上 MA4 / 框内任意一天指数站上 MA4。
  * 买成分股里连续站上 MA4 天数最短的一只。allCash 时每次用当前现金满仓，否则固定 stake。
  * 出场：个股收盘跌破 MA4、指数收盘跌破 MA4、趋势框结束、或区间最后一根。
- * in-box-on-ma4 出场后若仍在红框且指数仍站上 MA4，同一天可以再买。
+ * in-box-on-ma4 同时只持有一只；sameDayReentry 为 false 时，当天离场后要到下一根才允许再买。
  * 不计佣金印花税。成分股用给定名单（通常是当前成分，对历史有前视）。
  */
 export function runMa4StandBacktest(input: {
@@ -118,6 +119,11 @@ export function runMa4StandBacktest(input: {
   stake?: number;
   /** 每次用当前现金满仓（100 股一手），而不是固定 stake。 */
   allCash?: boolean;
+  /**
+   * 仅 in-box-on-ma4：当天离场后是否立刻用同一根收盘再买。
+   * 默认 false，必须等买入的那只离场后的下一根交易日。
+   */
+  sameDayReentry?: boolean;
   entryMode?: EntryMode;
   segments?: SectorTrendSegment[];
 }): BacktestResult {
@@ -126,6 +132,7 @@ export function runMa4StandBacktest(input: {
   const allCash = input.allCash ?? false;
   const entryMode = input.entryMode ?? "box-first-day";
   const reenter = entryMode === "in-box-on-ma4";
+  const sameDayReentry = input.sameDayReentry ?? false;
 
   const indexBars = input.indexBars.filter((bar) => bar.time <= input.periodEnd);
   const stocks = input.stocks.map((stock) => ({
@@ -219,6 +226,7 @@ export function runMa4StandBacktest(input: {
       if (!reenter) entered.add(segment.start);
       return;
     }
+    if (reenter && time >= segment.end) return;
     const idx = indexByTime.get(time);
     if (idx == null) return;
     if (!standsOnMa4(indexBars.slice(0, idx + 1))) {
@@ -276,10 +284,12 @@ export function runMa4StandBacktest(input: {
     const indexOn = standsOnMa4(indexBars.slice(0, idx + 1));
 
     const kept: Position[] = [];
+    let exitedToday = false;
     for (const pos of positions) {
       const reason = exitReason(pos, bar.time, indexOn);
       if (reason && pos.entry !== bar.time) {
         closePosition(pos, bar.time, reason);
+        exitedToday = true;
       } else {
         kept.push(pos);
       }
@@ -287,11 +297,14 @@ export function runMa4StandBacktest(input: {
     positions.length = 0;
     positions.push(...kept);
 
-    for (const segment of inPeriod) {
-      const inBox = bar.time >= segment.start && bar.time <= segment.end;
-      const isEntry =
-        entryMode === "box-first-day" ? bar.time === segment.start : inBox;
-      if (isEntry) tryEnter(bar.time, segment);
+    const canEnter = !exitedToday || sameDayReentry;
+    if (canEnter) {
+      for (const segment of inPeriod) {
+        const inBox = bar.time >= segment.start && bar.time <= segment.end;
+        const isEntry =
+          entryMode === "box-first-day" ? bar.time === segment.start : inBox;
+        if (isEntry) tryEnter(bar.time, segment);
+      }
     }
 
     const after: Position[] = [];
@@ -331,6 +344,7 @@ export function runMa4StandBacktest(input: {
     start: input.periodStart,
     end: input.periodEnd,
     entryMode,
+    sameDayReentry,
     capital,
     finalEquity,
     returnPct: capital > 0 ? finalEquity / capital - 1 : 0,
