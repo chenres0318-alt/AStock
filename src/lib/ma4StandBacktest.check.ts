@@ -126,10 +126,19 @@ assert(reentered.trades.length >= 2, `in-box-on-ma4 should re-enter after a stoc
 assert(reentered.trades[0].name === "短站", "the first fill is still the shortest stand");
 assert(reentered.trades[1].entry === index[14].time, "same-day re-entry is the close the first name drops MA4");
 assert(reentered.trades[1].name === "长站", "after the short name breaks, the remaining MA4 name is bought");
+assert(reentered.trades[1].code !== reentered.trades[0].code, "same-day rebuy must be a different name");
 assert(
   reentered.trades[0].shares * reentered.trades[0].entryPrice > 90_000,
   "all-cash 10w deploys most of the book",
 );
+for (let i = 1; i < reentered.trades.length; i += 1) {
+  const prev = reentered.trades[i - 1];
+  const cur = reentered.trades[i];
+  assert(cur.entry >= prev.exit, "the book never holds two names at once");
+  if (cur.entry === prev.exit) {
+    assert(cur.code !== prev.code, "same-day rebuy skips the name that just left");
+  }
+}
 
 const once = runMa4StandBacktest({
   label: "once",

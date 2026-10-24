@@ -475,8 +475,10 @@ async function main() {
   }
 
   const outPath = "/tmp/semi-ma4-backtest.json";
-  writeFileSync(outPath, JSON.stringify(payload, null, 2));
-  console.log(`wrote ${outPath}`);
+  const snapshot = JSON.stringify(payload, null, 2);
+  writeFileSync(outPath, snapshot);
+  writeFileSync("src/lib/ma4StandBacktest.semi.json", snapshot);
+  console.log(`wrote ${outPath} and src/lib/ma4StandBacktest.semi.json`);
 }
 
 main().catch((error) => {
