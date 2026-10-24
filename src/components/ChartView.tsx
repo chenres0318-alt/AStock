@@ -47,22 +47,19 @@ type ExtremeTag = {
   t?: TAction;
 };
 
-function tSuffix(t: TAction | undefined, side: ExtremeTag["side"]): string {
-  if (side === "clear" || t === "flatten") return side === "clear" ? "" : "，清仓不做成T";
-  if (t === "t-buy") return "，做T买";
-  if (t === "t-rebuy") return "，做T买回";
-  if (t === "t-sell") return "，做T卖";
-  if (t === "ignore") return "，不做成T";
-  return side === "top" ? "，卖" : "，买";
+function tActionLabel(t: TAction | undefined, side: ExtremeTag["side"]): string {
+  if (side === "clear" || t === "flatten") return "清仓";
+  if (t === "t-buy" || t === "t-rebuy" || t === "t-sell") return "做T";
+  if (t === "ignore") return "不做T";
+  return "";
 }
 
 function extremeCaption(tag: ExtremeTag, digits: number): string {
   const price = formatPrice(tag.price, digits);
-  if (tag.side === "clear") return `清仓离场(股价:${price})`;
-  const rank =
-    tag.position != null && tag.confidence != null ? `，价位指数${tag.position}，可信度${tag.confidence}` : "";
-  const name = tag.side === "top" ? "顶部" : "底部";
-  return `${name}(股价:${price}${rank})${tSuffix(tag.t, tag.side)}`;
+  if (tag.side === "clear") return `清仓(${price})`;
+  const letter = tag.side === "top" ? "T" : "B";
+  const signal = tag.confidence != null ? `,信号:${tag.confidence}` : "";
+  return `${letter}(${price}${signal})${tActionLabel(tag.t, tag.side)}`;
 }
 
 function formatChartTime(time: unknown, withDate: boolean): string {
@@ -263,7 +260,7 @@ export default function ChartView({
       const y = series.priceToCoordinate(mark.price);
       if (x == null || y == null) return [];
       if (x < -48 || x > width + 48) return [];
-      const half = mark.position != null ? 248 : 156;
+      const half = 84;
       const left = Math.min(Math.max(x, half), Math.max(half, width - half));
       const top = mark.side === "bottom" ? y + 16 : Math.max(2, y - 22);
       return [
@@ -823,7 +820,7 @@ export default function ChartView({
           {loading
             ? "加载中…"
             : mode === "trend"
-              ? "黄线现价 · 蓝线均价 · 下图 MACDFS(12,26,9，接昨尾盘1分钟EMA) · 先底后顶做T：底做T买、配成对的顶做T卖，不成对的顶不卖 · 9:45后相对1.5%/ETF0.5%也可先标底 · 9:30到10:00开盘急拉回落不标顶底、也不做T · 顶可信度看高位，底可信度看低位，70以上才标 · 14:00后的底不开新T · 14:45到14:52补顶和14:50清仓离场都不做成T"
+              ? "黄线现价 · 蓝线均价 · MACDFS · B底/T顶，配成对做T，不成对、开盘急拉、14:45补顶、14:50清仓不做T"
               : mode === "day"
                 ? "红MA4 · 青MA7 · 黄MA20 · 近5日收盘斜率仍向上但变弱为顶，仍向下但变弱为底 · 收盘低于下降的20日线超过8%不算底"
                 : `红MA4 · 青MA7 · 黄MA20 · 4上穿7且站上20买 · 4下穿7或跌破20卖 · 买 ${ribbonCounts.buy} 卖 ${ribbonCounts.sell}`}
@@ -835,7 +832,7 @@ export default function ChartView({
           ? extremeTags.map((tag) => (
               <div
                 key={`${tag.side}-${tag.timeKey}`}
-                className="pointer-events-none absolute z-10 whitespace-nowrap rounded bg-[#10151e]/92 px-2 py-1 text-[18px] font-semibold leading-none"
+                className="pointer-events-none absolute z-10 whitespace-nowrap rounded bg-[#10151e]/92 px-1.5 py-0.5 text-[12px] font-medium leading-none"
                 style={{
                   left: tag.x,
                   top: tag.y,
