@@ -10,7 +10,9 @@
     "lint": "eslint",
     "check:indicators": "node --experimental-strip-types --no-warnings src/lib/indicators.check.ts",
     "check:trend": "node --experimental-strip-types --no-warnings src/lib/sectorTrend.check.ts",
-    "check:screener": "node --experimental-strip-types --no-warnings src/lib/screener.check.ts"
+    "check:screener": "node --experimental-strip-types --no-warnings src/lib/screener.check.ts",
+    "check:ma4-backtest": "node --experimental-strip-types --no-warnings src/lib/ma4StandBacktest.check.ts",
+    "backtest:semi-ma4": "node --experimental-strip-types --no-warnings scripts/semi-ma4-backtest.ts"
   },
   "dependencies": {
     "iconv-lite": "^0.7.3",
