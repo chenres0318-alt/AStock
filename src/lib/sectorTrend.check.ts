@@ -1,5 +1,5 @@
 import { isTonghuashunBoard, isTonghuashunConcept, isTonghuashunIndustry } from "./codes.ts";
-import { captureSectorTrends, indexCouldBeOpen, listMa4CrossStocks, trendCoversLastBar, type SectorMemberPath } from "./sectorTrend.ts";
+import { captureSectorTrends, indexCouldBeOpen, listMa4CrossStocks, standsOnMa4, trendCoversLastBar, type SectorMemberPath } from "./sectorTrend.ts";
 import type { KBar } from "./types.ts";
 
 function assert(cond: unknown, message: string) {
@@ -251,68 +251,57 @@ function datedBars(closes: number[], start = "2026-01-02"): KBar[] {
   });
 }
 
-function downThenUp(down = 40, up = 6, start = 20, downStep = 0.4, upStep = 1.8): number[] {
-  const closes: number[] = [];
-  let price = start;
-  for (let i = 0; i < down; i += 1) {
-    price *= 1 - downStep / 100;
-    closes.push(Number(price.toFixed(4)));
-  }
-  for (let i = 0; i < up; i += 1) {
-    price *= 1 + upStep / 100;
-    closes.push(Number(price.toFixed(4)));
-  }
-  return closes;
-}
+const freshCloses = [10, 11, 12, 13, 14, 5, 20];
+const heldCloses = Array.from({ length: 16 }, () => 12);
+const fresh = datedBars(freshCloses);
+const heldLong = datedBars(heldCloses);
+const standWindow = { start: fresh[3].time, end: fresh[fresh.length - 1].time };
 
-const bounce = datedBars(downThenUp());
-const bounceTimes = bounce.map((bar) => bar.time);
-const lastTime = bounceTimes[45];
-const strong = datedBars(downThenUp(40, 10, 20, 0.4, 2.6));
-const window = { start: bounceTimes[40], end: lastTime };
-
-const ranked = listMa4CrossStocks(window, [
-  { code: "sh600001", name: "普通", bars: bounce },
-  { code: "sz000002", name: "更强", bars: strong },
+const ranked = listMa4CrossStocks(standWindow, [
+  { code: "sh600001", name: "站久", bars: heldLong },
+  { code: "sz000002", name: "刚站上", bars: fresh },
 ]);
-assert(ranked.length === 2, "both names that stand on MA4 after a 4/7 cross are kept");
-assert(ranked[0].name === "更强" && ranked[0].score === 2, "the widest MA4-over-MA7 gap gets the extra bullish-trend point and sorts first");
-assert(ranked[1].name === "普通" && ranked[1].score === 1, "the other cross still scores 1 for standing on MA4");
-assert(!ranked[0].belowMa4 && !ranked[1].belowMa4, "spot prices at the last close are still above MA4");
+assert(ranked.length === 2, "both names that stand on MA4 are kept, even without a 4/7 cross");
+assert(ranked[0].name === "刚站上" && ranked[0].days < ranked[1].days, "the shorter MA4 stand sorts first");
+assert(ranked[1].name === "站久", "the longer MA4 stand sorts after");
+assert(standsOnMa4(fresh) && standsOnMa4(heldLong), "both tapes close above MA4");
 
 assert(
-  listMa4CrossStocks(window, [{ code: "sh688001", name: "科创", bars: bounce }]).length === 0,
+  listMa4CrossStocks(standWindow, [{ code: "sh688001", name: "科创", bars: fresh }]).length === 0,
   "STAR board names are dropped",
 );
 assert(
-  listMa4CrossStocks(window, [{ code: "sz300001", name: "创业", bars: bounce }]).length === 0,
+  listMa4CrossStocks(standWindow, [{ code: "sz300001", name: "创业", bars: fresh }]).length === 0,
   "ChiNext 300 names are dropped",
 );
 assert(
-  listMa4CrossStocks(window, [{ code: "sz301001", name: "创业注册", bars: bounce }]).length === 0,
+  listMa4CrossStocks(standWindow, [{ code: "sz301001", name: "创业注册", bars: fresh }]).length === 0,
   "ChiNext 301 names are dropped",
 );
 
-const dipped = listMa4CrossStocks(window, [{ code: "sz000003", name: "回落", bars: bounce, price: 1 }]);
-assert(dipped.length === 1 && dipped[0].belowMa4 && dipped[0].score === 1, "a live print under MA4 stays listed with the stop mark, and still gets the trend-strength point if it is the only name");
-
-const stillUnder = datedBars(Array.from({ length: 46 }, () => 10));
 assert(
-  listMa4CrossStocks({ start: stillUnder[8].time, end: stillUnder[20].time }, [
+  listMa4CrossStocks(standWindow, [{ code: "sz000003", name: "回落", bars: fresh, price: 1 }]).length === 0,
+  "a live print under MA4 is not kept",
+);
+
+const stillUnder = datedBars(Array.from({ length: 12 }, () => 10));
+assert(
+  listMa4CrossStocks({ start: stillUnder[8].time, end: stillUnder[11].time }, [
     { code: "sh600002", name: "持平", bars: stillUnder },
-  ]).length === 0,
-  "a flat tape is not a 4/7 cross",
+  ]).length === 1,
+  "a flat tape still stands on MA4 when close equals the average",
 );
 
 const falling = datedBars(
-  Array.from({ length: 46 }, (_, i) => Number((20 - i * 0.12).toFixed(4))),
+  Array.from({ length: 16 }, (_, i) => Number((20 - i * 0.12).toFixed(4))),
 );
 assert(
-  listMa4CrossStocks({ start: falling[30].time, end: falling[45].time }, [
+  listMa4CrossStocks({ start: falling[10].time, end: falling[15].time }, [
     { code: "sh600003", name: "下跌", bars: falling },
   ]).length === 0,
-  "a decline without a 4/7 cross is not kept",
+  "a decline that stays under MA4 is not kept",
 );
+assert(!standsOnMa4(falling), "the falling tape is not standing on MA4");
 
 function k(time: string, open: number, high: number, low: number, close: number): KBar {
   return { time, open, high, low, close, volume: 1 };

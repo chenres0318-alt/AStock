@@ -26,7 +26,12 @@ type Report = {
   roster?: TrendBox["roster"];
   pct5: number | null;
   memberCount: number;
+  onMa4?: boolean;
 };
+
+function liveOffMa4Label(name: string, live: boolean, offMa4: boolean): string {
+  return live && offMa4 ? `${name}(未站上4日线)` : name;
+}
 
 async function readJson<T>(url: string, timeoutMs = 120_000): Promise<T> {
   const res = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(timeoutMs) });
@@ -59,6 +64,7 @@ export default function SectorTrendView() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [liveCodes, setLiveCodes] = useState<string[]>([]);
+  const [offMa4Codes, setOffMa4Codes] = useState<string[]>([]);
   const [liveHydrated, setLiveHydrated] = useState(false);
   const liveListStarted = useRef(false);
   const settledBoards = useRef(new Set<string>());
@@ -90,6 +96,7 @@ export default function SectorTrendView() {
     const live = report.trends.some((item) => item.status === "open" && item.end === last);
     settledBoards.current.add(report.board.code);
     setLiveCodes((prev) => applyBoardLive(prev, report.board.code, live));
+    setOffMa4Codes((prev) => applyBoardLive(prev, report.board.code, live && report.onMa4 === false));
   }, [report]);
 
   useEffect(() => {
@@ -120,14 +127,19 @@ export default function SectorTrendView() {
     if (!report || liveListStarted.current) return;
     liveListStarted.current = true;
     const load = (attempt: number) => {
-      readJson<{ codes: string[] }>("/api/market/sector-trend?list=active", 120_000)
+      readJson<{ codes: string[]; offMa4?: string[] }>("/api/market/sector-trend?list=active", 120_000)
         .then((data) => {
-          setLiveCodes((prev) =>
-            mergeLiveCodes(
-              prev,
-              (data.codes ?? []).filter((item) => !settledBoards.current.has(item)),
-            ),
-          );
+          const incoming = (data.codes ?? []).filter((item) => !settledBoards.current.has(item));
+          const incomingOff = new Set((data.offMa4 ?? []).filter((item) => !settledBoards.current.has(item)));
+          setLiveCodes((prev) => mergeLiveCodes(prev, incoming));
+          setOffMa4Codes((prev) => {
+            const next = new Set(prev);
+            for (const item of incoming) {
+              if (incomingOff.has(item)) next.add(item);
+              else next.delete(item);
+            }
+            return [...next];
+          });
         })
         .catch(() => {
           if (attempt < 2) window.setTimeout(() => load(attempt + 1), 2000);
@@ -137,6 +149,7 @@ export default function SectorTrendView() {
   }, [report]);
 
   const liveSet = useMemo(() => new Set(liveCodes), [liveCodes]);
+  const offMa4Set = useMemo(() => new Set(offMa4Codes), [offMa4Codes]);
   const selected = report?.trends.find((item) => item.start === picked) ?? report?.trends.at(-1) ?? null;
   const upTotal =
     report?.board.upCount != null
@@ -158,13 +171,16 @@ export default function SectorTrendView() {
             boards={boards}
             code={code}
             liveCodes={liveSet}
+            offMa4Codes={offMa4Set}
             onPick={(next) => router.push(`/sector?code=${next}`)}
           />
         </div>
         {report ? (
           <div className="mt-3 flex flex-wrap items-baseline gap-x-6 gap-y-2">
             <div>
-              <div className={liveSet.has(report.board.code) ? "text-lg text-up" : "text-lg"}>{report.board.name}</div>
+              <div className={liveSet.has(report.board.code) ? "text-lg text-up" : "text-lg"}>
+                {liveOffMa4Label(report.board.name, liveSet.has(report.board.code), offMa4Set.has(report.board.code))}
+              </div>
               <div className="text-[11px] text-mute">{report.board.code}</div>
             </div>
             <Stat label="5日涨幅" value={formatPct(report.pct5)} tone={report.pct5} />
@@ -215,9 +231,9 @@ export default function SectorTrendView() {
             </div>
           ) : null}
           <div className="mt-4 border-t border-line pt-3">
-            <div className="text-sm">站上MA4 / MA4上叉MA7</div>
+            <div className="text-sm">站上MA4</div>
             <div className="mt-1 text-[11px] leading-4 text-mute">
-              现价站上MA4且MA4上叉MA7记1分，多头趋势最大再记1分，按总分从高到低。不含科创板、创业板。盘中现价低于MA4则标记止盈止损。
+              现价站上MA4即可，按连续站上天数从少到多。不含科创板、创业板。
             </div>
             {selected?.maCrosses.length ? (
               <ol className="mt-2 max-h-72 space-y-2 overflow-auto scroll-thin">
@@ -229,18 +245,14 @@ export default function SectorTrendView() {
                       <span className="ml-2 text-[11px] text-mute">{displaySymbol(item.code)}</span>
                     </Link>
                     <span className="shrink-0 text-right">
-                      <span className="num text-mute">{item.score}分</span>
-                      {item.belowMa4 ? (
-                        <div className="text-[11px] text-up">低于MA4，止盈止损</div>
-                      ) : (
-                        <div className="num text-[11px] text-mute">{item.time.slice(5)}</div>
-                      )}
+                      <span className="num text-mute">{item.days}天</span>
+                      <div className="num text-[11px] text-mute">{item.time.slice(5)}</div>
                     </span>
                   </li>
                 ))}
               </ol>
             ) : (
-              <EmptyHint text="这段没有现价站上MA4、MA4上叉MA7的个股" />
+              <EmptyHint text="这段没有现价站上MA4的个股" />
             )}
           </div>
         </section>
@@ -257,11 +269,13 @@ function BoardPicker({
   boards,
   code,
   liveCodes,
+  offMa4Codes,
   onPick,
 }: {
   boards: SectorItem[];
   code: string;
   liveCodes: Set<string>;
+  offMa4Codes: Set<string>;
   onPick: (code: string) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -307,11 +321,13 @@ function BoardPicker({
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
       >
-        <span className={liveCodes.has(code) ? "text-up" : "text-ink"}>{current?.name ?? "选择板块"}</span>
+        <span className={liveCodes.has(code) ? "text-up" : "text-ink"}>
+          {liveOffMa4Label(current?.name ?? "选择板块", liveCodes.has(code), offMa4Codes.has(code))}
+        </span>
         <span aria-hidden="true">▾</span>
       </button>
       {open ? (
-        <div className="absolute right-0 z-30 mt-1 max-h-80 w-64 overflow-auto rounded bg-panel py-1 shadow-lg ring-1 ring-line scroll-thin">
+        <div className="absolute right-0 z-30 mt-1 max-h-80 w-72 overflow-auto rounded bg-panel py-1 shadow-lg ring-1 ring-line scroll-thin">
           {grouped.map((group) => (
             <div key={group.label}>
               <div className="px-3 py-1 text-[10px] text-mute">{group.label}</div>
@@ -331,7 +347,7 @@ function BoardPicker({
                       if (item.code !== code) onPick(item.code);
                     }}
                   >
-                    {item.name}
+                    {liveOffMa4Label(item.name, live, offMa4Codes.has(item.code))}
                   </button>
                 );
               })}

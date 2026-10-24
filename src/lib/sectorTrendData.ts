@@ -8,6 +8,7 @@ import {
   indexCouldBeOpen,
   listMa4CrossStocks,
   memberGainsInWindow,
+  standsOnMa4,
   type SectorMemberPath,
   type SectorTrendSegment,
 } from "./sectorTrend";
@@ -23,8 +24,7 @@ export type MaCrossStockView = {
   code: string;
   name: string;
   time: string;
-  score: number;
-  belowMa4: boolean;
+  days: number;
 };
 
 export type SectorTrendView = SectorTrendSegment & {
@@ -39,6 +39,7 @@ export type SectorTrendReport = {
   roster: SectorTrendMember[];
   pct5: number | null;
   memberCount: number;
+  onMa4: boolean;
 };
 
 async function memberSeries(
@@ -136,6 +137,7 @@ export async function getSectorTrend(code: string): Promise<SectorTrendReport> {
     roster,
     pct5,
     memberCount: members.length,
+    onMa4: standsOnMa4(bars, board.price),
   };
 }
 
@@ -144,9 +146,9 @@ export async function getSectorTrend(code: string): Promise<SectorTrendReport> {
  * 下拉标红只看指数价格是否还能把红框留到最后一根，避免对全市场成分股再扫一遍把当前板块拖死。
  * 点进某个行业后，仍用成分股做完整捕捉。
  */
-export async function listBoardsInTrend(): Promise<string[]> {
+export async function listBoardsInTrend(): Promise<{ codes: string[]; offMa4: string[] }> {
   try {
-    return await cached("boards-in-open-trend:v4", 10 * 60_000, async () => {
+    return await cached("boards-in-open-trend:v5", 10 * 60_000, async () => {
       const boards = await listAllIndustryBoards();
       const klines = await mapPool(boards, 6, async (board) => {
         try {
@@ -159,9 +161,13 @@ export async function listBoardsInTrend(): Promise<string[]> {
       if (klines.every((item) => item.bars.length < 3)) {
         throw new UpstreamError("板块日线暂时取不到");
       }
-      return klines.filter((item) => indexCouldBeOpen(item.bars)).map((item) => item.code);
+      const live = klines.filter((item) => indexCouldBeOpen(item.bars));
+      return {
+        codes: live.map((item) => item.code),
+        offMa4: live.filter((item) => !standsOnMa4(item.bars)).map((item) => item.code),
+      };
     });
   } catch {
-    return [];
+    return { codes: [], offMa4: [] };
   }
 }
