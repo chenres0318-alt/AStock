@@ -70,7 +70,7 @@ function toMemberPaths(series: Array<{ code: string; name: string; bars: KBar[] 
 }
 
 async function industrySeries(code: string): Promise<{ name: string; bars: KBar[] }> {
-  return fetchTonghuashunSeries(code, 160);
+  return cached(`ths-industry-series:${code}:160`, 10 * 60_000, () => fetchTonghuashunSeries(code, 160));
 }
 
 async function loadMembers(code: string): Promise<BoardMember[]> {
@@ -89,6 +89,10 @@ async function loadMembers(code: string): Promise<BoardMember[]> {
 export async function getSectorTrend(code: string): Promise<SectorTrendReport> {
   const boardCode = code.trim();
   if (!isTonghuashunBoard(boardCode)) throw new UpstreamError("请从同花顺行业或概念里选择一个板块", 400);
+  return cached(`sector-trend-report:v1:${boardCode}`, 10 * 60_000, () => loadSectorTrend(boardCode));
+}
+
+async function loadSectorTrend(boardCode: string): Promise<SectorTrendReport> {
   const [boards, series, members] = await Promise.all([
     listSelectableBoards().catch(() => [] as SectorItem[]),
     industrySeries(boardCode),
