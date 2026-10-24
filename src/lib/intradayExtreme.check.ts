@@ -11,6 +11,8 @@ import {
   sessionRangeAfter,
   macdfsSeries,
   recentVolumeAvg,
+  tagTTrades,
+  type IntradayMark,
   type IntradayMinute,
 } from "./intradayExtreme.ts";
 
@@ -548,6 +550,89 @@ const picked = pickPriorCloses(mkline, "20261023");
 assert(picked.length === 40 && picked[0] === 10.1 && picked.at(-1) === 10.49, "prior closes take the last 40 bars of the previous session");
 assert(pickPriorCloses(mkline.slice(0, 20), "20261023").length === 0, "fewer than 26 prior bars are not used as an EMA seed");
 assert(pickPriorCloses(mkline, "2026-10-23").length === 40, "a dashed trade date still selects yesterday's closes");
+
+function tMark(
+  index: number,
+  time: string,
+  side: IntradayMark["side"],
+  price: number,
+  extra: Partial<IntradayMark> = {},
+): IntradayMark {
+  return {
+    index,
+    time,
+    side,
+    price,
+    position: side === "top" ? 80 : 20,
+    confidence: 80,
+    origin: side === "clear" ? "clear" : "shape",
+    ...extra,
+  };
+}
+
+const pairedT = tagTTrades([tMark(40, "10:10", "bottom", 10), tMark(80, "10:50", "top", 10.2)]);
+assert(pairedT.map((mark) => mark.t).join(",") === "t-buy,t-sell", "a 10:00+ bottom then a paired 1.5%+ top is T-buy then T-sell");
+
+assert(
+  tagTTrades([tMark(50, "10:20", "top", 11)])[0]?.t === "ignore",
+  "a top with no bottom is not a T-sell",
+);
+
+assert(
+  tagTTrades([tMark(20, "09:50", "bottom", 10)])[0]?.t === "ignore",
+  "a bottom before 10:00 is not a T-buy",
+);
+
+assert(
+  tagTTrades([tMark(200, "14:10", "bottom", 10)])[0]?.t === "ignore",
+  "a bottom after 14:00 is not a new T",
+);
+
+const stacked = tagTTrades([
+  tMark(40, "10:10", "bottom", 10),
+  tMark(50, "10:20", "bottom", 9.9),
+  tMark(80, "10:50", "top", 10.2),
+]);
+assert(
+  stacked.map((mark) => mark.t).join(",") === "t-buy,ignore,t-sell",
+  "a second bottom while already in the T is not an add; the paired top still sells",
+);
+
+const twoLaps = tagTTrades([
+  tMark(40, "10:10", "bottom", 10),
+  tMark(80, "10:50", "top", 10.2),
+  tMark(140, "13:10", "bottom", 10.05),
+  tMark(170, "13:40", "top", 10.25),
+]);
+assert(
+  twoLaps.map((mark) => mark.t).join(",") === "t-buy,t-sell,t-rebuy,t-sell",
+  "after a T-sell the next bottom before 14:00 is a buyback, then the next paired top sells again",
+);
+
+const thinTop = tagTTrades([tMark(40, "10:10", "bottom", 10), tMark(80, "10:50", "top", 10.1)]);
+assert(thinTop[1]?.t === "ignore", "a top that does not cover the 1.5 percent pair swing is not a T-sell");
+
+const forced = tagTTrades([
+  tMark(40, "10:10", "bottom", 10),
+  tMark(230, "14:48", "top", 10.3, { origin: "forced" }),
+]);
+assert(
+  forced.map((mark) => mark.t).join(",") === "t-buy,flatten",
+  "the 14:45 forced sell top flattens instead of counting as a T-sell",
+);
+
+const cleared = tagTTrades([
+  tMark(40, "10:10", "bottom", 10),
+  tMark(231, "14:50", "clear", 9.8, { origin: "clear", position: null, confidence: null }),
+]);
+assert(cleared.map((mark) => mark.t).join(",") === "t-buy,flatten", "14:50 清仓离场 is flatten, not a T");
+
+const liveForcedT = tagTTrades(forcedSell);
+assert(
+  liveForcedT.some((mark) => mark.origin === "forced" && mark.t === "flatten") &&
+    liveForcedT.filter((mark) => mark.side === "bottom" && mark.time < "10:00").every((mark) => mark.t === "ignore"),
+  "14:45 补顶 flattens, and a bottom still inside the 9:30-10:00 dump window is not a T-buy",
+);
 
 console.log(
   "intradayExtreme.check ok",
