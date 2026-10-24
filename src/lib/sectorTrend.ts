@@ -234,11 +234,10 @@ function walkSegments(
 export type MaCrossStock = {
   code: string;
   name: string;
-  /** 4 日均线上穿 7 日均线那天。 */
+  /** 这一轮连续站上 MA4 的第一天。 */
   time: string;
-  score: number;
-  /** 盘中现价已经掉到 MA4 下面。 */
-  belowMa4: boolean;
+  /** 连续站上 MA4 的交易日数，越少越靠前。 */
+  days: number;
 };
 
 function isGrowthBoardShare(code: string): boolean {
@@ -258,42 +257,29 @@ function maAt(values: number[], period: number, index: number): number | null {
   return sum / period;
 }
 
-/** 前一日 MA4 还不超过 MA7，当日 MA4 升到 MA7 之上。 */
-function ma4CrossedUpMa7(closes: number[], index: number): boolean {
+function closeOnMa4(closes: number[], index: number, spot = closes[index]): boolean {
   const ma4 = maAt(closes, 4, index);
-  const ma4Prev = maAt(closes, 4, index - 1);
-  const ma7 = maAt(closes, 7, index);
-  const ma7Prev = maAt(closes, 7, index - 1);
-  if (ma4 == null || ma4Prev == null || ma7 == null || ma7Prev == null) return false;
-  return ma4Prev <= ma7Prev && ma4 > ma7;
+  return ma4 != null && ma4 > 0 && spot >= ma4;
 }
 
-/** 还守着 MA4 在 MA7 上方时，最近一次上叉的位置。 */
-function latestHeldCross(closes: number[], last: number): number {
-  const ma4Last = maAt(closes, 4, last);
-  const ma7Last = maAt(closes, 7, last);
-  if (ma4Last == null || ma7Last == null || ma4Last <= ma7Last) return -1;
-  for (let i = last; i >= 7; i -= 1) {
-    if (ma4CrossedUpMa7(closes, i)) return i;
-    const ma4 = maAt(closes, 4, i);
-    const ma7 = maAt(closes, 7, i);
-    if (ma4 == null || ma7 == null || ma4 <= ma7) return -1;
-  }
-  return -1;
+/** 指数或个股最新价是否站上 4 日均线。 */
+export function standsOnMa4(bars: KBar[], price?: number | null): boolean {
+  if (bars.length < 4) return false;
+  const closes = bars.map((bar) => bar.close);
+  const last = closes.length - 1;
+  const spot = price != null && price > 0 ? price : closes[last];
+  return closeOnMa4(closes, last, spot);
 }
-
-type ScoredRow = MaCrossStock & { strength: number };
 
 /**
- * 这段趋势最新一根上：现价站上 MA4 且 MA4 上叉 MA7 记 1 分，
- * 多头趋势（MA4 相对 MA7 的开口）最大的再记 1 分，按总分从高到低。
- * 不含科创板、创业板。现价掉到 MA4 下面仍列出，并标止盈止损。
+ * 这段趋势最新一根上：现价站上 MA4 即可，按连续站上天数从少到多。
+ * 不含科创板、创业板。没有站上的不进名单。
  */
 export function listMa4CrossStocks(
   segment: { start: string; end: string },
   stocks: Array<{ code: string; name: string; bars: KBar[]; price?: number | null }>,
 ): MaCrossStock[] {
-  const rows: ScoredRow[] = [];
+  const rows: MaCrossStock[] = [];
   for (const stock of stocks) {
     if (isGrowthBoardShare(stock.code)) continue;
     const closes = stock.bars.map((bar) => bar.close);
@@ -303,37 +289,25 @@ export function listMa4CrossStocks(
       if (time >= segment.start && time <= segment.end) last = i;
     }
     if (last < 0) continue;
-    const ma4 = maAt(closes, 4, last);
-    const ma7 = maAt(closes, 7, last);
-    if (ma4 == null || ma7 == null || !(ma4 > 0) || !(ma7 > 0)) continue;
-    const crossAt = latestHeldCross(closes, last);
-    if (crossAt < 0) continue;
     const spot = stock.price != null && stock.price > 0 ? stock.price : closes[last];
-    const belowMa4 = spot < ma4;
-    const standOnMa4 = spot >= ma4;
+    if (!closeOnMa4(closes, last, spot)) continue;
+    let from = last;
+    for (let i = last - 1; i >= 3; i -= 1) {
+      if (!closeOnMa4(closes, i)) break;
+      from = i;
+    }
     rows.push({
       code: stock.code,
       name: stock.name,
-      time: stock.bars[crossAt].time,
-      score: standOnMa4 ? 1 : 0,
-      belowMa4,
-      strength: (ma4 - ma7) / ma7,
+      time: stock.bars[from].time,
+      days: last - from + 1,
     });
   }
-  if (rows.length) {
-    const best = Math.max(...rows.map((row) => row.strength));
-    if (best > 0) {
-      for (const row of rows) {
-        if (row.strength === best) row.score += 1;
-      }
-    }
-  }
   rows.sort((a, b) => {
-    if (a.score !== b.score) return b.score - a.score;
-    if (a.strength !== b.strength) return b.strength - a.strength;
+    if (a.days !== b.days) return a.days - b.days;
     return a.name.localeCompare(b.name, "zh-CN");
   });
-  return rows.map(({ strength: _strength, ...item }) => item);
+  return rows;
 }
 
 /**
