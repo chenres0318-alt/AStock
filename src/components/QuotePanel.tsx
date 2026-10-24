@@ -22,7 +22,13 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: num
   );
 }
 
-export default function QuotePanel({ quote }: { quote: Quote | undefined }) {
+export default function QuotePanel({
+  quote,
+  hint,
+}: {
+  quote: Quote | undefined;
+  hint?: { label: string; hold: boolean; detail?: string } | null;
+}) {
   if (!quote) {
     return <div className="panel px-4 py-6 text-sm text-mute">选择一只股票查看行情</div>;
   }
@@ -61,6 +67,12 @@ export default function QuotePanel({ quote }: { quote: Quote | undefined }) {
             {quote.halted ? <span className="rounded bg-flat/20 px-1.5 py-0.5 text-[10px] text-mute">停牌</span> : null}
           </div>
           <div className="mt-0.5 text-xs text-mute">{displaySymbol(quote.code)}</div>
+          {hint ? (
+            <div className={`mt-1 text-xs ${hint.hold ? "text-down" : "text-up"}`}>
+              {hint.label}
+              {hint.detail ? <span className="ml-2 text-mute">{hint.detail}</span> : null}
+            </div>
+          ) : null}
         </div>
         <div className="text-right">
           <div className={`num text-3xl leading-none ${toneClass(quote.pct)}`}>{formatPrice(quote.price, digits)}</div>

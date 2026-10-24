@@ -2,11 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useHoldings } from "@/lib/useHoldings";
 
 const LINKS = [
   { href: "/", label: "看盘" },
   { href: "/sector", label: "板块" },
   { href: "/screener", label: "选股" },
+  { href: "/holdings", label: "持仓" },
   { href: "/analyze", label: "分析" },
 ];
 
@@ -16,6 +18,7 @@ export default function AppHeader({
   trailing?: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const { items, ready } = useHoldings();
   return (
     <header className="flex flex-wrap items-center justify-between gap-3">
       <div className="flex items-center gap-3">
@@ -33,6 +36,7 @@ export default function AppHeader({
         <nav className="ml-2 flex gap-1 rounded-full bg-panel p-1 ring-1 ring-line">
           {LINKS.map((link) => {
             const active = pathname === link.href;
+            const count = link.href === "/holdings" && ready && items.length ? items.length : 0;
             return (
               <Link
                 key={link.href}
@@ -42,6 +46,7 @@ export default function AppHeader({
                 }`}
               >
                 {link.label}
+                {count ? <span className="ml-1 num">{count}</span> : null}
               </Link>
             );
           })}

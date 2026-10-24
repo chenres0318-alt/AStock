@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { isListedStockCode, priceDigits } from "@/lib/codes";
 import { formatPct, formatPrice, toneClass } from "@/lib/format";
 import { loadWatchlist, saveWatchlist } from "@/lib/storage";
+import { useHoldings } from "@/lib/useHoldings";
 import type { ScreenerHit } from "@/lib/types";
 import AppHeader from "./AppHeader";
 import { EmptyHint, PanelTitle } from "./ui";
@@ -30,9 +31,13 @@ async function readJson<T>(url: string): Promise<T> {
 function HitTable({
   items,
   onOpen,
+  holdingCodes,
+  onToggleHold,
 }: {
   items: ScreenerHit[];
   onOpen: (item: ScreenerHit) => void;
+  holdingCodes: Set<string>;
+  onToggleHold: (item: ScreenerHit) => void;
 }) {
   if (!items.length) return <EmptyHint text="没有符合条件的结果" />;
   return (
@@ -82,13 +87,36 @@ function HitTable({
                 </div>
               </td>
               <td className="px-3 py-2">
-                <button
-                  type="button"
-                  className="rounded-full bg-gold px-2 py-1 text-[11px] text-bg"
-                  onClick={() => onOpen(item)}
-                >
-                  看盘
-                </button>
+                <div className="flex items-center justify-end gap-1.5">
+                  <button
+                    type="button"
+                    className="rounded-full bg-gold px-2 py-1 text-[11px] text-bg"
+                    onClick={() => onOpen(item)}
+                  >
+                    看盘
+                  </button>
+                  {holdingCodes.has(item.code) ? (
+                    <button
+                      type="button"
+                      aria-label={`移出持仓 ${item.name}`}
+                      title="移出持仓"
+                      className="flex h-7 w-7 items-center justify-center rounded-full bg-panel text-base leading-none text-mute ring-1 ring-line hover:text-up"
+                      onClick={() => onToggleHold(item)}
+                    >
+                      −
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      aria-label={`加入持仓 ${item.name}`}
+                      title="加入持仓"
+                      className="flex h-7 w-7 items-center justify-center rounded-full bg-gold text-base leading-none text-bg"
+                      onClick={() => onToggleHold(item)}
+                    >
+                      +
+                    </button>
+                  )}
+                </div>
               </td>
             </tr>
           ))}
@@ -100,6 +128,8 @@ function HitTable({
 
 export default function Screener() {
   const router = useRouter();
+  const { items: holdings, toggle } = useHoldings();
+  const holdingCodes = new Set(holdings.map((item) => item.code));
   const [hits, setHits] = useState<ScreenerHit[]>([]);
   const [meta, setMeta] = useState<{
     scanned: number;
@@ -187,7 +217,19 @@ export default function Screener() {
             正在扫描红框且指数站上 MA4 的行业成分股，按站上 MA4 持续时间从短到长排列，大约需要一分钟。
           </div>
         ) : (
-          <HitTable items={hits} onOpen={openStock} />
+          <HitTable
+            items={hits}
+            onOpen={openStock}
+            holdingCodes={holdingCodes}
+            onToggleHold={(item) =>
+              toggle({
+                code: item.code,
+                name: item.name,
+                sector: item.sector,
+                sectorCode: item.sectorCode,
+              })
+            }
+          />
         )}
       </section>
 
