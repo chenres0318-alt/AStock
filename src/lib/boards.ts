@@ -1,3 +1,4 @@
+import { mergeBoardMembers } from "./boardExtras";
 import { cached } from "./cache";
 import { isTonghuashunBoard, isTonghuashunIndustry } from "./codes";
 import { fetchBoardMembers } from "./sources/eastmoney";
@@ -31,21 +32,21 @@ export async function listBoardMembers(
   sort: "amount" | "turnover" = "amount",
 ): Promise<BoardMember[]> {
   const key = `board-members:v2:${boardCode}:${sort}:${limit}`;
-  return cached(key, 30 * 60_000, async () => {
+  const rows = await cached(key, 30 * 60_000, async () => {
     if (isTonghuashunBoard(boardCode)) {
-      const rows = await fetchTonghuashunMembers(boardCode, limit);
-      if (!rows.length && isTonghuashunIndustry(boardCode)) {
+      const fetched = await fetchTonghuashunMembers(boardCode, limit);
+      if (!fetched.length && isTonghuashunIndustry(boardCode)) {
         throw new Error("同花顺行业成分股暂时读不到");
       }
       if (sort === "turnover") {
-        return [...rows].sort((a, b) => (b.turnover ?? -1) - (a.turnover ?? -1));
+        return [...fetched].sort((a, b) => (b.turnover ?? -1) - (a.turnover ?? -1));
       }
-      return [...rows].sort((a, b) => (b.amount ?? -1) - (a.amount ?? -1));
+      return [...fetched].sort((a, b) => (b.amount ?? -1) - (a.amount ?? -1));
     }
     if (boardCode.startsWith("BK")) {
       try {
-        const rows = await fetchBoardMembers(boardCode, limit);
-        if (rows.length) return rows;
+        const fetched = await fetchBoardMembers(boardCode, limit);
+        if (fetched.length) return fetched;
       } catch {
         // fall through to Sina
       }
@@ -53,4 +54,5 @@ export async function listBoardMembers(
     const sinaSort: SinaNodeSort = sort === "turnover" ? "turnoverratio" : "amount";
     return fetchSinaBoardMembers(boardCode, limit, sinaSort);
   });
+  return mergeBoardMembers(boardCode, rows);
 }
