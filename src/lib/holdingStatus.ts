@@ -1,3 +1,4 @@
+import { forcedBoardForStock } from "./boardExtras";
 import { listAllIndustryBoards } from "./boards";
 import { cached } from "./cache";
 import { toTencentCode } from "./codes";
@@ -10,6 +11,8 @@ import { fetchEastMoneyIndustry } from "./sources/eastmoney";
 import type { HoldingItem, HoldingStatus, KBar } from "./types";
 
 export async function resolveHoldingBoard(code: string): Promise<{ sector: string; sectorCode: string } | null> {
+  const forced = forcedBoardForStock(code);
+  if (forced) return forced;
   try {
     const industry = await cached(`holding-industry:${toTencentCode(code)}`, 6 * 60 * 60_000, () =>
       fetchEastMoneyIndustry(code),
@@ -32,6 +35,8 @@ export async function evaluateHoldings(items: HoldingItem[]): Promise<HoldingSta
     sectorCode: item.sectorCode?.trim() || null,
   }));
   const rows = await mapPool(seeded, 4, async (item) => {
+    const forced = forcedBoardForStock(item.code);
+    if (forced) return { ...item, sector: forced.sector, sectorCode: forced.sectorCode };
     if (item.sectorCode) return item;
     const board = await resolveHoldingBoard(item.code);
     return board ? { ...item, sector: board.sector, sectorCode: board.sectorCode } : item;

@@ -1,6 +1,6 @@
 import { listAllIndustryBoards, listBoardMembers, listSelectableBoards } from "./boards";
 import { cached } from "./cache";
-import { isGrowthBoardShare, isTonghuashunBoard } from "./codes";
+import { bareCode, isGrowthBoardShare, isTonghuashunBoard } from "./codes";
 import { UpstreamError } from "./http";
 import { mapPool } from "./pool";
 import {
@@ -61,6 +61,27 @@ async function memberSeries(
   );
 }
 
+function fillMemberQuotes(
+  members: BoardMember[],
+  stocks: Array<{ code: string; name: string; bars: KBar[]; price: number | null }>,
+): BoardMember[] {
+  const byId = new Map(stocks.map((stock) => [bareCode(stock.code), stock]));
+  return members.map((item) => {
+    if (item.price != null && item.pct != null) return item;
+    const series = byId.get(bareCode(item.code));
+    if (!series) return item;
+    const last = series.bars.at(-1);
+    const prev = series.bars.at(-2);
+    return {
+      ...item,
+      price: item.price ?? series.price ?? last?.close ?? null,
+      pct:
+        item.pct ??
+        (last && prev && prev.close > 0 ? (last.close / prev.close - 1) * 100 : null),
+    };
+  });
+}
+
 function toMemberPaths(series: Array<{ code: string; name: string; bars: KBar[] }>): SectorMemberPath[] {
   return series.map((stock) => {
     const closes = new Map<string, number>();
@@ -89,7 +110,7 @@ async function loadMembers(code: string): Promise<BoardMember[]> {
 export async function getSectorTrend(code: string): Promise<SectorTrendReport> {
   const boardCode = code.trim();
   if (!isTonghuashunBoard(boardCode)) throw new UpstreamError("请从同花顺行业或概念里选择一个板块", 400);
-  return cached(`sector-trend-report:v1:${boardCode}`, 10 * 60_000, () => loadSectorTrend(boardCode));
+  return cached(`sector-trend-report:v2:${boardCode}`, 10 * 60_000, () => loadSectorTrend(boardCode));
 }
 
 async function loadSectorTrend(boardCode: string): Promise<SectorTrendReport> {
@@ -115,15 +136,14 @@ async function loadSectorTrend(boardCode: string): Promise<SectorTrendReport> {
     source: "ths",
   };
   const stocks = await memberSeries(members);
+  const quoted = fillMemberQuotes(members, stocks);
   const paths = toMemberPaths(stocks);
-  const roster = [...members]
-    .map((item) => ({ ...item, gain: null as number | null }))
-    .sort((a, b) => (b.amount ?? -1) - (a.amount ?? -1));
+  const roster = quoted.map((item) => ({ ...item, gain: null as number | null }));
   const trends = captureSectorTrends(bars, paths).map((segment) => {
     const gains = new Map(
       memberGainsInWindow(bars, paths, segment.start, segment.end).map((item) => [item.code, item.gain]),
     );
-    const trendRoster = members
+    const trendRoster = quoted
       .map((item) => ({ ...item, gain: gains.get(item.code) ?? null }))
       .sort((a, b) => (b.gain ?? -999) - (a.gain ?? -999));
     const maCrosses = listMa4CrossStocks(
