@@ -1,10 +1,20 @@
 import type { SectorItem } from "./types";
 
+const INDUSTRY_ALIASES: Record<string, string[]> = {
+  酿酒: ["白酒"],
+  白酒: ["酿酒"],
+};
+
 export function matchIndustryBoard(industry: string, boards: SectorItem[]): SectorItem | null {
   const name = industry.trim();
   if (!name) return null;
   const stem = name.replace(/(行业|板块)$/g, "");
   const keys = stem && stem !== name ? [name, stem] : [name];
+  for (const key of [...keys]) {
+    for (const alias of INDUSTRY_ALIASES[key] ?? []) {
+      if (!keys.includes(alias)) keys.push(alias);
+    }
+  }
   for (const key of keys) {
     const exact = boards.find((item) => item.name === key);
     if (exact) return exact;
