@@ -1,11 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { displaySymbol, priceDigits } from "@/lib/codes";
+import { displaySymbol, isIndexCode, isListedStockCode, priceDigits } from "@/lib/codes";
 import { formatClock, formatPct, formatPrice, toneClass } from "@/lib/format";
 import { useHoldings } from "@/lib/useHoldings";
-import type { HoldingStatus, Quote } from "@/lib/types";
+import type { HoldingItem, HoldingStatus, Quote, SearchItem } from "@/lib/types";
 import AppHeader from "./AppHeader";
 import StockWatchPane from "./StockWatchPane";
 import { EmptyHint, PanelTitle } from "./ui";
@@ -15,8 +15,105 @@ type StatusResponse = {
   error?: string;
 };
 
+function canHoldSearchHit(hit: SearchItem) {
+  return isListedStockCode(hit.code) && !isIndexCode(hit.code);
+}
+
+function HoldingSearch({
+  onPick,
+}: {
+  onPick: (item: HoldingItem) => void;
+}) {
+  const [keyword, setKeyword] = useState("");
+  const [hits, setHits] = useState<SearchItem[]>([]);
+  const [open, setOpen] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const boxRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "/" && !(event.target instanceof HTMLInputElement) && !(event.target instanceof HTMLTextAreaElement)) {
+        event.preventDefault();
+        inputRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  useEffect(() => {
+    const onClick = (event: MouseEvent) => {
+      if (!boxRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    window.addEventListener("mousedown", onClick);
+    return () => window.removeEventListener("mousedown", onClick);
+  }, []);
+
+  useEffect(() => {
+    const q = keyword.trim();
+    if (!q) {
+      setHits([]);
+      setSearching(false);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const res = await fetch(`/api/market/search?q=${encodeURIComponent(q)}`);
+        const data = (await res.json()) as { items?: SearchItem[]; error?: string };
+        setHits((data.items ?? []).filter(canHoldSearchHit));
+        setOpen(true);
+      } catch {
+        setHits([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [keyword]);
+
+  return (
+    <div className="relative border-b border-line px-3 py-2" ref={boxRef}>
+      <input
+        ref={inputRef}
+        value={keyword}
+        onChange={(event) => setKeyword(event.target.value)}
+        onFocus={() => hits.length && setOpen(true)}
+        placeholder="搜索代码 / 名称加入持仓"
+        className="w-full rounded-md border border-line bg-bg px-3 py-2 text-sm outline-none placeholder:text-mute focus:border-gold/60"
+      />
+      {open && (keyword.trim() || searching) ? (
+        <div className="absolute left-3 right-3 top-full z-20 mt-1 max-h-64 overflow-auto rounded-md border border-line bg-panel-2 scroll-thin">
+          {searching ? <div className="px-3 py-2 text-xs text-mute">搜索中…</div> : null}
+          {!searching && hits.length === 0 ? <div className="px-3 py-2 text-xs text-mute">没有匹配的股票</div> : null}
+          {hits.map((hit) => (
+            <button
+              key={hit.code}
+              type="button"
+              className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-panel"
+              onClick={() => {
+                onPick({ code: hit.code, name: hit.name, sector: null, sectorCode: null });
+                setKeyword("");
+                setOpen(false);
+                setHits([]);
+              }}
+            >
+              <span>
+                {hit.name}
+                <span className="ml-2 text-xs text-mute">{displaySymbol(hit.code)}</span>
+              </span>
+              <span className="text-[10px] text-gold">{hit.typeName || "加入"}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export default function Holdings() {
-  const { items, ready, remove } = useHoldings();
+  const { items, ready, add, remove } = useHoldings();
   const [selected, setSelected] = useState<string | null>(null);
   const [quotes, setQuotes] = useState<Map<string, Quote>>(new Map());
   const [statuses, setStatuses] = useState<Map<string, HoldingStatus>>(new Map());
@@ -94,6 +191,11 @@ export default function Holdings() {
     return () => clearInterval(timer);
   }, [ready, auto, items.length, loadQuotes]);
 
+  const pick = (item: HoldingItem) => {
+    add(item);
+    setSelected(item.code);
+  };
+
   const selectedItem = items.find((item) => item.code === selected) ?? null;
   const selectedStatus = selected ? statuses.get(selected) : undefined;
   const hint = selectedStatus
@@ -158,15 +260,16 @@ export default function Holdings() {
               </span>
             }
           />
+          <HoldingSearch onPick={pick} />
           <div className="flex-1 overflow-auto scroll-thin">
             {!ready ? <EmptyHint text="读取持仓…" /> : null}
             {ready && items.length === 0 ? (
               <div className="px-4 py-8 text-center text-sm text-mute">
-                还没有持仓。去
+                还没有持仓。上面搜索加入，或去
                 <Link href="/screener" className="mx-1 text-gold hover:underline">
                   选股
                 </Link>
-                页点 + 加入。
+                页点 + 。
               </div>
             ) : null}
             {items.map((item) => {
@@ -174,6 +277,7 @@ export default function Holdings() {
               const quote = quotes.get(item.code);
               const status = statuses.get(item.code);
               const hold = status?.action === "hold";
+              const sector = status?.sector ?? item.sector;
               return (
                 <div
                   key={item.code}
@@ -185,7 +289,7 @@ export default function Holdings() {
                     <div className="truncate text-sm">{item.name}</div>
                     <div className="text-[11px] text-mute">
                       {displaySymbol(item.code)}
-                      {item.sector ? ` · ${item.sector}` : ""}
+                      {sector ? ` · ${sector}` : ""}
                     </div>
                     {status ? (
                       <div className={`mt-1 text-xs ${hold ? "text-down" : "text-up"}`}>{status.label}</div>
@@ -233,7 +337,7 @@ export default function Holdings() {
       </div>
 
       <p className="pb-1 text-center text-[11px] text-mute">
-        继续持仓 / 需要离场按当前选股条件核对：板块红框、板块指数站上 MA4、个股收盘站上 MA4。仅供看盘学习，不构成投资建议。
+        搜索加入或从选股点 + 。继续持仓 / 需要离场按当前选股条件核对：板块红框、板块指数站上 MA4、个股收盘站上 MA4。仅供看盘学习，不构成投资建议。
       </p>
     </div>
   );
