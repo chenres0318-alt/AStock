@@ -1,6 +1,6 @@
 import { listAllIndustryBoards, listBoardMembers, listSelectableBoards } from "./boards";
 import { cached } from "./cache";
-import { bareCode, isGrowthBoardShare, isTonghuashunBoard } from "./codes";
+import { bareCode, isGrowthBoardShare, isStName, isTonghuashunBoard } from "./codes";
 import { UpstreamError } from "./http";
 import { mapPool } from "./pool";
 import {
@@ -12,7 +12,7 @@ import {
   type SectorMemberPath,
   type SectorTrendSegment,
 } from "./sectorTrend";
-import type { SectorMa4Screen } from "./screenerLogic";
+import { decorateMa4Crosses, type SectorMa4Screen } from "./screenerLogic";
 import { fetchTonghuashunSeries } from "./sources/tonghuashun";
 import { fetchTencentKline } from "./sources/tencent";
 import type { BoardMember, KBar, SectorItem } from "./types";
@@ -133,9 +133,12 @@ export async function loadBoardMa4Screen(code: string): Promise<SectorMa4Screen 
   const trends = captureSectorTrends(bars, paths);
   const open = trends.find((trend) => trend.status === "open" && trend.end === lastTime) ?? null;
   const crosses = open
-    ? listMa4CrossStocks(
-        open,
-        stocks.filter((stock) => !isGrowthBoardShare(stock.code)),
+    ? decorateMa4Crosses(
+        listMa4CrossStocks(
+          open,
+          stocks.filter((stock) => !isGrowthBoardShare(stock.code) && !isStName(stock.name)),
+        ),
+        stocks,
       )
     : [];
   return {

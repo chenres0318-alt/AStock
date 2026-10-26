@@ -1,12 +1,20 @@
-import { marketOf, toTencentCode } from "./codes";
+import { toTencentCode } from "./codes";
 import { listBoardsInTrend, loadBoardMa4Screen } from "./sectorTrendData";
-import { collectMa4StandHits, type SectorMa4Screen } from "./screenerLogic";
+import { collectMa4StandHits, isScreenerShare, type SectorMa4Screen } from "./screenerLogic";
 import { mapPool } from "./pool";
 import type { ScreenerHit } from "./types";
 
 const SCAN_DEADLINE_MS = 100_000;
 const BOARD_CONCURRENCY = 2;
 const RESULT_TTL_MS = 2 * 60_000;
+
+function hitReasons(row: ReturnType<typeof collectMa4StandHits>[number]): string[] {
+  const reasons: string[] = [];
+  if (row.ma4CrossUpMa7) reasons.push("MA4上叉MA7");
+  if (row.weekOnMa4) reasons.push("周K站上MA4");
+  reasons.push(`站上MA4共${row.days}日`, "板块红框", "板块指数站上MA4");
+  return reasons;
+}
 
 function toHit(row: ReturnType<typeof collectMa4StandHits>[number]): ScreenerHit {
   const code = toTencentCode(row.code);
@@ -24,7 +32,7 @@ function toHit(row: ReturnType<typeof collectMa4StandHits>[number]): ScreenerHit
     dea: 0,
     hist: 0,
     standDays: row.days,
-    reasons: [`站上MA4共${row.days}日`, "板块红框", "板块指数站上MA4"],
+    reasons: hitReasons(row),
     sector: row.sector,
     sectorCode: row.sectorCode,
   };
@@ -85,7 +93,7 @@ async function runScreenStocks(): Promise<StockScreenResult> {
     universe: liveOnMa4.length,
     liveBoards: codes.length,
     items: collectMa4StandHits(sectors)
-      .filter((row) => marketOf(row.code) !== "BJ")
+      .filter((row) => isScreenerShare(row.code, row.name))
       .map(toHit),
     source: "ths-industry",
     timedOut: Date.now() > deadline && scanned < liveOnMa4.length,
