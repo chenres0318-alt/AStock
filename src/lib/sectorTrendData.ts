@@ -123,13 +123,25 @@ export async function loadBoardMa4Screen(code: string): Promise<SectorMa4Screen 
   const series = await industrySeries(boardCode);
   const bars = series.bars;
   if (bars.length < 4) return null;
+  const lastTime = bars.at(-1)?.time;
+  const onMa4 = standsOnMa4(bars);
+  if (!lastTime || !onMa4 || !indexCouldBeOpen(bars)) {
+    return {
+      code: boardCode,
+      name: series.name || boardCode,
+      onMa4,
+      lastTime,
+      openTrend: null,
+      crosses: [],
+      members: [],
+    };
+  }
   const members = await loadMembers(boardCode);
   if (members.length < 5) return null;
-  const stocks = await memberSeries(members, 80, 3);
+  const stocks = await memberSeries(members, 40, 3);
   if (stocks.length < 5) return null;
   const quoted = fillMemberQuotes(members, stocks);
   const paths = toMemberPaths(stocks);
-  const lastTime = bars.at(-1)?.time;
   const trends = captureSectorTrends(bars, paths);
   const open = trends.find((trend) => trend.status === "open" && trend.end === lastTime) ?? null;
   const crosses = open
@@ -144,7 +156,7 @@ export async function loadBoardMa4Screen(code: string): Promise<SectorMa4Screen 
   return {
     code: boardCode,
     name: series.name || boardCode,
-    onMa4: standsOnMa4(bars),
+    onMa4,
     lastTime,
     openTrend: open ? { start: open.start, end: open.end, status: open.status } : null,
     crosses,

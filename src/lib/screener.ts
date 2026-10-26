@@ -1,12 +1,14 @@
 import { toTencentCode } from "./codes";
 import { listBoardsInTrend, loadBoardMa4Screen } from "./sectorTrendData";
 import { collectMa4StandHits, isScreenerShare, type SectorMa4Screen } from "./screenerLogic";
-import { mapPool } from "./pool";
+import { mapPool, raceDeadline } from "./pool";
 import type { ScreenerHit } from "./types";
 
-const SCAN_DEADLINE_MS = 100_000;
+/** 预览代理常在 60s 掐连接，必须在那之前把 JSON 送回去。 */
+const SCAN_DEADLINE_MS = 42_000;
 const BOARD_CONCURRENCY = 2;
 const RESULT_TTL_MS = 2 * 60_000;
+const PARTIAL_TTL_MS = 30_000;
 
 function hitReasons(row: ReturnType<typeof collectMa4StandHits>[number]): string[] {
   const reasons: string[] = [];
@@ -47,55 +49,82 @@ export type StockScreenResult = {
   timedOut?: boolean;
 };
 
-let running: Promise<StockScreenResult> | null = null;
+type ScanJob = {
+  startedAt: number;
+  promise: Promise<StockScreenResult>;
+  snapshot: (timedOut: boolean) => StockScreenResult;
+};
+
+let job: ScanJob | null = null;
 let cachedResult: { value: StockScreenResult; expireAt: number } | null = null;
 
-export function screenStocks(): Promise<StockScreenResult> {
-  if (cachedResult && cachedResult.expireAt > Date.now()) {
-    return Promise.resolve(cachedResult.value);
+export async function screenStocks(): Promise<StockScreenResult> {
+  if (!job && cachedResult && cachedResult.expireAt > Date.now()) {
+    return cachedResult.value;
   }
-  if (running) return running;
-  running = runScreenStocks()
+  if (!job) job = startJob();
+  const current = job;
+  const waitMs = Math.max(0, current.startedAt + SCAN_DEADLINE_MS - Date.now());
+  let finished = await raceDeadline(current.promise, waitMs);
+  if (finished) return finished;
+  let partial = current.snapshot(true);
+  if (!partial.scanned) {
+    finished = await raceDeadline(current.promise, 8_000);
+    if (finished) return finished;
+    partial = current.snapshot(true);
+  }
+  if (partial.items.length) {
+    cachedResult = { value: partial, expireAt: Date.now() + PARTIAL_TTL_MS };
+  }
+  return partial;
+}
+
+function startJob(): ScanJob {
+  const startedAt = Date.now();
+  const state = {
+    scanned: 0,
+    universe: 0,
+    liveBoards: 0,
+    sectors: [] as SectorMa4Screen[],
+  };
+  const snapshot = (timedOut: boolean): StockScreenResult => ({
+    scanned: state.scanned,
+    universe: state.universe,
+    liveBoards: state.liveBoards,
+    items: collectMa4StandHits(state.sectors)
+      .filter((row) => isScreenerShare(row.code, row.name))
+      .map(toHit),
+    source: "ths-industry",
+    timedOut,
+  });
+  const deadline = startedAt + SCAN_DEADLINE_MS;
+  const promise = (async () => {
+    const { codes, offMa4 } = await listBoardsInTrend();
+    const off = new Set(offMa4);
+    const liveOnMa4 = codes.filter((code) => !off.has(code));
+    state.universe = liveOnMa4.length;
+    state.liveBoards = codes.length;
+    await mapPool(liveOnMa4, BOARD_CONCURRENCY, async (code) => {
+      if (Date.now() > deadline) return;
+      try {
+        const screen = await loadBoardMa4Screen(code);
+        state.scanned += 1;
+        if (screen) state.sectors.push(screen);
+      } catch {
+        // skip board
+      }
+    });
+    return snapshot(Date.now() > deadline && state.scanned < liveOnMa4.length);
+  })()
     .then((value) => {
       cachedResult = {
         value,
-        expireAt: Date.now() + (value.timedOut ? 60_000 : RESULT_TTL_MS),
+        expireAt: Date.now() + (value.timedOut ? PARTIAL_TTL_MS : RESULT_TTL_MS),
       };
       return value;
     })
     .finally(() => {
-      running = null;
+      if (job?.startedAt === startedAt) job = null;
     });
-  return running;
-}
-
-async function runScreenStocks(): Promise<StockScreenResult> {
-  const deadline = Date.now() + SCAN_DEADLINE_MS;
-  const { codes, offMa4 } = await listBoardsInTrend();
-  const off = new Set(offMa4);
-  const liveOnMa4 = codes.filter((code) => !off.has(code));
-  let scanned = 0;
-  const sectors: SectorMa4Screen[] = [];
-
-  await mapPool(liveOnMa4, BOARD_CONCURRENCY, async (code) => {
-    if (Date.now() > deadline) return;
-    try {
-      const screen = await loadBoardMa4Screen(code);
-      scanned += 1;
-      if (screen) sectors.push(screen);
-    } catch {
-      // skip board
-    }
-  });
-
-  return {
-    scanned,
-    universe: liveOnMa4.length,
-    liveBoards: codes.length,
-    items: collectMa4StandHits(sectors)
-      .filter((row) => isScreenerShare(row.code, row.name))
-      .map(toHit),
-    source: "ths-industry",
-    timedOut: Date.now() > deadline && scanned < liveOnMa4.length,
-  };
+  return { startedAt, promise, snapshot };
 }
