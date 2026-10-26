@@ -32,8 +32,8 @@ function scanErrorMessage(error: unknown): string {
   return message;
 }
 
-async function readJson<T>(url: string): Promise<T> {
-  const res = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(110_000) });
+async function fetchScreen<T>(url: string): Promise<T> {
+  const res = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(55_000) });
   let data: T & { error?: string };
   try {
     data = (await res.json()) as T & { error?: string };
@@ -42,6 +42,17 @@ async function readJson<T>(url: string): Promise<T> {
   }
   if (!res.ok) throw new Error(data.error || "请求失败");
   return data;
+}
+
+async function readJson<T>(url: string): Promise<T> {
+  try {
+    return await fetchScreen<T>(url);
+  } catch (error) {
+    if (error instanceof TypeError || (error instanceof Error && /failed to fetch/i.test(error.message))) {
+      return await fetchScreen<T>(url);
+    }
+    throw error;
+  }
 }
 
 function HitTable({
@@ -231,7 +242,7 @@ export default function Screener() {
         />
         {loading ? (
           <div className="px-4 py-8 text-center text-sm text-mute">
-            正在扫描红框且指数站上 MA4 的行业成分股。MA4 上叉 MA7、周 K 站上 MA4 更靠前，站上 MA4 天数越短越靠前，大约需要一两分钟。
+            正在扫描红框且指数站上 MA4 的行业成分股。MA4 上叉 MA7、周 K 站上 MA4 更靠前，站上 MA4 天数越短越靠前，大约半分钟。
           </div>
         ) : (
           <HitTable

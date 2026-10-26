@@ -8,6 +8,7 @@ import {
   weekStandsOnMa4,
   type SectorMa4Screen,
 } from "./screenerLogic.ts";
+import { raceDeadline } from "./pool.ts";
 import type { KBar, SectorItem } from "./types.ts";
 
 function assert(cond: unknown, message: string) {
@@ -169,5 +170,14 @@ const decorated = decorateMa4Crosses(
   [{ code: "sh600030", bars: weekBars, price: 13 }],
 );
 assert(decorated[0]?.weekOnMa4 === true, "decorate fills weekly MA4 from the daily tape");
+
+{
+  const missed = await raceDeadline(new Promise((resolve) => setTimeout(() => resolve("late"), 80)), 15);
+  assert(missed === undefined, "deadline returns undefined while work keeps going");
+  const hit = await raceDeadline(Promise.resolve("now"), 50);
+  assert(hit === "now", "finished work wins the race");
+  const skipped = await raceDeadline(Promise.resolve("now"), 0);
+  assert(skipped === undefined, "a zero wait does not block on work");
+}
 
 console.log("screener.check ok");

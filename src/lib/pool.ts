@@ -17,3 +17,22 @@ export async function mapPool<T, R>(
   await Promise.all(workers);
   return out;
 }
+
+/** 到期返回 undefined，后台那份 Promise 继续跑。ms<=0 立刻放弃等待。 */
+export async function raceDeadline<T>(work: Promise<T>, ms: number): Promise<T | undefined> {
+  if (ms <= 0) return undefined;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      work.then((value) => {
+        if (timer) clearTimeout(timer);
+        return value;
+      }),
+      new Promise<undefined>((resolve) => {
+        timer = setTimeout(() => resolve(undefined), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
