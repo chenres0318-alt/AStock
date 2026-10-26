@@ -4,11 +4,10 @@ import { collectMa4StandHits, isScreenerShare, type SectorMa4Screen } from "./sc
 import { mapPool, raceDeadline } from "./pool";
 import type { ScreenerHit } from "./types";
 
-/** 预览代理常在 60s 掐连接，必须在那之前把 JSON 送回去。 */
-const SCAN_DEADLINE_MS = 42_000;
 const BOARD_CONCURRENCY = 2;
 const RESULT_TTL_MS = 2 * 60_000;
-const PARTIAL_TTL_MS = 30_000;
+const SCAN_MAX_MS = 180_000;
+const FIRST_WAIT_MS = 2_000;
 
 function hitReasons(row: ReturnType<typeof collectMa4StandHits>[number]): string[] {
   const reasons: string[] = [];
@@ -46,13 +45,14 @@ export type StockScreenResult = {
   liveBoards: number;
   items: ScreenerHit[];
   source: string;
+  scanning: boolean;
   timedOut?: boolean;
 };
 
 type ScanJob = {
   startedAt: number;
   promise: Promise<StockScreenResult>;
-  snapshot: (timedOut: boolean) => StockScreenResult;
+  snapshot: () => StockScreenResult;
 };
 
 let job: ScanJob | null = null;
@@ -60,23 +60,15 @@ let cachedResult: { value: StockScreenResult; expireAt: number } | null = null;
 
 export async function screenStocks(): Promise<StockScreenResult> {
   if (!job && cachedResult && cachedResult.expireAt > Date.now()) {
-    return cachedResult.value;
+    return { ...cachedResult.value, scanning: false };
   }
+  const created = !job;
   if (!job) job = startJob();
-  const current = job;
-  const waitMs = Math.max(0, current.startedAt + SCAN_DEADLINE_MS - Date.now());
-  let finished = await raceDeadline(current.promise, waitMs);
-  if (finished) return finished;
-  let partial = current.snapshot(true);
-  if (!partial.scanned) {
-    finished = await raceDeadline(current.promise, 8_000);
-    if (finished) return finished;
-    partial = current.snapshot(true);
+  if (created) {
+    const done = await raceDeadline(job.promise, FIRST_WAIT_MS);
+    if (done) return { ...done, scanning: false };
   }
-  if (partial.items.length) {
-    cachedResult = { value: partial, expireAt: Date.now() + PARTIAL_TTL_MS };
-  }
-  return partial;
+  return job.snapshot();
 }
 
 function startJob(): ScanJob {
@@ -86,8 +78,9 @@ function startJob(): ScanJob {
     universe: 0,
     liveBoards: 0,
     sectors: [] as SectorMa4Screen[],
+    done: false,
   };
-  const snapshot = (timedOut: boolean): StockScreenResult => ({
+  const snapshot = (): StockScreenResult => ({
     scanned: state.scanned,
     universe: state.universe,
     liveBoards: state.liveBoards,
@@ -95,9 +88,10 @@ function startJob(): ScanJob {
       .filter((row) => isScreenerShare(row.code, row.name))
       .map(toHit),
     source: "ths-industry",
-    timedOut,
+    scanning: !state.done,
+    timedOut: state.done && state.universe > 0 && state.scanned < state.universe,
   });
-  const deadline = startedAt + SCAN_DEADLINE_MS;
+  const deadline = startedAt + SCAN_MAX_MS;
   const promise = (async () => {
     const { codes, offMa4 } = await listBoardsInTrend();
     const off = new Set(offMa4);
@@ -108,22 +102,25 @@ function startJob(): ScanJob {
       if (Date.now() > deadline) return;
       try {
         const screen = await loadBoardMa4Screen(code);
-        state.scanned += 1;
         if (screen) state.sectors.push(screen);
       } catch {
         // skip board
+      } finally {
+        state.scanned += 1;
       }
     });
-    return snapshot(Date.now() > deadline && state.scanned < liveOnMa4.length);
+    state.done = true;
+    return snapshot();
   })()
     .then((value) => {
       cachedResult = {
-        value,
-        expireAt: Date.now() + (value.timedOut ? PARTIAL_TTL_MS : RESULT_TTL_MS),
+        value: { ...value, scanning: false },
+        expireAt: Date.now() + (value.timedOut ? 20_000 : RESULT_TTL_MS),
       };
       return value;
     })
     .finally(() => {
+      state.done = true;
       if (job?.startedAt === startedAt) job = null;
     });
   return { startedAt, promise, snapshot };

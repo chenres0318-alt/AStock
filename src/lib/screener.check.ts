@@ -144,6 +144,34 @@ const weekBeatsShort = collectMa4StandHits([
 ]);
 assert(weekBeatsShort[0]?.name === "周", "weekly MA4 still ranks ahead of a shorter stand without it");
 
+const wave1 = collectMa4StandHits([
+  screen({
+    code: "881121",
+    name: "食品加工制造",
+    crosses: [{ code: "sh600040", name: "先扫到", days: 2, time: "2026-10-22" }],
+    members: [{ code: "sh600040", name: "先扫到", price: 8, pct: 1, turnover: 1 }],
+  }),
+]);
+assert(wave1.map((row) => row.name).join(",") === "先扫到", "the first wave only has what has been scanned");
+const wave2 = collectMa4StandHits([
+  screen({
+    code: "881121",
+    name: "食品加工制造",
+    crosses: [{ code: "sh600040", name: "先扫到", days: 2, time: "2026-10-22" }],
+    members: [{ code: "sh600040", name: "先扫到", price: 8, pct: 1, turnover: 1 }],
+  }),
+  screen({
+    code: "881171",
+    name: "医疗器械",
+    crosses: [{ code: "sh600041", name: "后扫上叉", days: 5, time: "2026-10-19", ma4CrossUpMa7: true, weekOnMa4: true }],
+    members: [{ code: "sh600041", name: "后扫上叉", price: 9, pct: 1, turnover: 1 }],
+  }),
+]);
+assert(
+  wave2.map((row) => row.name).join(",") === "后扫上叉,先扫到",
+  "a later board still jumps ahead when it ranks better",
+);
+
 function bar(time: string, close: number): KBar {
   return { time, open: close, high: close, low: close, close, volume: 1 };
 }
