@@ -1,11 +1,12 @@
 import { marketOf, toTencentCode } from "./codes";
-import { getSectorTrend, listBoardsInTrend } from "./sectorTrendData";
+import { listBoardsInTrend, loadBoardMa4Screen } from "./sectorTrendData";
 import { collectMa4StandHits, type SectorMa4Screen } from "./screenerLogic";
 import { mapPool } from "./pool";
 import type { ScreenerHit } from "./types";
 
-const SCAN_DEADLINE_MS = 150_000;
-const BOARD_CONCURRENCY = 3;
+const SCAN_DEADLINE_MS = 100_000;
+const BOARD_CONCURRENCY = 2;
+const RESULT_TTL_MS = 2 * 60_000;
 
 function toHit(row: ReturnType<typeof collectMa4StandHits>[number]): ScreenerHit {
   const code = toTencentCode(row.code);
@@ -29,42 +30,51 @@ function toHit(row: ReturnType<typeof collectMa4StandHits>[number]): ScreenerHit
   };
 }
 
-export async function screenStocks(): Promise<{
+export type StockScreenResult = {
   scanned: number;
   universe: number;
   liveBoards: number;
   items: ScreenerHit[];
   source: string;
-}> {
+  timedOut?: boolean;
+};
+
+let running: Promise<StockScreenResult> | null = null;
+let cachedResult: { value: StockScreenResult; expireAt: number } | null = null;
+
+export function screenStocks(): Promise<StockScreenResult> {
+  if (cachedResult && cachedResult.expireAt > Date.now()) {
+    return Promise.resolve(cachedResult.value);
+  }
+  if (running) return running;
+  running = runScreenStocks()
+    .then((value) => {
+      cachedResult = {
+        value,
+        expireAt: Date.now() + (value.timedOut ? 60_000 : RESULT_TTL_MS),
+      };
+      return value;
+    })
+    .finally(() => {
+      running = null;
+    });
+  return running;
+}
+
+async function runScreenStocks(): Promise<StockScreenResult> {
+  const deadline = Date.now() + SCAN_DEADLINE_MS;
   const { codes, offMa4 } = await listBoardsInTrend();
   const off = new Set(offMa4);
   const liveOnMa4 = codes.filter((code) => !off.has(code));
-  const deadline = Date.now() + SCAN_DEADLINE_MS;
   let scanned = 0;
   const sectors: SectorMa4Screen[] = [];
 
   await mapPool(liveOnMa4, BOARD_CONCURRENCY, async (code) => {
     if (Date.now() > deadline) return;
     try {
-      const report = await getSectorTrend(code);
+      const screen = await loadBoardMa4Screen(code);
       scanned += 1;
-      const lastTime = report.bars.at(-1)?.time;
-      const open = report.trends.find((trend) => trend.status === "open" && trend.end === lastTime) ?? null;
-      sectors.push({
-        code: report.board.code,
-        name: report.board.name,
-        onMa4: report.onMa4,
-        lastTime,
-        openTrend: open ? { start: open.start, end: open.end, status: open.status } : null,
-        crosses: open?.maCrosses ?? [],
-        members: report.roster.map((item) => ({
-          code: item.code,
-          name: item.name,
-          price: item.price,
-          pct: item.pct,
-          turnover: item.turnover,
-        })),
-      });
+      if (screen) sectors.push(screen);
     } catch {
       // skip board
     }
@@ -78,5 +88,6 @@ export async function screenStocks(): Promise<{
       .filter((row) => marketOf(row.code) !== "BJ")
       .map(toHit),
     source: "ths-industry",
+    timedOut: Date.now() > deadline && scanned < liveOnMa4.length,
   };
 }

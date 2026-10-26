@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { isListedStockCode, priceDigits } from "@/lib/codes";
 import { formatPct, formatPrice, toneClass } from "@/lib/format";
+import { isAbortError } from "@/lib/readJson";
 import { loadWatchlist, saveWatchlist } from "@/lib/storage";
 import { useHoldings } from "@/lib/useHoldings";
 import type { ScreenerHit } from "@/lib/types";
@@ -19,11 +20,26 @@ type StockResponse = {
   elapsedMs?: number;
   source?: string;
   error?: string;
+  timedOut?: boolean;
 };
 
+function scanErrorMessage(error: unknown): string {
+  if (isAbortError(error)) return "选股超时，请再点一次开始选股";
+  const message = error instanceof Error ? error.message : "";
+  if (!message || /failed to fetch/i.test(message) || error instanceof TypeError) {
+    return "选股服务中断，请再点一次开始选股";
+  }
+  return message;
+}
+
 async function readJson<T>(url: string): Promise<T> {
-  const res = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(180_000) });
-  const data = (await res.json()) as T & { error?: string };
+  const res = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(110_000) });
+  let data: T & { error?: string };
+  try {
+    data = (await res.json()) as T & { error?: string };
+  } catch {
+    throw new TypeError("Failed to fetch");
+  }
   if (!res.ok) throw new Error(data.error || "请求失败");
   return data;
 }
@@ -155,8 +171,9 @@ export default function Screener() {
         source: data.source,
       });
       if (data.error) setError(data.error);
+      else if (data.timedOut) setError("扫描超时，下面是已经扫到的结果，可再点一次继续");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "选股失败");
+      setError(scanErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -214,7 +231,7 @@ export default function Screener() {
         />
         {loading ? (
           <div className="px-4 py-8 text-center text-sm text-mute">
-            正在扫描红框且指数站上 MA4 的行业成分股，按站上 MA4 持续时间从短到长排列，大约需要一分钟。
+            正在扫描红框且指数站上 MA4 的行业成分股，按站上 MA4 持续时间从短到长排列，大约需要一两分钟。
           </div>
         ) : (
           <HitTable
