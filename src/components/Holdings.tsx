@@ -185,10 +185,22 @@ export default function Holdings() {
 
   useEffect(() => {
     if (!ready || !auto || !items.length) return;
-    const timer = setInterval(() => {
-      loadQuotes().catch(() => undefined);
-    }, 5000);
-    return () => clearInterval(timer);
+    let cancelled = false;
+    let timer = 0;
+    const loop = () => {
+      timer = window.setTimeout(() => {
+        loadQuotes()
+          .catch(() => undefined)
+          .finally(() => {
+            if (!cancelled) loop();
+          });
+      }, 5000);
+    };
+    loop();
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
   }, [ready, auto, items.length, loadQuotes]);
 
   const pick = (item: HoldingItem) => {

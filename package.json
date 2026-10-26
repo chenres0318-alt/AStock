@@ -12,7 +12,8 @@
     "check:trend": "node --experimental-strip-types --no-warnings src/lib/sectorTrend.check.ts",
     "check:screener": "node --experimental-strip-types --no-warnings src/lib/screener.check.ts",
     "check:holdings": "node --experimental-strip-types --no-warnings src/lib/holdingAdvice.check.ts",
-    "check:board-extras": "node --experimental-strip-types --no-warnings src/lib/boardExtras.check.ts"
+    "check:board-extras": "node --experimental-strip-types --no-warnings src/lib/boardExtras.check.ts",
+    "check:read-json": "node --experimental-strip-types --no-warnings src/lib/readJson.check.ts"
   },
   "dependencies": {
     "iconv-lite": "^0.7.3",

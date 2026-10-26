@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { DEFAULT_WATCHLIST } from "@/lib/codes";
 import { formatClock } from "@/lib/format";
 import { pollInterval } from "@/lib/market-status";
+import { isAbortError, readJson } from "@/lib/readJson";
 import { loadWatchlist, saveWatchlist } from "@/lib/storage";
 import type { KBar, MarketStatus, Quote, RankItem, SectorItem, TrendPoint, WatchItem } from "@/lib/types";
 import AppHeader from "./AppHeader";
@@ -21,16 +22,6 @@ type OverviewResponse = {
   quotes: Quote[];
   error?: string;
 };
-
-async function readJson<T>(url: string, timeoutMs?: number): Promise<T> {
-  const res = await fetch(url, {
-    cache: "no-store",
-    signal: timeoutMs ? AbortSignal.timeout(timeoutMs) : undefined,
-  });
-  const data = (await res.json()) as T & { error?: string };
-  if (!res.ok) throw new Error(data.error || "请求失败");
-  return data;
-}
 
 export default function Dashboard() {
   const searchParams = useSearchParams();
@@ -91,111 +82,156 @@ export default function Dashboard() {
 
   const current = quoteMap.get(selected);
   const trading = status?.trading ?? false;
-
-  const loadOverview = useCallback(async () => {
-    const codes = Array.from(new Set([...watchlist.map((item) => item.code), selected]));
-    const data = await readJson<OverviewResponse>(`/api/market/overview?codes=${codes.join(",")}`);
-    setIndices(data.indices);
-    setQuotes(data.quotes);
-    setStatus(data.status);
-    setError(null);
-  }, [watchlist, selected]);
-
-  const loadChart = useCallback(async (silent = false) => {
-    if (!silent) setChartLoading(true);
-    try {
-      if (mode === "trend") {
-        const [data, day] = await Promise.all([
-          readJson<{ points: TrendPoint[]; preClose: number | null; priorCloses?: number[] }>(`/api/market/trend?code=${selected}`),
-          readJson<{ bars: KBar[] }>(`/api/market/kline?code=${selected}&period=day`).catch(() => ({ bars: [] as KBar[] })),
-        ]);
-        setTrend({ points: data.points, preClose: data.preClose, priorCloses: data.priorCloses ?? [] });
-        if (day.bars.length) setBars(day.bars);
-      } else {
-        const data = await readJson<{ bars: KBar[] }>(`/api/market/kline?code=${selected}&period=${mode}`);
-        setBars(data.bars);
-      }
-    } finally {
-      if (!silent) setChartLoading(false);
-    }
-  }, [mode, selected]);
-
-  const loadAux = useCallback(async () => {
-    const [sectorRes, up, down, amount, boards] = await Promise.all([
-      readJson<{ items: SectorItem[] }>("/api/market/sectors"),
-      readJson<{ items: RankItem[] }>("/api/market/rank?kind=up"),
-      readJson<{ items: RankItem[] }>("/api/market/rank?kind=down"),
-      readJson<{ items: RankItem[] }>("/api/market/rank?kind=amount"),
-      readJson<{ limitUp: RankItem[]; limitDown: RankItem[] }>("/api/market/boards"),
-    ]);
-    setSectors(sectorRes.items);
-    setRankMap({
-      up: up.items,
-      down: down.items,
-      amount: amount.items,
-      limitUp: boards.limitUp,
-      limitDown: boards.limitDown,
-    });
-  }, []);
+  const tradingRef = useRef(trading);
+  tradingRef.current = trading;
+  const refreshRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     if (!ready) return;
+    const ac = new AbortController();
     let cancelled = false;
-    const tick = async () => {
+    let timer = 0;
+    let inflight = false;
+
+    const loadChart = async (silent: boolean) => {
+      if (!silent) setChartLoading(true);
       try {
-        await loadOverview();
-        await loadChart(true);
-      } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : "行情刷新失败");
+        if (mode === "trend") {
+          const trendReq = readJson<{ points: TrendPoint[]; preClose: number | null; priorCloses?: number[] }>(
+            `/api/market/trend?code=${selected}`,
+            { signal: ac.signal },
+          );
+          const dayReq = silent
+            ? Promise.resolve({ bars: [] as KBar[] })
+            : readJson<{ bars: KBar[] }>(`/api/market/kline?code=${selected}&period=day`, { signal: ac.signal }).catch(
+                () => ({ bars: [] as KBar[] }),
+              );
+          const [data, day] = await Promise.all([trendReq, dayReq]);
+          if (cancelled) return;
+          setTrend({ points: data.points, preClose: data.preClose, priorCloses: data.priorCloses ?? [] });
+          if (day.bars.length) setBars(day.bars);
+        } else {
+          const data = await readJson<{ bars: KBar[] }>(`/api/market/kline?code=${selected}&period=${mode}`, {
+            signal: ac.signal,
+          });
+          if (cancelled) return;
+          setBars(data.bars);
+        }
+      } finally {
+        if (!silent) setChartLoading(false);
       }
     };
-    tick();
-    if (!auto) return;
-    const delay = pollInterval({
-      trading,
-      phase: trading ? "trading" : "closed",
-      label: "",
-      weekday: true,
-      serverTime: "",
-    });
-    const timer = setInterval(tick, delay);
+
+    const tick = async (silent: boolean) => {
+      if (inflight) return;
+      inflight = true;
+      try {
+        const codes = Array.from(new Set([...watchlist.map((item) => item.code), selected]));
+        const data = await readJson<OverviewResponse>(`/api/market/overview?codes=${codes.join(",")}`, {
+          signal: ac.signal,
+        });
+        if (cancelled) return;
+        setIndices(data.indices);
+        setQuotes(data.quotes);
+        setStatus(data.status);
+        setError(null);
+        await loadChart(silent);
+      } catch (err) {
+        if (cancelled || isAbortError(err)) return;
+        setError(err instanceof Error ? err.message : "行情刷新失败");
+      } finally {
+        inflight = false;
+      }
+    };
+
+    const loop = async (silent: boolean) => {
+      await tick(silent);
+      if (cancelled || !auto) return;
+      const live = tradingRef.current;
+      const delay = pollInterval({
+        trading: live,
+        phase: live ? "trading" : "closed",
+        label: "",
+        weekday: true,
+        serverTime: "",
+      });
+      timer = window.setTimeout(() => {
+        void loop(true);
+      }, delay);
+    };
+
+    refreshRef.current = () => {
+      void tick(false);
+    };
+    void loop(false);
     return () => {
       cancelled = true;
-      clearInterval(timer);
+      ac.abort();
+      window.clearTimeout(timer);
     };
-  }, [ready, auto, loadOverview, loadChart, trading]);
+  }, [ready, auto, selected, mode, watchlist]);
 
   useEffect(() => {
     if (!ready) return;
-    loadChart().catch((err) => setError(err instanceof Error ? err.message : "K线加载失败"));
-  }, [ready, loadChart]);
-
-  useEffect(() => {
-    if (!ready) return;
+    const ac = new AbortController();
     let cancelled = false;
     const load = (attempt: number) => {
-      readJson<{ codes: string[] }>("/api/market/sector-trend?list=active", 120_000)
+      readJson<{ codes: string[] }>("/api/market/sector-trend?list=active", { timeoutMs: 45_000, signal: ac.signal })
         .then((data) => {
           if (!cancelled) setLiveCodes(data.codes ?? []);
         })
-        .catch(() => {
-          if (!cancelled && attempt < 2) window.setTimeout(() => load(attempt + 1), 2000);
+        .catch((err) => {
+          if (!cancelled && !isAbortError(err) && attempt < 2) window.setTimeout(() => load(attempt + 1), 2000);
         });
     };
     load(0);
     return () => {
       cancelled = true;
+      ac.abort();
     };
   }, [ready]);
 
   useEffect(() => {
     if (!ready) return;
-    loadAux().catch(() => undefined);
-    const timer = setInterval(() => {
-      loadAux().catch(() => undefined);
-    }, 15000);
-    return () => clearInterval(timer);
-  }, [ready, loadAux]);
+    const ac = new AbortController();
+    let cancelled = false;
+    let timer = 0;
+    const loadAux = async () => {
+      try {
+        const [sectorRes, up, down, amount, boards] = await Promise.all([
+          readJson<{ items: SectorItem[] }>("/api/market/sectors", { signal: ac.signal }),
+          readJson<{ items: RankItem[] }>("/api/market/rank?kind=up", { signal: ac.signal }),
+          readJson<{ items: RankItem[] }>("/api/market/rank?kind=down", { signal: ac.signal }),
+          readJson<{ items: RankItem[] }>("/api/market/rank?kind=amount", { signal: ac.signal }),
+          readJson<{ limitUp: RankItem[]; limitDown: RankItem[] }>("/api/market/boards", { signal: ac.signal }),
+        ]);
+        if (cancelled) return;
+        setSectors(sectorRes.items);
+        setRankMap({
+          up: up.items,
+          down: down.items,
+          amount: amount.items,
+          limitUp: boards.limitUp,
+          limitDown: boards.limitDown,
+        });
+      } catch (err) {
+        if (cancelled || isAbortError(err)) return;
+      }
+    };
+    const loop = async () => {
+      await loadAux();
+      if (cancelled) return;
+      timer = window.setTimeout(() => {
+        void loop();
+      }, 15_000);
+    };
+    void loop();
+    return () => {
+      cancelled = true;
+      ac.abort();
+      window.clearTimeout(timer);
+    };
+  }, [ready]);
 
   const pickStock = (code: string, name: string) => {
     setSelected(code);
@@ -225,9 +261,7 @@ export default function Dashboard() {
             <button
               type="button"
               onClick={() => {
-                loadOverview().catch((err) => setError(err instanceof Error ? err.message : "刷新失败"));
-                loadChart().catch(() => undefined);
-                loadAux().catch(() => undefined);
+                refreshRef.current();
               }}
               className="rounded-full bg-panel px-2.5 py-1 text-xs text-ink ring-1 ring-line"
             >

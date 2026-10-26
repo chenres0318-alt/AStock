@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { pollInterval } from "@/lib/market-status";
+import { isAbortError, readJson } from "@/lib/readJson";
 import type { KBar, Quote, TrendPoint } from "@/lib/types";
 import ChartView, { type ChartMode } from "./ChartView";
 import QuotePanel from "./QuotePanel";
@@ -10,16 +11,6 @@ type OverviewResponse = {
   quotes: Quote[];
   status?: { trading: boolean };
 };
-
-async function readJson<T>(url: string, timeoutMs?: number): Promise<T> {
-  const res = await fetch(url, {
-    cache: "no-store",
-    signal: timeoutMs ? AbortSignal.timeout(timeoutMs) : undefined,
-  });
-  const data = (await res.json()) as T & { error?: string };
-  if (!res.ok) throw new Error(data.error || "请求失败");
-  return data;
-}
 
 export default function StockWatchPane({
   code,
@@ -41,46 +32,8 @@ export default function StockWatchPane({
   const [chartLoading, setChartLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [trading, setTrading] = useState(false);
-
-  const loadQuote = useCallback(async () => {
-    if (!code) {
-      setQuote(undefined);
-      return;
-    }
-    const data = await readJson<OverviewResponse>(`/api/market/overview?codes=${code}`);
-    setQuote(data.quotes.find((item) => item.code === code) ?? data.quotes[0]);
-    setTrading(data.status?.trading ?? false);
-  }, [code]);
-
-  const loadChart = useCallback(
-    async (silent = false) => {
-      if (!code) {
-        setBars([]);
-        setTrend({ points: [], preClose: null, priorCloses: [] });
-        return;
-      }
-      if (!silent) setChartLoading(true);
-      try {
-        if (mode === "trend") {
-          const [data, day] = await Promise.all([
-            readJson<{ points: TrendPoint[]; preClose: number | null; priorCloses?: number[] }>(
-              `/api/market/trend?code=${code}`,
-            ),
-            readJson<{ bars: KBar[] }>(`/api/market/kline?code=${code}&period=day`).catch(() => ({ bars: [] as KBar[] })),
-          ]);
-          setTrend({ points: data.points, preClose: data.preClose, priorCloses: data.priorCloses ?? [] });
-          if (day.bars.length) setBars(day.bars);
-        } else {
-          const data = await readJson<{ bars: KBar[] }>(`/api/market/kline?code=${code}&period=${mode}`);
-          setBars(data.bars);
-        }
-        setError(null);
-      } finally {
-        if (!silent) setChartLoading(false);
-      }
-    },
-    [code, mode],
-  );
+  const tradingRef = useRef(trading);
+  tradingRef.current = trading;
 
   useEffect(() => {
     setQuote(undefined);
@@ -91,35 +44,81 @@ export default function StockWatchPane({
 
   useEffect(() => {
     if (!code) return;
+    const ac = new AbortController();
     let cancelled = false;
-    const tick = async () => {
+    let timer = 0;
+    let inflight = false;
+
+    const loadChart = async (silent: boolean) => {
+      if (!silent) setChartLoading(true);
       try {
-        await loadQuote();
-        await loadChart(true);
-      } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : "行情刷新失败");
+        if (mode === "trend") {
+          const trendReq = readJson<{ points: TrendPoint[]; preClose: number | null; priorCloses?: number[] }>(
+            `/api/market/trend?code=${code}`,
+            { signal: ac.signal },
+          );
+          const dayReq = silent
+            ? Promise.resolve({ bars: [] as KBar[] })
+            : readJson<{ bars: KBar[] }>(`/api/market/kline?code=${code}&period=day`, { signal: ac.signal }).catch(
+                () => ({ bars: [] as KBar[] }),
+              );
+          const [data, day] = await Promise.all([trendReq, dayReq]);
+          if (cancelled) return;
+          setTrend({ points: data.points, preClose: data.preClose, priorCloses: data.priorCloses ?? [] });
+          if (day.bars.length) setBars(day.bars);
+        } else {
+          const data = await readJson<{ bars: KBar[] }>(`/api/market/kline?code=${code}&period=${mode}`, {
+            signal: ac.signal,
+          });
+          if (cancelled) return;
+          setBars(data.bars);
+        }
+        setError(null);
+      } finally {
+        if (!silent) setChartLoading(false);
       }
     };
-    tick();
-    if (!auto) return;
-    const delay = pollInterval({
-      trading,
-      phase: trading ? "trading" : "closed",
-      label: "",
-      weekday: true,
-      serverTime: "",
-    });
-    const timer = setInterval(tick, delay);
+
+    const tick = async (silent: boolean) => {
+      if (inflight) return;
+      inflight = true;
+      try {
+        const data = await readJson<OverviewResponse>(`/api/market/overview?codes=${code}`, { signal: ac.signal });
+        if (cancelled) return;
+        setQuote(data.quotes.find((item) => item.code === code) ?? data.quotes[0]);
+        setTrading(data.status?.trading ?? false);
+        await loadChart(silent);
+      } catch (err) {
+        if (cancelled || isAbortError(err)) return;
+        setError(err instanceof Error ? err.message : "行情刷新失败");
+      } finally {
+        inflight = false;
+      }
+    };
+
+    const loop = async (silent: boolean) => {
+      await tick(silent);
+      if (cancelled || !auto) return;
+      const live = tradingRef.current;
+      const delay = pollInterval({
+        trading: live,
+        phase: live ? "trading" : "closed",
+        label: "",
+        weekday: true,
+        serverTime: "",
+      });
+      timer = window.setTimeout(() => {
+        void loop(true);
+      }, delay);
+    };
+
+    void loop(false);
     return () => {
       cancelled = true;
-      clearInterval(timer);
+      ac.abort();
+      window.clearTimeout(timer);
     };
-  }, [code, auto, trading, loadQuote, loadChart]);
-
-  useEffect(() => {
-    if (!code) return;
-    loadChart().catch((err) => setError(err instanceof Error ? err.message : "K线加载失败"));
-  }, [code, loadChart]);
+  }, [code, auto, mode]);
 
   if (!code) {
     return <div className="panel flex min-h-[560px] flex-1 items-center justify-center text-sm text-mute">选择一只持仓查看看盘图</div>;

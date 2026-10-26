@@ -10,11 +10,35 @@ export class UpstreamError extends Error {
   }
 }
 
+const MAX_UPSTREAM = 8;
+let activeUpstream = 0;
+const upstreamWaiters: Array<() => void> = [];
+
+function acquireUpstream(): Promise<void> {
+  if (activeUpstream < MAX_UPSTREAM) {
+    activeUpstream += 1;
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => {
+    upstreamWaiters.push(() => {
+      activeUpstream += 1;
+      resolve();
+    });
+  });
+}
+
+function releaseUpstream() {
+  activeUpstream = Math.max(0, activeUpstream - 1);
+  const next = upstreamWaiters.shift();
+  if (next) next();
+}
+
 export async function fetchBuffer(
   url: string,
   init: RequestInit & { timeoutMs?: number; referer?: string } = {},
 ): Promise<Buffer> {
   const { timeoutMs = 8000, referer, ...rest } = init;
+  await acquireUpstream();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -44,6 +68,7 @@ export async function fetchBuffer(
     throw new UpstreamError(detail);
   } finally {
     clearTimeout(timer);
+    releaseUpstream();
   }
 }
 
