@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { isListedStockCode, priceDigits } from "@/lib/codes";
@@ -21,6 +21,7 @@ type StockResponse = {
   source?: string;
   error?: string;
   timedOut?: boolean;
+  scanning?: boolean;
 };
 
 function scanErrorMessage(error: unknown): string {
@@ -32,8 +33,23 @@ function scanErrorMessage(error: unknown): string {
   return message;
 }
 
-async function fetchScreen<T>(url: string): Promise<T> {
-  const res = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(55_000) });
+function combineSignals(timeout: AbortSignal, extra?: AbortSignal): AbortSignal {
+  if (!extra) return timeout;
+  if (typeof AbortSignal.any === "function") return AbortSignal.any([timeout, extra]);
+  const ac = new AbortController();
+  const abort = () => ac.abort();
+  if (timeout.aborted || extra.aborted) {
+    ac.abort();
+    return ac.signal;
+  }
+  timeout.addEventListener("abort", abort, { once: true });
+  extra.addEventListener("abort", abort, { once: true });
+  return ac.signal;
+}
+
+async function fetchScreen<T>(url: string, signal?: AbortSignal): Promise<T> {
+  const timeout = AbortSignal.timeout(12_000);
+  const res = await fetch(url, { cache: "no-store", signal: combineSignals(timeout, signal) });
   let data: T & { error?: string };
   try {
     data = (await res.json()) as T & { error?: string };
@@ -44,29 +60,52 @@ async function fetchScreen<T>(url: string): Promise<T> {
   return data;
 }
 
-async function readJson<T>(url: string): Promise<T> {
+async function readJson<T>(url: string, signal?: AbortSignal): Promise<T> {
   try {
-    return await fetchScreen<T>(url);
+    return await fetchScreen<T>(url, signal);
   } catch (error) {
+    if (signal?.aborted) throw error;
     if (error instanceof TypeError || (error instanceof Error && /failed to fetch/i.test(error.message))) {
-      return await fetchScreen<T>(url);
+      return await fetchScreen<T>(url, signal);
     }
     throw error;
   }
 }
 
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(Object.assign(new Error("aborted"), { name: "AbortError" }));
+      return;
+    }
+    const timer = setTimeout(resolve, ms);
+    signal?.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(timer);
+        reject(Object.assign(new Error("aborted"), { name: "AbortError" }));
+      },
+      { once: true },
+    );
+  });
+}
+
 function HitTable({
   items,
+  scanning,
   onOpen,
   holdingCodes,
   onToggleHold,
 }: {
   items: ScreenerHit[];
+  scanning: boolean;
   onOpen: (item: ScreenerHit) => void;
   holdingCodes: Set<string>;
   onToggleHold: (item: ScreenerHit) => void;
 }) {
-  if (!items.length) return <EmptyHint text="没有符合条件的结果" />;
+  if (!items.length) {
+    return <EmptyHint text={scanning ? "正在扫描，扫到的股票会马上出现并重新排序" : "没有符合条件的结果"} />;
+  }
   return (
     <div className="overflow-auto scroll-thin">
       <table className="w-full min-w-[880px] text-left text-sm">
@@ -167,26 +206,45 @@ export default function Screener() {
   } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const pollAbort = useRef<AbortController | null>(null);
+
+  useEffect(() => () => pollAbort.current?.abort(), []);
 
   const runScan = async () => {
+    pollAbort.current?.abort();
+    const ac = new AbortController();
+    pollAbort.current = ac;
     setLoading(true);
     setError(null);
+    const startedAt = Date.now();
     try {
-      const data = await readJson<StockResponse>("/api/screener/stocks");
-      setHits(data.items);
-      setMeta({
-        scanned: data.scanned,
-        universe: data.universe,
-        liveBoards: data.liveBoards,
-        elapsedMs: data.elapsedMs,
-        source: data.source,
-      });
-      if (data.error) setError(data.error);
-      else if (data.timedOut) setError("扫描超时，下面是已经扫到的结果，可再点一次继续");
+      for (;;) {
+        const data = await readJson<StockResponse>("/api/screener/stocks", ac.signal);
+        if (ac.signal.aborted) return;
+        setHits(data.items);
+        setMeta({
+          scanned: data.scanned,
+          universe: data.universe,
+          liveBoards: data.liveBoards,
+          elapsedMs: Date.now() - startedAt,
+          source: data.source,
+        });
+        if (data.error) {
+          setError(data.error);
+          break;
+        }
+        if (!data.scanning) {
+          if (data.timedOut) setError("扫描超时，下面是已经扫到的结果，可再点一次继续");
+          else setError(null);
+          break;
+        }
+        await sleep(800, ac.signal);
+      }
     } catch (err) {
+      if (ac.signal.aborted) return;
       setError(scanErrorMessage(err));
     } finally {
-      setLoading(false);
+      if (pollAbort.current === ac) setLoading(false);
     }
   };
 
@@ -209,7 +267,7 @@ export default function Screener() {
           选股：板块当前红框（不限第几天）、指数站上 MA4 的同花顺行业，再列出收盘站上 MA4 的成分股
         </div>
         <div className="mt-2 max-w-4xl text-xs leading-5 text-mute">
-          先找当前红框、且指数收盘站上 4 日线的同花顺行业，不区分红框第几天。再列出里面收盘站上 MA4 的股票。MA4 上叉 MA7 更靠前，周 K 站上 MA4 更靠前，站上 MA4 天数越短越靠前。不含科创板、创业板、北交所、ST。同一只股票只出现一次。结果带所属板块，可点进板块页核对红框。
+          先找当前红框、且指数收盘站上 4 日线的同花顺行业，不区分红框第几天。再列出里面收盘站上 MA4 的股票。扫到就显示，并按 MA4 上叉 MA7、周 K 站上 MA4、站上 MA4 天数越短重新排序。不含科创板、创业板、北交所、ST。同一只股票只出现一次。结果带所属板块，可点进板块页核对红框。
         </div>
       </section>
 
@@ -241,24 +299,25 @@ export default function Screener() {
           }
         />
         {loading ? (
-          <div className="px-4 py-8 text-center text-sm text-mute">
-            正在扫描红框且指数站上 MA4 的行业成分股。MA4 上叉 MA7、周 K 站上 MA4 更靠前，站上 MA4 天数越短越靠前，大约半分钟。
+          <div className="border-b border-line px-4 py-2 text-xs text-mute">
+            边扫边显示，扫到就按上叉 / 周K / 天数重新排序。已扫 {meta?.scanned ?? 0}
+            {meta?.universe ? `/${meta.universe}` : ""} · 命中 {hits.length}
           </div>
-        ) : (
-          <HitTable
-            items={hits}
-            onOpen={openStock}
-            holdingCodes={holdingCodes}
-            onToggleHold={(item) =>
-              toggle({
-                code: item.code,
-                name: item.name,
-                sector: item.sector,
-                sectorCode: item.sectorCode,
-              })
-            }
-          />
-        )}
+        ) : null}
+        <HitTable
+          items={hits}
+          scanning={loading}
+          onOpen={openStock}
+          holdingCodes={holdingCodes}
+          onToggleHold={(item) =>
+            toggle({
+              code: item.code,
+              name: item.name,
+              sector: item.sector,
+              sectorCode: item.sectorCode,
+            })
+          }
+        />
       </section>
 
       <p className="pb-1 text-center text-[11px] text-mute">
