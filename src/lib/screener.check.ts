@@ -1,5 +1,14 @@
-import { collectMa4StandHits, matchIndustryBoard, type SectorMa4Screen } from "./screenerLogic.ts";
-import type { SectorItem } from "./types.ts";
+import {
+  collectMa4StandHits,
+  dailyToWeekly,
+  decorateMa4Crosses,
+  isScreenerShare,
+  ma4CrossedUpMa7,
+  matchIndustryBoard,
+  weekStandsOnMa4,
+  type SectorMa4Screen,
+} from "./screenerLogic.ts";
+import type { KBar, SectorItem } from "./types.ts";
 
 function assert(cond: unknown, message: string) {
   if (!cond) throw new Error(message);
@@ -78,5 +87,87 @@ const dup = collectMa4StandHits([
 ]);
 assert(dup.length === 1, "the same name is not listed twice");
 assert(dup[0].days === 1 && dup[0].sector === "白酒", "the shorter stand wins when a name sits in two boxes");
+
+assert(isScreenerShare("sh600519", "贵州茅台"), "a Shanghai main-board name stays in the screener");
+assert(isScreenerShare("sz000858", "五粮液"), "a Shenzhen main-board name stays in the screener");
+assert(!isScreenerShare("sz300750", "宁德时代"), "ChiNext names are dropped");
+assert(!isScreenerShare("sh688981", "中芯国际"), "STAR names are dropped");
+assert(!isScreenerShare("bj430047", "诺思兰德"), "Beijing names are dropped");
+assert(!isScreenerShare("sh600180", "*ST瑞茂"), "ST names are dropped");
+assert(!isScreenerShare("sz000002", "ST万科"), "a leading ST tag is dropped");
+
+const stHit = collectMa4StandHits([
+  screen({
+    code: "881121",
+    name: "物流",
+    crosses: [{ code: "sh600180", name: "*ST瑞茂", days: 1, time: "2026-10-23" }],
+    members: [{ code: "sh600180", name: "*ST瑞茂", price: 4, pct: 1, turnover: 1 }],
+  }),
+]);
+assert(stHit.length === 0, "ST names do not appear in the stand list");
+
+const rankedBoost = collectMa4StandHits([
+  screen({
+    code: "881121",
+    name: "半导体",
+    crosses: [
+      { code: "sh600010", name: "短站无加成", days: 1, time: "2026-10-23" },
+      { code: "sh600011", name: "周线", days: 6, time: "2026-10-16", weekOnMa4: true },
+      { code: "sh600012", name: "上叉", days: 9, time: "2026-10-13", ma4CrossUpMa7: true },
+    ],
+    members: [
+      { code: "sh600010", name: "短站无加成", price: 10, pct: 1, turnover: 1 },
+      { code: "sh600011", name: "周线", price: 11, pct: 1, turnover: 1 },
+      { code: "sh600012", name: "上叉", price: 12, pct: 1, turnover: 1 },
+    ],
+  }),
+]);
+assert(
+  rankedBoost.map((row) => row.name).join(",") === "上叉,周线,短站无加成",
+  "MA4 cross up MA7 ranks first, then weekly MA4, then the shortest stand",
+);
+
+const weekBeatsShort = collectMa4StandHits([
+  screen({
+    code: "881121",
+    name: "半导体",
+    crosses: [
+      { code: "sh600020", name: "短", days: 1, time: "2026-10-23" },
+      { code: "sh600021", name: "周", days: 8, time: "2026-10-14", weekOnMa4: true },
+    ],
+    members: [
+      { code: "sh600020", name: "短", price: 10, pct: 1, turnover: 1 },
+      { code: "sh600021", name: "周", price: 11, pct: 1, turnover: 1 },
+    ],
+  }),
+]);
+assert(weekBeatsShort[0]?.name === "周", "weekly MA4 still ranks ahead of a shorter stand without it");
+
+function bar(time: string, close: number): KBar {
+  return { time, open: close, high: close, low: close, close, volume: 1 };
+}
+
+const weekBars = [
+  ...["2026-10-05", "2026-10-06", "2026-10-07", "2026-10-08", "2026-10-09"].map((time) => bar(time, 10)),
+  ...["2026-10-12", "2026-10-13", "2026-10-14", "2026-10-15", "2026-10-16"].map((time) => bar(time, 11)),
+  ...["2026-10-19", "2026-10-20", "2026-10-21", "2026-10-22", "2026-10-23"].map((time) => bar(time, 12)),
+  ...["2026-10-26", "2026-10-27"].map((time) => bar(time, 13)),
+];
+const weeks = dailyToWeekly(weekBars);
+assert(weeks.length === 4, "four calendar weeks collapse into four weekly bars");
+assert(weeks[0].time === "2026-10-09" && weeks[0].close === 10, "the first week closes on Friday");
+assert(weeks[3].time === "2026-10-27" && weeks[3].close === 13, "the unfinished week still uses the latest close");
+assert(weekStandsOnMa4(weekBars), "a rising weekly tape stands on weekly MA4");
+assert(!weekStandsOnMa4(weekBars.slice(0, 10)), "fewer than four weekly bars cannot stand on weekly MA4");
+
+const crossCloses = [10, 10, 10, 10, 10, 10, 10, 14];
+assert(ma4CrossedUpMa7(crossCloses), "a jump that lifts MA4 through MA7 is a golden cross");
+assert(!ma4CrossedUpMa7([10, 10, 10, 10, 10, 10, 10, 10]), "a flat tape is not a MA4/MA7 cross");
+
+const decorated = decorateMa4Crosses(
+  [{ code: "sh600030", name: "装饰", days: 2, time: "2026-10-27" }],
+  [{ code: "sh600030", bars: weekBars, price: 13 }],
+);
+assert(decorated[0]?.weekOnMa4 === true, "decorate fills weekly MA4 from the daily tape");
 
 console.log("screener.check ok");

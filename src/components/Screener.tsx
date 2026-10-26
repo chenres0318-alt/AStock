@@ -195,10 +195,10 @@ export default function Screener() {
 
       <section className="panel px-4 py-3">
         <div className="text-sm">
-          选股：板块处于趋势红色区间（不限第几天），板块指数站上 MA4，成分股收盘站上 MA4，按连续站上天数从短到长
+          选股：板块当前红框（不限第几天）、指数站上 MA4 的同花顺行业，再列出收盘站上 MA4 的成分股
         </div>
         <div className="mt-2 max-w-4xl text-xs leading-5 text-mute">
-          先找当前红框、且指数收盘站上 4 日线的同花顺行业，再列出里面收盘站上 MA4 的股票。不区分红框第几天。持续时间越短越靠前。不含科创板、创业板、北交所。同一只股票只出现一次。结果带所属板块，可点进板块页核对红框。
+          先找当前红框、且指数收盘站上 4 日线的同花顺行业，不区分红框第几天。再列出里面收盘站上 MA4 的股票。MA4 上叉 MA7 更靠前，周 K 站上 MA4 更靠前，站上 MA4 天数越短越靠前。不含科创板、创业板、北交所、ST。同一只股票只出现一次。结果带所属板块，可点进板块页核对红框。
         </div>
       </section>
 
@@ -231,7 +231,7 @@ export default function Screener() {
         />
         {loading ? (
           <div className="px-4 py-8 text-center text-sm text-mute">
-            正在扫描红框且指数站上 MA4 的行业成分股，按站上 MA4 持续时间从短到长排列，大约需要一两分钟。
+            正在扫描红框且指数站上 MA4 的行业成分股。MA4 上叉 MA7、周 K 站上 MA4 更靠前，站上 MA4 天数越短越靠前，大约需要一两分钟。
           </div>
         ) : (
           <HitTable
