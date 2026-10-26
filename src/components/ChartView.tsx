@@ -92,6 +92,13 @@ function maLine(bars: KBar[], period: number): Array<{ time: string; value: numb
   return points;
 }
 
+function schedulePlace(place: () => void) {
+  requestAnimationFrame(() => {
+    place();
+    requestAnimationFrame(place);
+  });
+}
+
 function applyTimeScale(chart: IChartApi, mode: ChartMode, barCount: number, resetRange: boolean) {
   chart.timeScale().applyOptions({
     timeVisible: mode === "trend",
@@ -337,11 +344,11 @@ export default function ChartView({
       chart.timeScale().applyOptions({
         barSpacing: Math.min(96, Math.max(2, next)),
       });
-      requestAnimationFrame(() => placeRef.current());
+      schedulePlace(() => placeRef.current());
     };
     const wheelHost = el.parentElement ?? el;
     wheelHost.addEventListener("wheel", onWheel, { passive: false });
-    const onVisible = () => placeRef.current();
+    const onVisible = () => schedulePlace(() => placeRef.current());
     chart.timeScale().subscribeVisibleLogicalRangeChange(onVisible);
     const onCrosshair = (param: { time?: Time; logical?: number }) => {
       if (modeRef.current !== "trend") return;
@@ -441,7 +448,7 @@ export default function ChartView({
     const ro = new ResizeObserver(() => {
       const { mode: currentMode, barCount } = viewRef.current;
       applyTimeScale(chart, currentMode, barCount, false);
-      requestAnimationFrame(() => placeRef.current());
+      schedulePlace(() => placeRef.current());
     });
     ro.observe(el);
     return () => {
@@ -632,7 +639,7 @@ export default function ChartView({
               };
         }),
       );
-      requestAnimationFrame(() => placeRef.current());
+      schedulePlace(() => placeRef.current());
       const trendKey = `trend:${trend.points.length}:${trend.points.at(-1)?.timestamp ?? ""}`;
       const resetTrend = rangeKeyRef.current !== trendKey;
       rangeKeyRef.current = trendKey;
@@ -649,7 +656,7 @@ export default function ChartView({
     trendMarksRef.current = [];
     line.setData(maLine(bars, 20));
     line.setMarkers([]);
-    requestAnimationFrame(() => placeRef.current());
+    schedulePlace(() => placeRef.current());
     avg.setData([]);
     ma4.setData(maLine(bars, 4));
     ma7.setData(maLine(bars, 7));
@@ -723,7 +730,7 @@ export default function ChartView({
     const resetRange = rangeKeyRef.current !== rangeKey;
     rangeKeyRef.current = rangeKey;
     applyTimeScale(chart, mode, bars.length, resetRange);
-    requestAnimationFrame(() => placeRef.current());
+    schedulePlace(() => placeRef.current());
   }, [bars, trend, mode, etf]);
 
   const stats = useMemo(() => {

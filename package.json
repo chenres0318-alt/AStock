@@ -9,6 +9,7 @@
     "start": "next start --hostname 0.0.0.0 --port 3000",
     "lint": "eslint",
     "check:indicators": "node --experimental-strip-types --no-warnings src/lib/indicators.check.ts",
+    "check:extremes": "node --experimental-strip-types --no-warnings src/lib/intradayExtreme.check.ts",
     "check:trend": "node --experimental-strip-types --no-warnings src/lib/sectorTrend.check.ts",
     "check:screener": "node --experimental-strip-types --no-warnings src/lib/screener.check.ts",
     "check:holdings": "node --experimental-strip-types --no-warnings src/lib/holdingAdvice.check.ts",
