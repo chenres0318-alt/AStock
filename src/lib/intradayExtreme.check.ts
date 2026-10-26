@@ -306,7 +306,15 @@ const liveTop = intradayExtremes(
     20,
   ),
 );
-assert(liveTop.every((mark) => mark.side !== "top"), "a 1.5 percent rise after 9:45 does not open a top before a bottom");
+assert(
+  liveTop[0]?.side === "bottom" && liveTop[0].time === "09:45" && liveTop.some((mark) => mark.side === "top"),
+  "after 9:45 a 1.5 percent rise stamps the session low as a bottom, then the session high as a top",
+);
+assert(
+  liveTop.find((mark) => mark.side === "bottom")?.confidence === 100 &&
+    liveTop.find((mark) => mark.side === "top")?.confidence === 100,
+  "the live session low and high keep 100 confidence while they still are the range extremes",
+);
 
 const liveBottom = intradayExtremes(
   session(
@@ -354,8 +362,8 @@ const livePair = intradayExtremes(
   ),
 );
 assert(
-  livePair.some((mark) => mark.side === "bottom") && livePair.every((mark) => mark.side !== "top"),
-  "a rise then drop opens a bottom first and does not keep the early top",
+  livePair[0]?.side === "bottom" && livePair.some((mark) => mark.side === "top"),
+  "a rise then drop still opens a bottom first, then keeps the session high as a top",
 );
 
 const laterHigherHigh = session(
@@ -370,21 +378,24 @@ const laterHigherHigh = session(
 );
 const midRangeKept = intradayExtremes(laterHigherHigh, { minConfidence: 0 });
 const midRangeShown = intradayExtremes(laterHigherHigh);
+const sessionHighPrice = Math.max(...laterHigherHigh.filter((point) => point.time >= "09:45").map((point) => point.price));
+const sessionLowPrice = Math.min(...laterHigherHigh.filter((point) => point.time >= "09:45").map((point) => point.price));
 assert(
-  midRangeKept.some((mark) => mark.side === "top" && mark.confidence != null && mark.confidence < 70),
-  "after a later higher high, the earlier top sits mid-range and falls below 70 confidence",
+  midRangeKept.some((mark) => mark.side === "top" && Math.abs(mark.price - sessionHighPrice) < 1e-9 && mark.confidence === 100),
+  "after a later higher high, the live top moves to the session high so confidence stays at 100",
 );
 assert(
   midRangeShown.every((mark) => mark.confidence != null && mark.confidence >= 70),
   "the watch chart hides tops and bottoms whose confidence is under 70",
 );
 assert(
-  midRangeShown.some((mark) => mark.side === "bottom" && mark.confidence === 100),
+  midRangeShown.some((mark) => mark.side === "bottom" && mark.confidence === 100 && Math.abs(mark.price - sessionLowPrice) < 1e-9),
   "the session-low bottom still shows because its confidence stays at 100",
 );
 assert(
-  midRangeShown.every((mark) => mark.side !== "top"),
-  "the mid-range top is not marked once confidence is below 70",
+  midRangeShown.some((mark) => mark.side === "top" && mark.confidence === 100 && Math.abs(mark.price - sessionHighPrice) < 1e-9) &&
+    midRangeShown.filter((mark) => mark.side === "top").length === 1,
+  "the session-high top still shows because the live mark tracks the running high",
 );
 
 function withDeadline(points: IntradayMinute[], extra: Array<{ time: string; price: number }>): IntradayMinute[] {
@@ -397,37 +408,44 @@ function withDeadline(points: IntradayMinute[], extra: Array<{ time: string; pri
 const morningOnlyBottoms = withDeadline(laterHigherHigh, [{ time: "14:44", price: Math.max(...laterHigherHigh.map((point) => point.price)) }]);
 assert(
   !morningOnlyBottoms.some((point) => point.time >= "14:45") &&
-    intradayExtremes(morningOnlyBottoms).every((mark) => mark.side !== "top"),
-  "before 14:45 a tape with only bottoms does not force a sell top",
+    intradayExtremes(morningOnlyBottoms).every((mark) => mark.origin !== "forced"),
+  "before 14:45 a tape does not force a 14:45 sell top",
 );
 
-const lateHigh = Math.max(...laterHigherHigh.map((point) => point.price)) + 2;
-const lastBottomPrice = laterHigherHigh.reduce((low, point) => Math.min(low, point.price), Infinity);
-const liveAfterBottom = lastBottomPrice + 1;
-const bottomsPastDeadline = withDeadline(laterHigherHigh, [
-  { time: "14:42", price: lateHigh },
+const dumpOnly = session(
+  [
+    { n: 15, step: 0 },
+    { n: 1, step: 0 },
+    { n: 8, step: -0.05 },
+  ],
+  20,
+);
+const lastBottomPrice = dumpOnly.reduce((low, point) => Math.min(low, point.price), Infinity);
+const liveAfterBottom = lastBottomPrice + 0.1;
+const bottomsPastDeadline = withDeadline(dumpOnly, [
+  { time: "14:42", price: liveAfterBottom },
   { time: "14:45", price: liveAfterBottom },
 ]);
 const forcedSell = intradayExtremes(bottomsPastDeadline);
 assert(
   forcedSell.some((mark) => mark.side === "bottom") &&
-    forcedSell.some((mark) => mark.side === "top" && mark.time === "14:45" && mark.price === liveAfterBottom),
-  "after 14:45 a tape that still only shows bottoms marks a top at the current price if it is above the bottom",
+    forcedSell.some((mark) => mark.side === "top" && mark.origin === "forced" && mark.time === "14:45" && mark.price === liveAfterBottom),
+  "after 14:45 a dump that still only shows bottoms marks a top at the current price if it is above the bottom",
 );
-const belowBottom = withDeadline(laterHigherHigh, [{ time: "14:45", price: lastBottomPrice - 0.5 }]);
+const belowBottom = withDeadline(dumpOnly, [{ time: "14:45", price: lastBottomPrice - 0.5 }]);
 assert(
   intradayExtremes(belowBottom).every((mark) => mark.side !== "top"),
   "after 14:45 a current price still under the bottom does not mint a sell top",
 );
-const insideWindow = withDeadline(laterHigherHigh, [
+const insideWindow = withDeadline(dumpOnly, [
   { time: "14:45", price: liveAfterBottom },
-  { time: "14:52", price: liveAfterBottom + 0.5 },
-  { time: "14:53", price: liveAfterBottom + 1 },
-  { time: "15:00", price: liveAfterBottom + 2 },
+  { time: "14:52", price: liveAfterBottom + 0.05 },
+  { time: "14:53", price: liveAfterBottom + 0.06 },
+  { time: "15:00", price: liveAfterBottom + 0.08 },
 ]);
 const forcedInsideWindow = intradayExtremes(insideWindow);
 assert(
-  forcedInsideWindow.some((mark) => mark.side === "top" && mark.time === "14:52" && mark.price === liveAfterBottom + 0.5) &&
+  forcedInsideWindow.some((mark) => mark.side === "top" && mark.origin === "forced" && mark.time === "14:52" && mark.price === liveAfterBottom + 0.05) &&
     !forcedInsideWindow.some((mark) => mark.side === "top" && (mark.time === "14:53" || mark.time === "15:00")),
   "the forced top follows the latest price only through 14:52, not later prints",
 );
@@ -447,8 +465,9 @@ const alreadyHasTop = intradayExtremes(
   ),
 );
 assert(
-  alreadyHasTop.filter((mark) => mark.side === "top").length <= 1,
-  "14:50 does not stack a second sell top when a 70 top is already visible",
+  alreadyHasTop.filter((mark) => mark.side === "top").length >= 1 &&
+    alreadyHasTop.filter((mark) => mark.origin === "forced").length === 0,
+  "14:50 does not stack a forced sell top when a 70 top is already visible",
 );
 const liveTopPastDeadline = withDeadline(
   session(
@@ -462,13 +481,15 @@ const liveTopPastDeadline = withDeadline(
   [{ time: "14:50", price: 20.2 }],
 );
 assert(
-  intradayExtremes(liveTopPastDeadline).every((mark) => mark.side !== "top" && mark.side !== "clear"),
-  "a top-first tape without a bottom and without daily MA confirmation does not force a top or a clear at 14:50",
+  intradayExtremes(liveTopPastDeadline).some((mark) => mark.side === "bottom") &&
+    intradayExtremes(liveTopPastDeadline).some((mark) => mark.side === "top") &&
+    intradayExtremes(liveTopPastDeadline).every((mark) => mark.origin !== "forced" && mark.side !== "clear"),
+  "a 1.5 percent live rise already has a bottom and a top by 14:50, so it does not force another top or a clear",
 );
 const clearExit = intradayExtremes(liveTopPastDeadline, { belowDailyMa4AndMa7: true });
 assert(
-  clearExit.some((mark) => mark.side === "clear" && mark.time === "14:50") && clearExit.every((mark) => mark.side !== "top"),
-  "at 14:50 a tape still below daily MA4 and MA7 marks 清仓离场 even without a prior top",
+  clearExit.some((mark) => mark.side === "clear" && mark.time === "14:50"),
+  "at 14:50 a tape still below daily MA4 and MA7 marks 清仓离场 even when live swing already placed a top",
 );
 const bottomThenClear = intradayExtremes(
   withDeadline(laterHigherHigh, [
@@ -517,8 +538,12 @@ assert(
   "after 10:00 the same dump can still open a bottom",
 );
 
-assert(intradayExtremes(etfPop, { etf: true }).every((mark) => mark.side !== "top"), "an ETF also waits for a bottom before marking a top");
-assert(intradayExtremes(etfPop).length === 0, "the same 0.6 percent pop is not enough to open a stock top");
+const etfLive = intradayExtremes(etfPop, { etf: true });
+assert(
+  etfLive[0]?.side === "bottom" && etfLive.some((mark) => mark.side === "top"),
+  "an ETF 0.6 percent pop still opens a bottom first, then marks the session high as a top",
+);
+assert(intradayExtremes(etfPop).length === 0, "the same 0.6 percent pop is not enough to open a stock pair");
 assert(shapeExtremes(etfPop, { etf: true }).length === 0, "without the live swing door that small ETF pop is not a shape top");
 
 const coldOpen = Array.from({ length: 40 }, (_, i) => 10 + i * 0.01);
@@ -550,6 +575,21 @@ const picked = pickPriorCloses(mkline, "20261023");
 assert(picked.length === 40 && picked[0] === 10.1 && picked.at(-1) === 10.49, "prior closes take the last 40 bars of the previous session");
 assert(pickPriorCloses(mkline.slice(0, 20), "20261023").length === 0, "fewer than 26 prior bars are not used as an EMA seed");
 assert(pickPriorCloses(mkline, "2026-10-23").length === 40, "a dashed trade date still selects yesterday's closes");
+
+const rallyFromOpenRange = session(
+  [
+    { n: 15, step: 0 },
+    { n: 1, step: 0 },
+    { n: 10, step: 0.04 },
+  ],
+  20,
+);
+const rallyMarks = intradayExtremes(rallyFromOpenRange);
+assert(
+  rallyMarks.some((mark) => mark.side === "bottom" && mark.time === "09:45" && mark.confidence === 100) &&
+    rallyMarks.some((mark) => mark.side === "top" && mark.confidence === 100 && mark.time > "09:45"),
+  "a 9:45 low that then rallies 1.5 percent still stamps that past low as a bottom and the running high as a top",
+);
 
 function tMark(
   index: number,

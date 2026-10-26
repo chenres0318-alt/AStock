@@ -12,7 +12,8 @@
  * 同一段连续满足时只标第一分钟。之后顶和底交替。看盘默认先出底再找顶，先走出的顶不当普通顶。
  * 还没配上对面时，更高的顶要红柱不低于前一个顶的八成才换掉；更低的底直接换掉前一个底。
  * 贴着均价线也可以标。配成一对时，个股顶底波动至少 1.5%，ETF 至少 0.5%。
- * 波动按 (高 - 低) / 低。9:45 之后相对波动够了也可以先标第一个底，不必等 MACD 形态，盘中就能看到。
+ * 波动按 (高 - 低) / 低。9:45 之后相对波动够了，就把这段的最低价回补成底，不必等当前这一分钟还停在最低，也不必等 MACD 形态。
+ * 底标上之后，这段最高价只要比底高过一档波动，就标成顶，后面更高再换掉，让盘中顶底贴着当日高低走。
  * 9:30 到 9:45 先急拉出一对波动、10:00 前又吐回至少一半的，当作开盘冲高回落，这段时间不标顶底。
  * 对面除了再等形态，价格相对达到这档波动也可以直接标，然后开始下一对。
  * 价位指数看 9:45 之后的日内高低：(现价 - 最低) / (最高 - 最低) × 100。越高越靠近高位，越低越靠近低位。
@@ -405,6 +406,35 @@ function swingMark(points: IntradayMinute[], index: number, side: "top" | "botto
   };
 }
 
+function inSwingWindow(time: string, openTrap: boolean): boolean {
+  if (time > RANGE_END) return false;
+  if (openTrap) return time > OPEN_QUIET_END;
+  return time >= RANGE_START;
+}
+
+/** 从 fromIndex 起、到 end 这一根为止，窗口里最高或最低所在的那一根。同价取更早的。 */
+function extremeIndex(
+  points: IntradayMinute[],
+  end: number,
+  side: "low" | "high",
+  openTrap: boolean,
+  fromIndex = 0,
+): number {
+  let best = -1;
+  let value = side === "low" ? Infinity : -Infinity;
+  const last = Math.min(end, points.length - 1);
+  for (let i = Math.max(0, fromIndex); i <= last; i += 1) {
+    if (!inSwingWindow(points[i].time, openTrap)) continue;
+    if (!Number.isFinite(points[i].price) || !(points[i].price > 0) || points[i].volume <= 0) continue;
+    const price = points[i].price;
+    if (side === "low" ? price < value : price > value) {
+      value = price;
+      best = i;
+    }
+  }
+  return best;
+}
+
 export function intradayExtremes(
   points: IntradayMinute[],
   options?: {
@@ -485,7 +515,7 @@ export function intradayExtremes(
         marks.push(candidate);
         continue;
       }
-      if (phase === "either" || (phase === "bottom" && !openBottom)) {
+      if (phase === "either" || (phase === "bottom" && !openBottom && !openTop)) {
         closeWithBottom(candidate);
         continue;
       }
@@ -495,27 +525,57 @@ export function intradayExtremes(
       }
     }
 
-    if (points[i].volume <= 0 || !(points[i].price > 0)) continue;
-    if (
-      openWithSwing &&
-      !openBottom &&
-      !openTop &&
-      points[i].time >= RANGE_START &&
-      pairSwingCovers(runLow, runHigh, etf)
-    ) {
-      if (points[i].price <= runLow) {
-        closeWithBottom(swingMark(points, i, "bottom"));
-        continue;
-      }
-      if (points[i].price >= runHigh) {
-        if (phase === "either") {
-          closeWithTop(swingMark(points, i, "top"));
-          continue;
+    if (openWithSwing && inSwingWindow(points[i].time, openTrap)) {
+      if (!openBottom && !openTop && pairSwingCovers(runLow, runHigh, etf)) {
+        const lowAt = extremeIndex(points, i, "low", openTrap);
+        if (lowAt >= 0) closeWithBottom(swingMark(points, lowAt, "bottom"));
+        else if (state.seek === "either") {
+          const highAt = extremeIndex(points, i, "high", openTrap);
+          if (highAt >= 0) closeWithTop(swingMark(points, highAt, "top"));
+        } else {
+          topFirst = true;
         }
-        topFirst = true;
-        continue;
       }
+      if (state.seek === "top" && openBottom) {
+        const lowAt = extremeIndex(points, i, "low", openTrap);
+        const firstBottom = marks.every((mark) => mark.side !== "top");
+        if (
+          lowAt >= 0 &&
+          points[lowAt].price < openBottom.price &&
+          (firstBottom || lowAt > openBottom.index)
+        ) {
+          dropMark(marks, openBottom);
+          openBottom = swingMark(points, lowAt, "bottom");
+          marks.push(openBottom);
+        }
+        const highAt = extremeIndex(points, i, "high", openTrap, openBottom.index);
+        if (
+          highAt >= 0 &&
+          highAt !== openBottom.index &&
+          pairSwingCovers(openBottom.price, points[highAt].price, etf)
+        ) {
+          closeWithTop(swingMark(points, highAt, "top"));
+        }
+      }
+      if (state.seek === "bottom" && openTop) {
+        const highAt = extremeIndex(points, i, "high", openTrap, openTop.index);
+        if (highAt >= 0 && points[highAt].price > openTop.price) {
+          dropMark(marks, openTop);
+          openTop = swingMark(points, highAt, "top");
+          marks.push(openTop);
+        }
+        const lowAt = extremeIndex(points, i, "low", openTrap, openTop.index);
+        if (
+          lowAt >= 0 &&
+          lowAt !== openTop.index &&
+          pairSwingCovers(points[lowAt].price, openTop.price, etf)
+        ) {
+          closeWithBottom(swingMark(points, lowAt, "bottom"));
+        }
+      }
+      continue;
     }
+    if (points[i].volume <= 0 || !(points[i].price > 0)) continue;
     if (phase === "top" && openBottom && pairSwingCovers(openBottom.price, points[i].price, etf)) {
       closeWithTop(swingMark(points, i, "top"));
       continue;
@@ -526,7 +586,10 @@ export function intradayExtremes(
   }
 
   const range = sessionRangeAfter(points);
-  const scored = marks
+  const unique = new Map<string, Candidate>();
+  for (const mark of marks) unique.set(`${mark.side}:${mark.index}`, mark);
+  const scored = [...unique.values()]
+    .sort((a, b) => a.index - b.index || (a.side === "bottom" ? -1 : 1))
     .map(({ index, time, side, price }) => {
       const position = positionIndex(price, range);
       return {
