@@ -44,10 +44,11 @@ function session(parts: Array<{ n: number; step: number }>, origin: number, avgA
 assert(pairSwingCovers(10, 10.06) === false, "0.6 percent on a stock pair is below the 0.7 percent swing");
 assert(pairSwingCovers(10, 10.07) === true, "0.7 percent on a stock pair meets the swing floor");
 assert(pairSwingCovers(0.598, 0.602) === false, "a 0.67 percent move still fails the stock 0.7 percent floor");
-assert(pairSwingCovers(0.598, 0.604, true) === true, "the same 1 percent move covers the ETF 1 percent floor");
-assert(pairSwingCovers(0.598, 0.603, true) === false, "0.84 percent on an ETF pair is below the 1 percent swing");
-assert(pairSwingCovers(0.598, 0.601, true) === false, "0.5 percent on an ETF pair is below the 1 percent swing");
-assert(pairSwingCovers(0.598, 0.59801, true) === false, "a 0.001 fen ETF pair is not a 1 percent swing");
+assert(pairSwingCovers(0.598, 0.604, true) === true, "a 1 percent move still covers the ETF 0.7 percent floor");
+assert(pairSwingCovers(0.598, 0.603, true) === true, "0.84 percent on an ETF pair meets the 0.7 percent swing");
+assert(pairSwingCovers(0.598, 0.602, true) === false, "0.67 percent on an ETF pair is below the 0.7 percent swing");
+assert(pairSwingCovers(0.598, 0.601, true) === false, "0.5 percent on an ETF pair is below the 0.7 percent swing");
+assert(pairSwingCovers(0.598, 0.59801, true) === false, "a 0.001 fen ETF pair is not a 0.7 percent swing");
 assert(sessionRangeAfter([{ time: "09:30", price: 30, volume: 1, avg: 30 }]) == null, "the open auction window alone has no 9:45 range");
 const afterOpen = sessionRangeAfter([
   { time: "09:30", price: 30, volume: 1, avg: 30 },
@@ -220,9 +221,9 @@ assert(shyBounce.length === 1 && shyBounce[0].side === "bottom", "a bounce under
 const etfBounce = shapeExtremes(session([...dropThenBounce, { n: 1, step: 0.6 }], 20), { etf: true });
 assert(
   etfBounce.length === 2 && etfBounce[0].side === "bottom" && etfBounce[1].side === "top",
-  "a 1 percent bounce after a morphological bottom is enough to pair an ETF top",
+  "a 0.7 percent bounce after a morphological bottom is enough to pair an ETF top",
 );
-assert(shapeExtremes(session([...dropThenBounce, { n: 1, step: 0.1 }], 20), { etf: true }).length === 1, "a bounce under 1 percent does not mint an ETF top");
+assert(shapeExtremes(session([...dropThenBounce, { n: 1, step: 0.1 }], 20), { etf: true }).length === 1, "a bounce under 0.7 percent does not mint an ETF top");
 
 const steadyRise = shapeExtremes(
   session(
@@ -538,7 +539,7 @@ assert(
 );
 
 const etfLive = intradayExtremes(etfPop, { etf: true });
-assert(etfLive.length === 0, "an ETF 0.6 percent pop is below the 1 percent floor, so it does not lock a live pair");
+assert(etfLive.length === 0, "an ETF 0.6 percent pop is below the 0.7 percent floor, so it does not lock a live pair");
 assert(intradayExtremes(etfPop).length === 0, "the same 0.6 percent pop is not enough to open a stock pair");
 assert(shapeExtremes(etfPop, { etf: true }).length === 0, "without the live swing door that small ETF pop is not a shape top");
 
@@ -554,7 +555,7 @@ const etfPair = session(
 const etfPairMarks = intradayExtremes(etfPair, { etf: true });
 assert(
   etfPairMarks[0]?.side === "bottom" && etfPairMarks.some((mark) => mark.side === "top"),
-  "an ETF 1.2 percent rise then 1 percent pullback locks a bottom then a top",
+  "an ETF 1.2 percent rise then 0.7 percent pullback locks a bottom then a top",
 );
 
 const coldOpen = Array.from({ length: 40 }, (_, i) => 10 + i * 0.01);
