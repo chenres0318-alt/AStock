@@ -14,7 +14,7 @@ import {
   type UTCTimestamp,
 } from "lightweight-charts";
 import { isEtf, priceDigits } from "@/lib/codes";
-import { formatPrice, shanghaiDate } from "@/lib/format";
+import { formatPrice } from "@/lib/format";
 import { dailyExtremes } from "@/lib/dailyExtreme";
 import {
   intradayExtremes,
@@ -25,7 +25,7 @@ import {
   type MacdfsBar,
   type TAction,
 } from "@/lib/intradayExtreme";
-import { buildMaLines, klineRangeChange, maAt, priceBelowDailyMa4AndMa7 } from "@/lib/indicators";
+import { buildMaLines, klineRangeChange, maAt } from "@/lib/indicators";
 import type { KBar, Quote, TrendPoint } from "@/lib/types";
 
 export type ChartMode = "trend" | "day" | "week" | "month";
@@ -39,7 +39,7 @@ const DIFF_COLOR = "#f4f7fb";
 type ExtremeTag = {
   timeKey: string;
   price: number;
-  side: "top" | "bottom" | "clear";
+  side: "top" | "bottom";
   x: number;
   y: number;
   position?: number | null;
@@ -47,19 +47,17 @@ type ExtremeTag = {
   t?: TAction;
 };
 
-function tActionLabel(t: TAction | undefined, side: ExtremeTag["side"]): string {
-  if (side === "clear" || t === "flatten") return "清仓";
+function tActionLabel(t: TAction | undefined): string {
   if (t === "t-buy" || t === "t-rebuy" || t === "t-sell") return "做T";
-  if (t === "ignore") return "不做T";
+  if (t === "ignore" || t === "flatten") return "不做T";
   return "";
 }
 
 function extremeCaption(tag: ExtremeTag, digits: number): string {
   const price = formatPrice(tag.price, digits);
-  if (tag.side === "clear") return `清仓(${price})`;
   const letter = tag.side === "top" ? "T" : "B";
   const signal = tag.confidence != null ? `,信号:${tag.confidence}` : "";
-  return `${letter}(${price}${signal})${tActionLabel(tag.t, tag.side)}`;
+  return `${letter}(${price}${signal})${tActionLabel(tag.t)}`;
 }
 
 function formatChartTime(time: unknown, withDate: boolean): string {
@@ -218,7 +216,7 @@ export default function ChartView({
     Array<{
       time: Time;
       price: number;
-      side: "top" | "bottom" | "clear";
+      side: "top" | "bottom";
       position?: number | null;
       confidence?: number | null;
       t?: TAction;
@@ -585,18 +583,9 @@ export default function ChartView({
           title: "昨收",
         });
       }
-      const lastPoint = trend.points.at(-1);
-      const checkPoint =
-        points.find((item) => item.time === "14:50") ??
-        points.find((item) => item.time >= "14:50") ??
-        lastPoint;
-      const checkPrice = checkPoint?.price ?? quote?.price ?? null;
-      const today = lastPoint ? shanghaiDate(new Date(lastPoint.timestamp * 1000)) : undefined;
-      const belowDaily = checkPrice != null && priceBelowDailyMa4AndMa7(bars, checkPrice, today);
       const marks = tagTTrades(
         intradayExtremes(points, {
           etf,
-          belowDailyMa4AndMa7: belowDaily,
           priorPrices: priorCloses,
         }),
         etf,
@@ -613,13 +602,7 @@ export default function ChartView({
       line.setMarkers(
         marks.map((mark) => {
           const tText =
-            mark.t === "t-buy" || mark.t === "t-rebuy"
-              ? "T买"
-              : mark.t === "t-sell"
-                ? "T卖"
-                : mark.t === "flatten" || mark.side === "clear"
-                  ? "清"
-                  : "";
+            mark.t === "t-buy" || mark.t === "t-rebuy" ? "T买" : mark.t === "t-sell" ? "T卖" : "";
           return mark.side === "bottom"
             ? {
                 time: mark.time,
@@ -632,7 +615,7 @@ export default function ChartView({
             : {
                 time: mark.time,
                 position: "aboveBar" as const,
-                color: mark.side === "clear" || mark.t === "flatten" ? MA20_COLOR : UP,
+                color: UP,
                 shape: "arrowDown" as const,
                 size: 2,
                 text: tText,
@@ -827,7 +810,7 @@ export default function ChartView({
           {loading
             ? "加载中…"
             : mode === "trend"
-              ? "黄线现价 · 蓝线均价 · MACDFS · 反向够一档才锁顶底，先顶可卖、先底可买；买回须更低、卖出须更高；开盘急拉、14:45补顶、14:50清仓不做T"
+              ? "黄线现价 · 蓝线均价 · MACDFS · 反向够一档才锁顶底，先顶可卖、先底可买；买回须更低、卖出须更高；开盘急拉、14:45补顶不做T"
               : mode === "day"
                 ? "红MA4 · 青MA7 · 黄MA20 · 近5日收盘斜率仍向上但变弱为顶，仍向下但变弱为底 · 收盘低于下降的20日线超过8%不算底"
                 : `红MA4 · 青MA7 · 黄MA20 · 4上穿7且站上20买 · 4下穿7或跌破20卖 · 买 ${ribbonCounts.buy} 卖 ${ribbonCounts.sell}`}
@@ -843,7 +826,7 @@ export default function ChartView({
                 style={{
                   left: tag.x,
                   top: tag.y,
-                  color: tag.side === "bottom" ? DOWN : tag.side === "clear" ? MA20_COLOR : UP,
+                  color: tag.side === "bottom" ? DOWN : UP,
                   transform: tag.side === "bottom" ? "translate(-50%, 0)" : "translate(-50%, -100%)",
                 }}
               >

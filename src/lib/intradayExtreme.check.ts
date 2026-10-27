@@ -486,22 +486,19 @@ assert(
     intradayExtremes(liveTopPastDeadline).some((mark) => mark.side === "top" && mark.origin === "forced"),
   "a 2 percent live rise that never pulled back still only has a locked bottom, so 14:50 forces a sell top",
 );
-const clearExit = intradayExtremes(liveTopPastDeadline, { belowDailyMa4AndMa7: true });
 assert(
-  clearExit.some((mark) => mark.side === "clear" && mark.time === "14:50"),
-  "at 14:50 a tape still below daily MA4 and MA7 marks 清仓离场 even when live swing already placed a top",
+  intradayExtremes(liveTopPastDeadline).every((mark) => mark.side === "bottom" || mark.side === "top"),
+  "14:50 no longer marks 清仓离场; the tape only keeps tops and bottoms",
 );
-const bottomThenClear = intradayExtremes(
+const bottomThenLate = intradayExtremes(
   withDeadline(laterHigherHigh, [
     { time: "14:45", price: liveAfterBottom },
     { time: "14:50", price: liveAfterBottom },
   ]),
-  { belowDailyMa4AndMa7: true },
 );
 assert(
-  bottomThenClear.some((mark) => mark.side === "bottom") &&
-    bottomThenClear.some((mark) => mark.side === "clear" && mark.time === "14:50"),
-  "a bottom-first tape also marks 清仓离场 at 14:50 when price is still below MA4 and MA7",
+  bottomThenLate.some((mark) => mark.side === "bottom") && bottomThenLate.every((mark) => mark.time !== "14:50"),
+  "a tape that already has a locked top does not add a 14:50 清仓 mark",
 );
 
 const etfPop = session(
@@ -618,7 +615,7 @@ function tMark(
     price,
     position: side === "top" ? 80 : 20,
     confidence: 80,
-    origin: side === "clear" ? "clear" : "shape",
+    origin: "shape",
     ...extra,
   };
 }
@@ -693,12 +690,6 @@ assert(
   forced.map((mark) => mark.t).join(",") === "t-buy,flatten",
   "the 14:45 forced sell top flattens instead of counting as a T-sell",
 );
-
-const cleared = tagTTrades([
-  tMark(40, "10:10", "bottom", 10),
-  tMark(231, "14:50", "clear", 9.8, { origin: "clear", position: null, confidence: null }),
-]);
-assert(cleared.map((mark) => mark.t).join(",") === "t-buy,flatten", "14:50 清仓离场 is flatten, not a T");
 
 const liveForcedT = tagTTrades(forcedSell);
 assert(

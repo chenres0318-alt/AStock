@@ -19,9 +19,8 @@
  * 顶的可信度等于价位指数，底的可信度等于 100 减去价位指数。
  * 看盘默认只标锁定时可信度 70 及以上的顶底；后面区间再展开，已经锁定的不撤。
  * 到 14:45 还只有底、没有 70 以上的顶时，14:45 到 14:52 的现价只要比底高就标成顶。
- * 尾盘 14:50 现价仍同时低于日线 MA4 和 MA7 时，标清仓离场。
  * 做T接在这些标记上：先出底就买、先出顶就卖；买回必须比卖出价低，卖出必须比买入价高。
- * 不成对的顶、10:00 前的新底、14:00 后的新底、14:45 补顶和清仓都不做成T。锁定的顶 9:45 后就可以卖。
+ * 不成对的顶、10:00 前的新底、14:00 后的新底、14:45 补顶都不做成T。锁定的顶 9:45 后就可以卖。
  * 做T看锁定那一分钟，不看极值那一分钟。
  * MACDFS 仍用 12/26/9。单独从今天 9:30 起算时，EMA26 和 DEA9 要到约 10:04 才有柱。
  * 方案 A：带上前一个交易日尾盘至少 26 根 1 分钟收盘，用昨收处的 EMA 当初始状态，再接着算今天。
@@ -59,13 +58,11 @@ const OPEN_DUMP_RETRACE = 0.5;
 const FORCE_TOP_DEADLINE = "14:45";
 /** 补卖顶只看到这一分钟的现价，14:52 之后不再跟着走。 */
 const FORCE_TOP_END = "14:52";
-/** 现价仍低于日线 MA4 和 MA7 时，在这一分钟标清仓离场。 */
-const CLEAR_EXIT_DEADLINE = "14:50";
 /** 开盘急拉回落走完之前，底也不做成T。 */
 export const T_OPEN_START = "10:00";
 /** 14:00 之后的底来不及再做完一对，不再开新T、不再买回。 */
 export const T_BUY_END = "14:00";
-/** 14:42 之后的顶按清仓处理，不按做T卖。 */
+/** 14:42 之后的顶不再做成T卖。 */
 export const T_SELL_END = "14:42";
 /** 看盘默认只标可信度达到这一档的顶底。 */
 export const MIN_MARK_CONFIDENCE = 70;
@@ -88,14 +85,14 @@ export type IntradayMinute = {
 export type IntradayMark = {
   index: number;
   time: string;
-  side: "bottom" | "top" | "clear";
+  side: "bottom" | "top";
   price: number;
   /** 9:45 后日内位置，0 是最低，100 是最高。 */
   position: number | null;
   /** 顶看高位、底看低位，0 到 100。 */
   confidence: number | null;
-  /** 形态顶底、14:45 补顶、还是 14:50 清仓。 */
-  origin?: "shape" | "forced" | "clear";
+  /** 形态顶底，还是 14:45 补顶。 */
+  origin?: "shape" | "forced";
   /** 价格反向够一档、真正锁定这一标的那一根。做T看这个时刻。 */
   confirmIndex?: number;
   confirmTime?: string;
@@ -477,7 +474,6 @@ export function intradayExtremes(
     openWithSwing?: boolean;
     minConfidence?: number;
     openFirst?: "either" | "bottom";
-    belowDailyMa4AndMa7?: boolean;
     priorPrices?: number[];
   },
 ): IntradayMark[] {
@@ -590,12 +586,12 @@ export function intradayExtremes(
       };
     })
     .filter((mark) => minConfidence <= 0 || (mark.confidence != null && mark.confidence >= minConfidence));
-  return withClearExit(points, withForcedSellTop(points, scored), Boolean(options?.belowDailyMa4AndMa7));
+  return withForcedSellTop(points, scored);
 }
 
 /**
  * 用已经锁定的底和顶做T：先出底就买，先出顶就卖；买回必须比卖出价低，卖出必须比买入价高。
- * 不成对的顶、开盘 10:00 前的新底、14:00 后的新底、14:45 补顶、14:50 清仓，都不做成T。
+ * 不成对的顶、开盘 10:00 前的新底、14:00 后的新底、14:45 补顶，都不做成T。
  * 锁定的顶 9:45 后就可以先卖。时间窗口看锁定那一分钟，不看极值那一分钟。
  */
 export function tagTTrades(marks: IntradayMark[], etf = false): TTaggedMark[] {
@@ -610,14 +606,6 @@ export function tagTTrades(marks: IntradayMark[], etf = false): TTaggedMark[] {
   for (const mark of ordered) {
     const forcedTop =
       mark.side === "top" && (mark.origin === "forced" || mark.time >= FORCE_TOP_DEADLINE);
-    if (mark.side === "clear" || mark.origin === "clear") {
-      tagged.push({ ...mark, t: "flatten" });
-      phase = "open";
-      lastBuy = null;
-      lastBuyFill = null;
-      lastSellFill = null;
-      continue;
-    }
     if (forcedTop) {
       tagged.push({ ...mark, t: "flatten" });
       phase = "open";
@@ -704,35 +692,4 @@ function withForcedSellTop(points: IntradayMinute[], marks: IntradayMark[]): Int
     origin: "forced",
   };
   return [...marks, forced].sort((a, b) => a.index - b.index);
-}
-
-function deadlineIndex(points: IntradayMinute[]): number {
-  let after = -1;
-  for (let i = 0; i < points.length; i += 1) {
-    if (points[i].time === CLEAR_EXIT_DEADLINE) return i;
-    if (after < 0 && points[i].time >= CLEAR_EXIT_DEADLINE && points[i].time <= RANGE_END) after = i;
-  }
-  return after;
-}
-
-/** 14:50 现价仍低于日线 MA4 和 MA7 时，标清仓离场。不要求先出顶。 */
-function withClearExit(
-  points: IntradayMinute[],
-  marks: IntradayMark[],
-  belowDailyMa4AndMa7: boolean,
-): IntradayMark[] {
-  if (!belowDailyMa4AndMa7) return marks;
-  const index = deadlineIndex(points);
-  if (index < 0) return marks;
-  if (marks.some((mark) => mark.side === "clear" && mark.index === index)) return marks;
-  const clear: IntradayMark = {
-    index,
-    time: points[index].time,
-    side: "clear",
-    price: points[index].price,
-    position: null,
-    confidence: null,
-    origin: "clear",
-  };
-  return [...marks, clear].sort((a, b) => a.index - b.index);
 }
