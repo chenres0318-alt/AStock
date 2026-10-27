@@ -19,7 +19,8 @@
  * 顶的可信度等于价位指数，底的可信度等于 100 减去价位指数。
  * 看盘默认只标锁定时可信度 70 及以上的顶底；后面区间再展开，已经锁定的不撤。
  * 到 14:45 还只有底、没有 70 以上的顶时，14:45 到 14:52 的现价只要比底高就标成顶。
- * 前面已经有顶做成 T 卖、到 14:55 还没有底时，用 14:55 现价补一个底接回；接回价必须低于卖出价。
+ * 前面已经有顶做成 T 卖、到 14:55 还没有接回时，用 14:55 现价补一个底接回；接回价必须低于卖出价。
+ * 中间即使标过底，只要那一底没有做成 T 买回，14:55 仍补接回。
  * 做T接在这些标记上：先出底就买、先出顶就卖；买回必须比卖出价低，卖出必须比买入价高。
  * 不成对的顶、10:00 前的新底、14:00 后的新底、14:45 补顶都不做成T。14:55 接回底除外。锁定的顶 9:45 后就可以卖。
  * 做T看锁定那一分钟，不看极值那一分钟。
@@ -59,7 +60,7 @@ const OPEN_DUMP_RETRACE = 0.5;
 const FORCE_TOP_DEADLINE = "14:45";
 /** 补卖顶只看到这一分钟的现价，14:52 之后不再跟着走。 */
 const FORCE_TOP_END = "14:52";
-/** 已有 T 卖、还没有底时，这一分钟补一个接回底。 */
+/** 已有 T 卖、还没有接回时，这一分钟补一个接回底。 */
 const FORCE_REBUY_DEADLINE = "14:55";
 /** 接回底钉在 14:55，不跟到 15:00。 */
 const FORCE_REBUY_END = "14:55";
@@ -710,15 +711,12 @@ function withForcedSellTop(points: IntradayMinute[], marks: IntradayMark[]): Int
   return [...marks, forced].sort((a, b) => a.index - b.index);
 }
 
-/** 14:55 已到、前面有顶做成 T 卖、之后还没有底、现价比卖出价低时，用 14:55 现价补一个接回底。 */
+/** 14:55 已到、前面有顶做成 T 卖、还没有接回、现价比卖出价低时，用 14:55 现价补一个接回底。 */
 function withForcedRebuyBottom(points: IntradayMinute[], marks: IntradayMark[], etf: boolean): IntradayMark[] {
   if (!points.some((point) => point.time >= FORCE_REBUY_DEADLINE)) return marks;
   if (marks.some((mark) => mark.side === "bottom" && mark.origin === "forced")) return marks;
-  const lastTop = [...marks].reverse().find((mark) => mark.side === "top");
-  if (!lastTop || lastTop.origin === "forced") return marks;
-  if (marks.some((mark) => mark.side === "bottom" && mark.index > lastTop.index)) return marks;
   const index = lastPointFrom(points, FORCE_REBUY_DEADLINE, FORCE_REBUY_END);
-  if (index < 0 || !(points[index].price < lastTop.price)) return marks;
+  if (index < 0) return marks;
   if (marks.some((mark) => mark.index === index && mark.side === "bottom")) return marks;
   const tagged = tagTTrades(marks, etf);
   const lastSell = [...tagged].reverse().find((mark) => mark.t === "t-sell");
