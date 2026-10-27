@@ -736,8 +736,16 @@ const forced = tagTTrades([
   tMark(230, "14:48", "top", 10.3, { origin: "forced" }),
 ]);
 assert(
-  forced.map((mark) => mark.t).join(",") === "t-buy,flatten",
-  "the 14:45 forced sell top flattens instead of counting as a T-sell",
+  forced.map((mark) => mark.t).join(",") === "t-buy,t-sell",
+  "a 14:45 补顶 above the T-buy fill sells that bottom instead of flattening",
+);
+const forcedAdd = tagTTrades([
+  tMark(40, "10:10", "bottom", 10, { confirmTime: "10:10", confirmPrice: 10.2 }),
+  tMark(230, "14:48", "top", 10.1, { origin: "forced", confirmTime: "14:48", confirmPrice: 10.1 }),
+]);
+assert(
+  forcedAdd.map((mark) => mark.t).join(",") === "add,add",
+  "a 14:45 补顶 at or below the T-buy fill keeps the bottom as 加仓",
 );
 
 const liveForcedT = tagTTrades(forcedSell);
@@ -800,7 +808,45 @@ const forceTopThenLate = withDeadline(dumpOnly, [
 assert(
   intradayExtremes(forceTopThenLate).some((mark) => mark.side === "top" && mark.origin === "forced") &&
     intradayExtremes(forceTopThenLate).every((mark) => mark.side !== "bottom" || mark.origin !== "forced"),
-  "a 14:45 补顶 is not a T-sell, so 14:55 does not mint a rebuy bottom",
+  "a 14:45 补顶 after an ignored open bottom is not a T-sell, so 14:55 does not mint a rebuy bottom",
+);
+const buyThenForceExit = withDeadline(
+  session(
+    [
+      { n: 15, step: 0 },
+      { n: 1, step: 0 },
+      { n: 15, step: 0.02 },
+    ],
+    20,
+  ),
+  [
+    { time: "14:52", price: 20.5 },
+    { time: "14:55", price: 20.2 },
+  ],
+);
+const buyThenForceExitMarks = tagTTrades(intradayExtremes(buyThenForceExit));
+assert(
+  buyThenForceExitMarks.some((mark) => mark.side === "bottom" && mark.t === "t-buy") &&
+    buyThenForceExitMarks.some((mark) => mark.side === "top" && mark.origin === "forced" && mark.t === "t-sell" && mark.price === 20.5) &&
+    buyThenForceExitMarks.every((mark) => mark.origin !== "forced" || mark.side !== "bottom"),
+  "a T-buy bottom then a higher 14:52 补顶 sells that bottom and does not 14:55 接回",
+);
+const buyThenForceAdd = withDeadline(
+  session(
+    [
+      { n: 15, step: 0 },
+      { n: 1, step: 0 },
+      { n: 15, step: 0.02 },
+    ],
+    20,
+  ),
+  [{ time: "14:52", price: 20.2 }],
+);
+const buyThenForceAddMarks = tagTTrades(intradayExtremes(buyThenForceAdd));
+assert(
+  buyThenForceAddMarks.some((mark) => mark.side === "bottom" && mark.t === "add") &&
+    buyThenForceAddMarks.some((mark) => mark.side === "top" && mark.origin === "forced" && mark.t === "add"),
+  "a T-buy bottom then a 14:52 补顶 not above the buy fill is 加仓 on both marks",
 );
 const soldThenIgnoredBottom = withDeadline(
   session(

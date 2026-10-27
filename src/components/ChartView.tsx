@@ -49,6 +49,7 @@ type ExtremeTag = {
 
 function tActionLabel(t: TAction | undefined): string {
   if (t === "t-buy" || t === "t-rebuy" || t === "t-sell") return "做T";
+  if (t === "add") return "加仓";
   if (t === "ignore" || t === "flatten") return "不做T";
   return "";
 }
@@ -602,7 +603,13 @@ export default function ChartView({
       line.setMarkers(
         marks.map((mark) => {
           const tText =
-            mark.t === "t-buy" || mark.t === "t-rebuy" ? "T买" : mark.t === "t-sell" ? "T卖" : "";
+            mark.t === "t-buy" || mark.t === "t-rebuy"
+              ? "T买"
+              : mark.t === "t-sell"
+                ? "T卖"
+                : mark.t === "add"
+                  ? "加仓"
+                  : "";
           return mark.side === "bottom"
             ? {
                 time: mark.time,
@@ -810,7 +817,7 @@ export default function ChartView({
           {loading
             ? "加载中…"
             : mode === "trend"
-              ? "黄线现价 · 蓝线均价 · MACDFS · 个股1.5%反弹锁底、1.5%回落锁顶，ETF各1%；先顶可卖、先底可买；买回须更低、卖出须更高；开盘急拉、14:45补顶不做T；有顶T卖到14:55还没接回则补底"
+              ? "黄线现价 · 蓝线均价 · MACDFS · 个股1.5%反弹锁底、1.5%回落锁顶，ETF各1%；先顶可卖、先底可买；买回须更低、卖出须更高；开盘急拉不做T；只有底时14:52补顶高于买价则出掉，否则加仓；有顶T卖到14:55还没接回则补底"
               : mode === "day"
                 ? "红MA4 · 青MA7 · 黄MA20 · 近5日收盘斜率仍向上但变弱为顶，仍向下但变弱为底 · 收盘低于下降的20日线超过8%不算底"
                 : `红MA4 · 青MA7 · 黄MA20 · 4上穿7且站上20买 · 4下穿7或跌破20卖 · 买 ${ribbonCounts.buy} 卖 ${ribbonCounts.sell}`}
