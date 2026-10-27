@@ -20,10 +20,11 @@
  * 顶的可信度等于价位指数，底的可信度等于 100 减去价位指数。
  * 看盘默认只标锁定时可信度 70 及以上的顶底；后面区间再展开，已经锁定的不撤。
  * 到 14:45 还只有底、没有 70 以上的顶时，14:45 到 14:52 的现价只要比底高就标成顶。
+ * 这笔补顶若已经有做T买、且锁定价高于买入价，就把底这笔卖出；若不高于买入价，底和补顶都标成加仓。
  * 前面已经有顶做成 T 卖、到 14:55 还没有接回时，用 14:55 现价补一个底接回；接回价必须低于卖出价。
- * 中间即使标过底，只要那一底没有做成 T 买回，14:55 仍补接回。
+ * 中间即使标过底，只要那一底没有做成 T 买回，14:55 仍补接回。14:52 补顶卖出后不再接回。
  * 做T接在这些标记上：先出底就买、先出顶就卖；买回必须比卖出价低，卖出必须比买入价高。
- * 不成对的顶、10:00 前的新底、14:00 后的新底、14:45 补顶都不做成T。14:55 接回底除外。锁定的顶 9:45 后就可以卖。
+ * 不成对的顶、10:00 前的新底、14:00 后的新底都不做成T。14:55 接回底除外。锁定的顶 9:45 后就可以卖。
  * 做T看锁定那一分钟，不看极值那一分钟。
  * MACDFS 仍用 12/26/9。单独从今天 9:30 起算时，EMA26 和 DEA9 要到约 10:04 才有柱。
  * 方案 A：带上前一个交易日尾盘至少 26 根 1 分钟收盘，用昨收处的 EMA 当初始状态，再接着算今天。
@@ -107,7 +108,7 @@ export type IntradayMark = {
 };
 
 /** 接到现有顶底之后，这一标是不是做成T。 */
-export type TAction = "t-buy" | "t-rebuy" | "t-sell" | "flatten" | "ignore";
+export type TAction = "t-buy" | "t-rebuy" | "t-sell" | "add" | "flatten" | "ignore";
 
 export type TTaggedMark = IntradayMark & { t: TAction };
 
@@ -598,7 +599,8 @@ export function intradayExtremes(
 
 /**
  * 用已经锁定的底和顶做T：先出底就买，先出顶就卖；买回必须比卖出价低，卖出必须比买入价高。
- * 不成对的顶、开盘 10:00 前的新底、14:00 后的新底、14:45 补顶，都不做成T。14:55 接回底除外。
+ * 不成对的顶、开盘 10:00 前的新底、14:00 后的新底都不做成T。14:55 接回底除外。
+ * 只有底时 14:45 补顶：高于买入价就把底出掉，否则标加仓。
  * 锁定的顶 9:45 后就可以先卖。时间窗口看锁定那一分钟，不看极值那一分钟。
  */
 export function tagTTrades(marks: IntradayMark[], etf = false): TTaggedMark[] {
@@ -614,6 +616,24 @@ export function tagTTrades(marks: IntradayMark[], etf = false): TTaggedMark[] {
     const forcedTop =
       mark.side === "top" && (mark.origin === "forced" || mark.time >= FORCE_TOP_DEADLINE);
     if (forcedTop) {
+      const fill = fillOf(mark);
+      if (phase === "long" && lastBuyFill != null && fill > lastBuyFill) {
+        tagged.push({ ...mark, t: "t-sell" });
+        phase = "sold";
+        lastSellFill = fill;
+        lastBuy = null;
+        continue;
+      }
+      if (phase === "long") {
+        for (let i = tagged.length - 1; i >= 0; i -= 1) {
+          if (tagged[i].t === "t-buy" || tagged[i].t === "t-rebuy") {
+            tagged[i] = { ...tagged[i], t: "add" };
+            break;
+          }
+        }
+        tagged.push({ ...mark, t: "add" });
+        continue;
+      }
       tagged.push({ ...mark, t: "flatten" });
       phase = "open";
       lastBuy = null;
@@ -722,6 +742,7 @@ function withForcedRebuyBottom(points: IntradayMinute[], marks: IntradayMark[], 
   const tagged = tagTTrades(marks, etf);
   const lastSell = [...tagged].reverse().find((mark) => mark.t === "t-sell");
   if (!lastSell) return marks;
+  if (lastSell.origin === "forced" || lastSell.time >= FORCE_TOP_DEADLINE) return marks;
   if (tagged.some((mark) => mark.index > lastSell.index && (mark.t === "t-rebuy" || mark.t === "t-buy"))) return marks;
   const fill = points[index].price;
   const lastSellFill = lastSell.confirmPrice ?? lastSell.price;
