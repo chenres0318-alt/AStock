@@ -9,19 +9,20 @@
  *     并且 KDJ 的 J 在超买区，这一分钟量不低于近 5 分钟均量的六成（有量滞涨，滤掉无量虚顶）。
  * 底：现价在均价线下方，DEA > DIF，两条斜率仍为负但变弱，两条 EMA 下跌变慢，
  *     并且 KDJ 的 J 在超卖区，这一分钟有成交且量不超过近 5 分钟均量的 1.5 倍（滤掉无量和天量杀跌）。
- * 同一段连续满足时只标第一分钟。之后顶和底交替。看盘默认先出底再找顶，先走出的顶不当普通顶。
+ * 同一段连续满足时只标第一分钟。之后顶和底交替。MACD 形态路径仍可先出顶或先出底。
  * 还没配上对面时，更高的顶要红柱不低于前一个顶的八成才换掉；更低的底直接换掉前一个底。
- * 贴着均价线也可以标。配成一对时，个股顶底波动至少 1.5%，ETF 至少 0.5%。
- * 波动按 (高 - 低) / 低。9:45 之后相对波动够了，就把这段的最低价回补成底，不必等当前这一分钟还停在最低，也不必等 MACD 形态。
- * 底标上之后，这段最高价只要比底高过一档波动，就标成顶，后面更高再换掉，让盘中顶底贴着当日高低走。
+ * 贴着均价线也可以标。配成一对时，个股顶底波动至少 1.5%，ETF 至少 1%。
+ * 波动按 (高 - 低) / 低。看盘实时顶底不用“当前最低/最高立刻标”，要等价格反向够这一档才锁定：
+ * 从高点回落一档锁顶，从低点反弹一档锁底。先走出哪一边就先标哪一边，锁上之后不再跟着阴跌/阴涨挪走。
  * 9:30 到 9:45 先急拉出一对波动、10:00 前又吐回至少一半的，当作开盘冲高回落，这段时间不标顶底。
- * 对面除了再等形态，价格相对达到这档波动也可以直接标，然后开始下一对。
- * 价位指数看 9:45 之后的日内高低：(现价 - 最低) / (最高 - 最低) × 100。越高越靠近高位，越低越靠近低位。
+ * 价位指数按锁定当时、9:45 之后已走出的日内高低：(现价 - 最低) / (最高 - 最低) × 100。
  * 顶的可信度等于价位指数，底的可信度等于 100 减去价位指数。
- * 看盘默认只标可信度 70 及以上的顶底；区间展开后不够 70 的会藏掉。
+ * 看盘默认只标锁定时可信度 70 及以上的顶底；后面区间再展开，已经锁定的不撤。
  * 到 14:45 还只有底、没有 70 以上的顶时，14:45 到 14:52 的现价只要比底高就标成顶。
  * 尾盘 14:50 现价仍同时低于日线 MA4 和 MA7 时，标清仓离场。
- * 做T接在这些标记上：先底后买，配成对且波动够的顶才卖；不成对的顶、10:00 前、14:00 后的新底、14:45 补顶和清仓都不做成T。
+ * 做T接在这些标记上：先出底就买、先出顶就卖；买回必须比卖出价低，卖出必须比买入价高。
+ * 不成对的顶、10:00 前的新底、14:00 后的新底、14:45 补顶和清仓都不做成T。锁定的顶 9:45 后就可以卖。
+ * 做T看锁定那一分钟，不看极值那一分钟。
  * MACDFS 仍用 12/26/9。单独从今天 9:30 起算时，EMA26 和 DEA9 要到约 10:04 才有柱。
  * 方案 A：带上前一个交易日尾盘至少 26 根 1 分钟收盘，用昨收处的 EMA 当初始状态，再接着算今天。
  */
@@ -29,7 +30,7 @@
 /** 个股一对顶底至少要有这么多相对波动。 */
 const STOCK_SWING = 0.015;
 /** ETF 一对顶底至少要有这么多相对波动。 */
-const ETF_SWING = 0.005;
+const ETF_SWING = 0.01;
 /** 回归和短期 EMA 都看这么多分钟。 */
 const WINDOW = 4;
 /** 更高的价格要配上差不多高的红柱，才换掉已经标出的顶。 */
@@ -95,6 +96,10 @@ export type IntradayMark = {
   confidence: number | null;
   /** 形态顶底、14:45 补顶、还是 14:50 清仓。 */
   origin?: "shape" | "forced" | "clear";
+  /** 价格反向够一档、真正锁定这一标的那一根。做T看这个时刻。 */
+  confirmIndex?: number;
+  confirmTime?: string;
+  confirmPrice?: number;
 };
 
 /** 接到现有顶底之后，这一标是不是做成T。 */
@@ -112,6 +117,7 @@ type Candidate = {
   side: "bottom" | "top";
   price: number;
   hist: number;
+  confirmIndex?: number;
 };
 
 function emaSeries(values: number[], period: number): Array<number | null> {
@@ -211,7 +217,7 @@ export function recentVolumeAvg(points: IntradayMinute[], index: number, lookbac
   return sum / count;
 }
 
-/** 一对顶底的相对波动 (高 - 低) / 低。个股至少 1.5%，ETF 至少 0.5%。 */
+/** 一对顶底的相对波动 (高 - 低) / 低。个股至少 1.5%，ETF 至少 1%。 */
 export function pairSwingCovers(low: number, high: number, etf = false): boolean {
   if (!(high > low) || !(low > 0)) return false;
   return (high - low) / low >= (etf ? ETF_SWING : STOCK_SWING);
@@ -396,43 +402,72 @@ function dropMark(marks: Candidate[], target: Candidate) {
   if (index >= 0) marks.splice(index, 1);
 }
 
-function swingMark(points: IntradayMinute[], index: number, side: "top" | "bottom"): Candidate {
+function swingMark(points: IntradayMinute[], index: number, side: "top" | "bottom", confirmIndex?: number): Candidate {
   return {
     index,
     time: points[index].time,
     side,
     price: points[index].price,
     hist: 0,
+    confirmIndex,
   };
+}
+
+/**
+ * 看盘实时顶底：反向够一档才锁定。先走出顶就先标顶，先走出底就先标底。
+ * 锁上的点不再跟着未确认的新高新低挪走，避免阴跌里把底一路改成更低、并反复给出做T买。
+ */
+function confirmSwingPivots(points: IntradayMinute[], etf: boolean, openTrap: boolean): Candidate[] {
+  const pivots: Candidate[] = [];
+  let pendingLow: { index: number; price: number } | null = null;
+  let pendingHigh: { index: number; price: number } | null = null;
+  let seek: "either" | "top" | "bottom" = "either";
+
+  const lock = (side: "top" | "bottom", confirmIndex: number) => {
+    const src = side === "top" ? pendingHigh : pendingLow;
+    if (!src) return;
+    pivots.push(swingMark(points, src.index, side, confirmIndex));
+    seek = side === "top" ? "bottom" : "top";
+    const price = points[confirmIndex].price;
+    pendingLow = { index: confirmIndex, price };
+    pendingHigh = { index: confirmIndex, price };
+  };
+
+  for (let i = 0; i < points.length; i += 1) {
+    if (!inSwingWindow(points[i].time, openTrap)) continue;
+    if (!Number.isFinite(points[i].price) || !(points[i].price > 0) || points[i].volume <= 0) continue;
+    const price = points[i].price;
+    if (!pendingLow || price < pendingLow.price) pendingLow = { index: i, price };
+    if (!pendingHigh || price > pendingHigh.price) pendingHigh = { index: i, price };
+    const bounce = pendingLow != null && pairSwingCovers(pendingLow.price, price, etf);
+    const pullback = pendingHigh != null && pairSwingCovers(price, pendingHigh.price, etf);
+    if (seek === "either") {
+      const preferTop = pendingHigh != null && pendingLow != null && pendingHigh.index >= pendingLow.index;
+      if (pullback && (!bounce || preferTop)) {
+        lock("top", i);
+        continue;
+      }
+      if (bounce && (!pullback || !preferTop)) {
+        lock("bottom", i);
+        continue;
+      }
+      continue;
+    }
+    if (seek === "bottom" && bounce && pendingLow && pendingLow.index >= (pivots.at(-1)?.index ?? -1)) {
+      lock("bottom", i);
+      continue;
+    }
+    if (seek === "top" && pullback && pendingHigh && pendingHigh.index >= (pivots.at(-1)?.index ?? -1)) {
+      lock("top", i);
+    }
+  }
+  return pivots;
 }
 
 function inSwingWindow(time: string, openTrap: boolean): boolean {
   if (time > RANGE_END) return false;
   if (openTrap) return time > OPEN_QUIET_END;
   return time >= RANGE_START;
-}
-
-/** 从 fromIndex 起、到 end 这一根为止，窗口里最高或最低所在的那一根。同价取更早的。 */
-function extremeIndex(
-  points: IntradayMinute[],
-  end: number,
-  side: "low" | "high",
-  openTrap: boolean,
-  fromIndex = 0,
-): number {
-  let best = -1;
-  let value = side === "low" ? Infinity : -Infinity;
-  const last = Math.min(end, points.length - 1);
-  for (let i = Math.max(0, fromIndex); i <= last; i += 1) {
-    if (!inSwingWindow(points[i].time, openTrap)) continue;
-    if (!Number.isFinite(points[i].price) || !(points[i].price > 0) || points[i].volume <= 0) continue;
-    const price = points[i].price;
-    if (side === "low" ? price < value : price > value) {
-      value = price;
-      best = i;
-    }
-  }
-  return best;
 }
 
 export function intradayExtremes(
@@ -455,11 +490,10 @@ export function intradayExtremes(
   const state: { seek: "either" | "bottom" | "top" } = { seek: openFirst === "either" ? "either" : "bottom" };
   let openBottom: Candidate | null = null;
   let openTop: Candidate | null = null;
-  let topFirst = false;
   const pending = new Map<number, Candidate>();
-  for (const candidate of slopeCandidates(points, options?.priorPrices ?? [])) pending.set(candidate.index, candidate);
-  let runHigh = -Infinity;
-  let runLow = Infinity;
+  if (!openWithSwing) {
+    for (const candidate of slopeCandidates(points, options?.priorPrices ?? [])) pending.set(candidate.index, candidate);
+  }
   const quietLast = lastPointFrom(points, OPEN_BELL, OPEN_QUIET_END);
   const openTrap = quietLast >= 0 && isOpenSpikeDump(points, quietLast, etf);
 
@@ -476,130 +510,83 @@ export function intradayExtremes(
     openTop = null;
   };
 
-  for (let i = 0; i < points.length; i += 1) {
-    if (points[i].time >= RANGE_START && points[i].time <= RANGE_END && Number.isFinite(points[i].price)) {
-      runHigh = Math.max(runHigh, points[i].price);
-      runLow = Math.min(runLow, points[i].price);
-    }
-    const phase = state.seek;
-    if (openTrap && points[i].time <= OPEN_QUIET_END) continue;
-    const candidate = pending.get(i);
-    if (candidate?.side === "top") {
-      if (
-        phase === "bottom" &&
-        openTop &&
-        candidate.price > openTop.price &&
-        candidate.hist >= openTop.hist * REPLACE_HIST_RATIO
-      ) {
-        dropMark(marks, openTop);
-        openTop = candidate;
-        marks.push(candidate);
-        continue;
-      }
-      if (phase === "either") {
-        closeWithTop(candidate);
-        continue;
-      }
-      if (phase === "top" && openBottom && pairSwingCovers(openBottom.price, candidate.price, etf)) {
-        closeWithTop(candidate);
-        continue;
-      }
-      if (!openBottom && !openTop) {
-        topFirst = true;
-        continue;
-      }
-    } else if (candidate?.side === "bottom") {
-      if (phase === "top" && openBottom && candidate.price < openBottom.price) {
-        dropMark(marks, openBottom);
-        openBottom = candidate;
-        marks.push(candidate);
-        continue;
-      }
-      if (phase === "either" || (phase === "bottom" && !openBottom && !openTop)) {
-        closeWithBottom(candidate);
-        continue;
-      }
-      if (phase === "bottom" && openTop && pairSwingCovers(candidate.price, openTop.price, etf)) {
-        closeWithBottom(candidate);
-        continue;
-      }
-    }
-
-    if (openWithSwing && inSwingWindow(points[i].time, openTrap)) {
-      if (!openBottom && !openTop && pairSwingCovers(runLow, runHigh, etf)) {
-        const lowAt = extremeIndex(points, i, "low", openTrap);
-        if (lowAt >= 0) closeWithBottom(swingMark(points, lowAt, "bottom"));
-        else if (state.seek === "either") {
-          const highAt = extremeIndex(points, i, "high", openTrap);
-          if (highAt >= 0) closeWithTop(swingMark(points, highAt, "top"));
-        } else {
-          topFirst = true;
-        }
-      }
-      if (state.seek === "top" && openBottom) {
-        const lowAt = extremeIndex(points, i, "low", openTrap);
-        const firstBottom = marks.every((mark) => mark.side !== "top");
+  if (openWithSwing) {
+    marks.push(...confirmSwingPivots(points, etf, openTrap));
+  } else {
+    for (let i = 0; i < points.length; i += 1) {
+      const phase = state.seek;
+      if (openTrap && points[i].time <= OPEN_QUIET_END) continue;
+      const candidate = pending.get(i);
+      if (candidate?.side === "top") {
         if (
-          lowAt >= 0 &&
-          points[lowAt].price < openBottom.price &&
-          (firstBottom || lowAt > openBottom.index)
+          phase === "bottom" &&
+          openTop &&
+          candidate.price > openTop.price &&
+          candidate.hist >= openTop.hist * REPLACE_HIST_RATIO
         ) {
-          dropMark(marks, openBottom);
-          openBottom = swingMark(points, lowAt, "bottom");
-          marks.push(openBottom);
-        }
-        const highAt = extremeIndex(points, i, "high", openTrap, openBottom.index);
-        if (
-          highAt >= 0 &&
-          highAt !== openBottom.index &&
-          pairSwingCovers(openBottom.price, points[highAt].price, etf)
-        ) {
-          closeWithTop(swingMark(points, highAt, "top"));
-        }
-      }
-      if (state.seek === "bottom" && openTop) {
-        const highAt = extremeIndex(points, i, "high", openTrap, openTop.index);
-        if (highAt >= 0 && points[highAt].price > openTop.price) {
           dropMark(marks, openTop);
-          openTop = swingMark(points, highAt, "top");
-          marks.push(openTop);
+          openTop = candidate;
+          marks.push(candidate);
+          continue;
         }
-        const lowAt = extremeIndex(points, i, "low", openTrap, openTop.index);
-        if (
-          lowAt >= 0 &&
-          lowAt !== openTop.index &&
-          pairSwingCovers(points[lowAt].price, openTop.price, etf)
-        ) {
-          closeWithBottom(swingMark(points, lowAt, "bottom"));
+        if (phase === "either") {
+          closeWithTop(candidate);
+          continue;
+        }
+        if (phase === "top" && openBottom && pairSwingCovers(openBottom.price, candidate.price, etf)) {
+          closeWithTop(candidate);
+          continue;
+        }
+        if (!openBottom && !openTop) {
+          continue;
+        }
+      } else if (candidate?.side === "bottom") {
+        if (phase === "top" && openBottom && candidate.price < openBottom.price) {
+          dropMark(marks, openBottom);
+          openBottom = candidate;
+          marks.push(candidate);
+          continue;
+        }
+        if (phase === "either" || (phase === "bottom" && !openBottom && !openTop)) {
+          closeWithBottom(candidate);
+          continue;
+        }
+        if (phase === "bottom" && openTop && pairSwingCovers(candidate.price, openTop.price, etf)) {
+          closeWithBottom(candidate);
+          continue;
         }
       }
-      continue;
-    }
-    if (points[i].volume <= 0 || !(points[i].price > 0)) continue;
-    if (phase === "top" && openBottom && pairSwingCovers(openBottom.price, points[i].price, etf)) {
-      closeWithTop(swingMark(points, i, "top"));
-      continue;
-    }
-    if (phase === "bottom" && openTop && pairSwingCovers(points[i].price, openTop.price, etf)) {
-      closeWithBottom(swingMark(points, i, "bottom"));
+
+      if (points[i].volume <= 0 || !(points[i].price > 0)) continue;
+      if (phase === "top" && openBottom && pairSwingCovers(openBottom.price, points[i].price, etf)) {
+        closeWithTop(swingMark(points, i, "top"));
+        continue;
+      }
+      if (phase === "bottom" && openTop && pairSwingCovers(points[i].price, openTop.price, etf)) {
+        closeWithBottom(swingMark(points, i, "bottom"));
+      }
     }
   }
 
-  const range = sessionRangeAfter(points);
   const unique = new Map<string, Candidate>();
   for (const mark of marks) unique.set(`${mark.side}:${mark.index}`, mark);
   const scored = [...unique.values()]
     .sort((a, b) => a.index - b.index || (a.side === "bottom" ? -1 : 1))
-    .map(({ index, time, side, price }) => {
-      const position = positionIndex(price, range);
+    .map((mark) => {
+      const confirmIndex = mark.confirmIndex ?? mark.index;
+      const range = sessionRangeAfter(points.slice(0, confirmIndex + 1));
+      const position = positionIndex(mark.price, range);
       return {
-        index,
-        time,
-        side,
-        price,
+        index: mark.index,
+        time: mark.time,
+        side: mark.side,
+        price: mark.price,
         position,
-        confidence: markConfidence(side, position),
+        confidence: markConfidence(mark.side, position),
         origin: "shape" as const,
+        confirmIndex,
+        confirmTime: points[confirmIndex]?.time ?? mark.time,
+        confirmPrice: points[confirmIndex]?.price ?? mark.price,
       };
     })
     .filter((mark) => minConfidence <= 0 || (mark.confidence != null && mark.confidence >= minConfidence));
@@ -607,53 +594,80 @@ export function intradayExtremes(
 }
 
 /**
- * 用已经标出的底和顶做T：先底后买，配成对的顶才卖。
- * 不成对的顶、开盘 10:00 前、14:00 后的新底、14:45 补顶、14:50 清仓，都不做成T。
+ * 用已经锁定的底和顶做T：先出底就买，先出顶就卖；买回必须比卖出价低，卖出必须比买入价高。
+ * 不成对的顶、开盘 10:00 前的新底、14:00 后的新底、14:45 补顶、14:50 清仓，都不做成T。
+ * 锁定的顶 9:45 后就可以先卖。时间窗口看锁定那一分钟，不看极值那一分钟。
  */
 export function tagTTrades(marks: IntradayMark[], etf = false): TTaggedMark[] {
   const ordered = [...marks].sort((a, b) => a.index - b.index);
   const tagged: TTaggedMark[] = [];
-  let held = false;
+  let phase: "open" | "long" | "sold" = "open";
   let lastBuy: IntradayMark | null = null;
-  let opened = false;
+  let lastBuyFill: number | null = null;
+  let lastSellFill: number | null = null;
+  const whenOf = (mark: IntradayMark) => mark.confirmTime ?? mark.time;
+  const fillOf = (mark: IntradayMark) => mark.confirmPrice ?? mark.price;
   for (const mark of ordered) {
     const forcedTop =
       mark.side === "top" && (mark.origin === "forced" || mark.time >= FORCE_TOP_DEADLINE);
     if (mark.side === "clear" || mark.origin === "clear") {
       tagged.push({ ...mark, t: "flatten" });
-      held = false;
+      phase = "open";
       lastBuy = null;
+      lastBuyFill = null;
+      lastSellFill = null;
       continue;
     }
     if (forcedTop) {
       tagged.push({ ...mark, t: "flatten" });
-      held = false;
+      phase = "open";
       lastBuy = null;
+      lastBuyFill = null;
+      lastSellFill = null;
       continue;
     }
+    const when = whenOf(mark);
+    const fill = fillOf(mark);
     if (mark.side === "bottom") {
-      if (mark.time < T_OPEN_START || mark.time >= T_BUY_END || held) {
+      if (when < T_OPEN_START || when >= T_BUY_END || phase === "long") {
         tagged.push({ ...mark, t: "ignore" });
         continue;
       }
-      tagged.push({ ...mark, t: opened ? "t-rebuy" : "t-buy" });
-      held = true;
+      if (phase === "sold" && lastSellFill != null && fill >= lastSellFill) {
+        tagged.push({ ...mark, t: "ignore" });
+        continue;
+      }
+      tagged.push({ ...mark, t: phase === "sold" ? "t-rebuy" : "t-buy" });
+      phase = "long";
       lastBuy = mark;
-      opened = true;
+      lastBuyFill = fill;
       continue;
     }
-    if (mark.time < T_OPEN_START || !held || lastBuy == null || !pairSwingCovers(lastBuy.price, mark.price, etf)) {
+    if (when < RANGE_START || phase === "sold") {
       tagged.push({ ...mark, t: "ignore" });
       continue;
     }
-    if (mark.time >= T_SELL_END) {
+    if (phase === "long") {
+      if (lastBuy == null || !pairSwingCovers(lastBuy.price, mark.price, etf)) {
+        tagged.push({ ...mark, t: "ignore" });
+        continue;
+      }
+      if (lastBuyFill != null && fill <= lastBuyFill) {
+        tagged.push({ ...mark, t: "ignore" });
+        continue;
+      }
+    }
+    if (when >= T_SELL_END) {
       tagged.push({ ...mark, t: "flatten" });
-      held = false;
+      phase = "open";
       lastBuy = null;
+      lastBuyFill = null;
+      lastSellFill = null;
       continue;
     }
     tagged.push({ ...mark, t: "t-sell" });
-    held = false;
+    phase = "sold";
+    lastSellFill = fill;
     lastBuy = null;
   }
   return tagged;
