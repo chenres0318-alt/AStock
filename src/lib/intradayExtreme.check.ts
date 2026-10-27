@@ -698,6 +698,62 @@ assert(
   "14:45 补顶 flattens, and a bottom still inside the 9:30-10:00 dump window is not a T-buy",
 );
 
+const forcedRebuyTagged = tagTTrades([
+  tMark(50, "10:20", "top", 11),
+  tMark(240, "14:55", "bottom", 10.5, { origin: "forced", confirmTime: "14:55", confirmPrice: 10.5 }),
+]);
+assert(
+  forcedRebuyTagged.map((mark) => mark.t).join(",") === "t-sell,t-rebuy",
+  "a 14:55 forced bottom after a T-sell is a T-rebuy even after 14:00",
+);
+
+const soldThenLate = session(
+  [
+    { n: 15, step: 0 },
+    { n: 1, step: 0 },
+    { n: 5, step: 0.1 },
+    { n: 5, step: -0.12 },
+  ],
+  20,
+);
+const beforeRebuyDeadline = withDeadline(soldThenLate, [{ time: "14:54", price: 19.4 }]);
+assert(
+  intradayExtremes(beforeRebuyDeadline).every((mark) => mark.origin !== "forced" || mark.side !== "bottom"),
+  "before 14:55 a T-sell with no later bottom does not mint a rebuy bottom",
+);
+const soldNoBottom = withDeadline(soldThenLate, [
+  { time: "14:54", price: 19.4 },
+  { time: "14:55", price: 19.3 },
+  { time: "15:00", price: 19.1 },
+]);
+const soldNoBottomMarks = intradayExtremes(soldNoBottom);
+const soldNoBottomT = tagTTrades(soldNoBottomMarks);
+assert(
+  soldNoBottomMarks.some((mark) => mark.side === "top" && mark.origin !== "forced") &&
+    soldNoBottomMarks.some((mark) => mark.side === "bottom" && mark.origin === "forced" && mark.time === "14:55" && mark.price === 19.3) &&
+    !soldNoBottomMarks.some((mark) => mark.side === "bottom" && mark.time === "15:00"),
+  "at 14:55 a T-sell with no later bottom marks a rebuy bottom at 14:55, not at 15:00",
+);
+assert(
+  soldNoBottomT.some((mark) => mark.t === "t-sell") &&
+    soldNoBottomT.some((mark) => mark.side === "bottom" && mark.origin === "forced" && mark.t === "t-rebuy"),
+  "the 14:55 forced bottom is a T-rebuy below the T-sell fill",
+);
+const rebuyTooHigh = withDeadline(soldThenLate, [{ time: "14:55", price: 20.45 }]);
+assert(
+  intradayExtremes(rebuyTooHigh).every((mark) => mark.origin !== "forced" || mark.side !== "bottom"),
+  "14:55 does not rebuy at or above the T-sell fill",
+);
+const forceTopThenLate = withDeadline(dumpOnly, [
+  { time: "14:45", price: liveAfterBottom },
+  { time: "14:55", price: liveAfterBottom - 0.2 },
+]);
+assert(
+  intradayExtremes(forceTopThenLate).some((mark) => mark.side === "top" && mark.origin === "forced") &&
+    intradayExtremes(forceTopThenLate).every((mark) => mark.side !== "bottom" || mark.origin !== "forced"),
+  "a 14:45 补顶 is not a T-sell, so 14:55 does not mint a rebuy bottom",
+);
+
 const grindDown = session(
   [
     { n: 15, step: 0 },
@@ -719,6 +775,14 @@ assert(
   (intradayExtremes(grindPrefix).find((mark) => mark.side === "top")?.price ?? 0) ===
     (intradayExtremes(grindLater).find((mark) => mark.side === "top")?.price ?? 1),
   "the locked grind top does not walk down as later lows print",
+);
+const grindUntilRebuy = withDeadline(grindDown, [{ time: "14:55", price: 18.8 }]);
+const grindUntilRebuyMarks = intradayExtremes(grindUntilRebuy);
+assert(
+  grindUntilRebuyMarks.some((mark) => mark.side === "top") &&
+    grindUntilRebuyMarks.some((mark) => mark.side === "bottom" && mark.origin === "forced" && mark.time === "14:55" && mark.price === 18.8) &&
+    tagTTrades(grindUntilRebuyMarks).some((mark) => mark.origin === "forced" && mark.t === "t-rebuy"),
+  "a grind that T-sold the top and never bounced 2 percent still 接回 at 14:55",
 );
 
 console.log(

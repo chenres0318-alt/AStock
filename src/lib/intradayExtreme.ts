@@ -19,8 +19,9 @@
  * 顶的可信度等于价位指数，底的可信度等于 100 减去价位指数。
  * 看盘默认只标锁定时可信度 70 及以上的顶底；后面区间再展开，已经锁定的不撤。
  * 到 14:45 还只有底、没有 70 以上的顶时，14:45 到 14:52 的现价只要比底高就标成顶。
+ * 前面已经有顶做成 T 卖、到 14:55 还没有底时，用 14:55 现价补一个底接回；接回价必须低于卖出价。
  * 做T接在这些标记上：先出底就买、先出顶就卖；买回必须比卖出价低，卖出必须比买入价高。
- * 不成对的顶、10:00 前的新底、14:00 后的新底、14:45 补顶都不做成T。锁定的顶 9:45 后就可以卖。
+ * 不成对的顶、10:00 前的新底、14:00 后的新底、14:45 补顶都不做成T。14:55 接回底除外。锁定的顶 9:45 后就可以卖。
  * 做T看锁定那一分钟，不看极值那一分钟。
  * MACDFS 仍用 12/26/9。单独从今天 9:30 起算时，EMA26 和 DEA9 要到约 10:04 才有柱。
  * 方案 A：带上前一个交易日尾盘至少 26 根 1 分钟收盘，用昨收处的 EMA 当初始状态，再接着算今天。
@@ -58,6 +59,10 @@ const OPEN_DUMP_RETRACE = 0.5;
 const FORCE_TOP_DEADLINE = "14:45";
 /** 补卖顶只看到这一分钟的现价，14:52 之后不再跟着走。 */
 const FORCE_TOP_END = "14:52";
+/** 已有 T 卖、还没有底时，这一分钟补一个接回底。 */
+const FORCE_REBUY_DEADLINE = "14:55";
+/** 接回底钉在 14:55，不跟到 15:00。 */
+const FORCE_REBUY_END = "14:55";
 /** 开盘急拉回落走完之前，底也不做成T。 */
 export const T_OPEN_START = "10:00";
 /** 14:00 之后的底来不及再做完一对，不再开新T、不再买回。 */
@@ -91,7 +96,7 @@ export type IntradayMark = {
   position: number | null;
   /** 顶看高位、底看低位，0 到 100。 */
   confidence: number | null;
-  /** 形态顶底，还是 14:45 补顶。 */
+  /** 形态顶底、14:45 补顶、还是 14:55 接回底。 */
   origin?: "shape" | "forced";
   /** 价格反向够一档、真正锁定这一标的那一根。做T看这个时刻。 */
   confirmIndex?: number;
@@ -586,12 +591,12 @@ export function intradayExtremes(
       };
     })
     .filter((mark) => minConfidence <= 0 || (mark.confidence != null && mark.confidence >= minConfidence));
-  return withForcedSellTop(points, scored);
+  return withForcedRebuyBottom(points, withForcedSellTop(points, scored), etf);
 }
 
 /**
  * 用已经锁定的底和顶做T：先出底就买，先出顶就卖；买回必须比卖出价低，卖出必须比买入价高。
- * 不成对的顶、开盘 10:00 前的新底、14:00 后的新底、14:45 补顶，都不做成T。
+ * 不成对的顶、开盘 10:00 前的新底、14:00 后的新底、14:45 补顶，都不做成T。14:55 接回底除外。
  * 锁定的顶 9:45 后就可以先卖。时间窗口看锁定那一分钟，不看极值那一分钟。
  */
 export function tagTTrades(marks: IntradayMark[], etf = false): TTaggedMark[] {
@@ -616,6 +621,17 @@ export function tagTTrades(marks: IntradayMark[], etf = false): TTaggedMark[] {
     }
     const when = whenOf(mark);
     const fill = fillOf(mark);
+    if (mark.side === "bottom" && mark.origin === "forced") {
+      if (phase !== "sold" || (lastSellFill != null && fill >= lastSellFill)) {
+        tagged.push({ ...mark, t: "ignore" });
+        continue;
+      }
+      tagged.push({ ...mark, t: "t-rebuy" });
+      phase = "long";
+      lastBuy = mark;
+      lastBuyFill = fill;
+      continue;
+    }
     if (mark.side === "bottom") {
       if (when < T_OPEN_START || when >= T_BUY_END || phase === "long") {
         tagged.push({ ...mark, t: "ignore" });
@@ -690,6 +706,40 @@ function withForcedSellTop(points: IntradayMinute[], marks: IntradayMark[]): Int
     position,
     confidence: markConfidence("top", position),
     origin: "forced",
+  };
+  return [...marks, forced].sort((a, b) => a.index - b.index);
+}
+
+/** 14:55 已到、前面有顶做成 T 卖、之后还没有底、现价比卖出价低时，用 14:55 现价补一个接回底。 */
+function withForcedRebuyBottom(points: IntradayMinute[], marks: IntradayMark[], etf: boolean): IntradayMark[] {
+  if (!points.some((point) => point.time >= FORCE_REBUY_DEADLINE)) return marks;
+  if (marks.some((mark) => mark.side === "bottom" && mark.origin === "forced")) return marks;
+  const lastTop = [...marks].reverse().find((mark) => mark.side === "top");
+  if (!lastTop || lastTop.origin === "forced") return marks;
+  if (marks.some((mark) => mark.side === "bottom" && mark.index > lastTop.index)) return marks;
+  const index = lastPointFrom(points, FORCE_REBUY_DEADLINE, FORCE_REBUY_END);
+  if (index < 0 || !(points[index].price < lastTop.price)) return marks;
+  if (marks.some((mark) => mark.index === index && mark.side === "bottom")) return marks;
+  const tagged = tagTTrades(marks, etf);
+  const lastSell = [...tagged].reverse().find((mark) => mark.t === "t-sell");
+  if (!lastSell) return marks;
+  if (tagged.some((mark) => mark.index > lastSell.index && (mark.t === "t-rebuy" || mark.t === "t-buy"))) return marks;
+  const fill = points[index].price;
+  const lastSellFill = lastSell.confirmPrice ?? lastSell.price;
+  if (!(fill < lastSellFill)) return marks;
+  const range = sessionRangeAfter(points.slice(0, index + 1));
+  const position = positionIndex(points[index].price, range);
+  const forced: IntradayMark = {
+    index,
+    time: points[index].time,
+    side: "bottom",
+    price: points[index].price,
+    position,
+    confidence: markConfidence("bottom", position),
+    origin: "forced",
+    confirmIndex: index,
+    confirmTime: points[index].time,
+    confirmPrice: points[index].price,
   };
   return [...marks, forced].sort((a, b) => a.index - b.index);
 }
