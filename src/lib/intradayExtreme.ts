@@ -11,7 +11,7 @@
  *     并且 KDJ 的 J 在超卖区，这一分钟有成交且量不超过近 5 分钟均量的 1.5 倍（滤掉无量和天量杀跌）。
  * 同一段连续满足时只标第一分钟。之后顶和底交替。MACD 形态路径仍可先出顶或先出底。
  * 还没配上对面时，更高的顶要红柱不低于前一个顶的八成才换掉；更低的底直接换掉前一个底。
- * 贴着均价线也可以标。配成一对时，个股和 ETF 顶底波动至少 0.7%。
+ * 贴着均价线也可以标。配成一对时，个股顶底波动至少 2%，ETF 至少 1%。
  * 波动按 (高 - 低) / 低。看盘实时顶底不用“当前最低/最高立刻标”，要等价格反向够这一档才锁定：
  * 从高点回落一档锁顶，从低点反弹一档锁底。先走出哪一边就先标哪一边，锁上之后不再跟着阴跌/阴涨挪走。
  * 9:30 到 9:45 先急拉出一对波动、10:00 前又吐回至少一半的，当作开盘冲高回落，这段时间不标顶底。
@@ -28,9 +28,9 @@
  */
 
 /** 个股一对顶底至少要有这么多相对波动。 */
-const STOCK_SWING = 0.007;
+const STOCK_SWING = 0.02;
 /** ETF 一对顶底至少要有这么多相对波动。 */
-const ETF_SWING = 0.007;
+const ETF_SWING = 0.01;
 /** 回归和短期 EMA 都看这么多分钟。 */
 const WINDOW = 4;
 /** 更高的价格要配上差不多高的红柱，才换掉已经标出的顶。 */
@@ -217,7 +217,7 @@ export function recentVolumeAvg(points: IntradayMinute[], index: number, lookbac
   return sum / count;
 }
 
-/** 一对顶底的相对波动 (高 - 低) / 低。个股和 ETF 至少 0.7%。 */
+/** 一对顶底的相对波动 (高 - 低) / 低。个股至少 2%，ETF 至少 1%。 */
 export function pairSwingCovers(low: number, high: number, etf = false): boolean {
   if (!(high > low) || !(low > 0)) return false;
   return (high - low) / low >= (etf ? ETF_SWING : STOCK_SWING);

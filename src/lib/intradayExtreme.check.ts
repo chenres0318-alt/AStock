@@ -41,14 +41,15 @@ function session(parts: Array<{ n: number; step: number }>, origin: number, avgA
   return points;
 }
 
-assert(pairSwingCovers(10, 10.06) === false, "0.6 percent on a stock pair is below the 0.7 percent swing");
-assert(pairSwingCovers(10, 10.07) === true, "0.7 percent on a stock pair meets the swing floor");
-assert(pairSwingCovers(0.598, 0.602) === false, "a 0.67 percent move still fails the stock 0.7 percent floor");
-assert(pairSwingCovers(0.598, 0.604, true) === true, "a 1 percent move still covers the ETF 0.7 percent floor");
-assert(pairSwingCovers(0.598, 0.603, true) === true, "0.84 percent on an ETF pair meets the 0.7 percent swing");
-assert(pairSwingCovers(0.598, 0.602, true) === false, "0.67 percent on an ETF pair is below the 0.7 percent swing");
-assert(pairSwingCovers(0.598, 0.601, true) === false, "0.5 percent on an ETF pair is below the 0.7 percent swing");
-assert(pairSwingCovers(0.598, 0.59801, true) === false, "a 0.001 fen ETF pair is not a 0.7 percent swing");
+assert(pairSwingCovers(50, 50.95) === false, "1.9 percent on a stock pair is below the 2 percent swing");
+assert(pairSwingCovers(50, 51) === true, "2 percent on a stock pair meets the swing floor");
+assert(pairSwingCovers(10, 10.07) === false, "0.7 percent on a stock pair is below the 2 percent swing");
+assert(pairSwingCovers(0.598, 0.602) === false, "a 0.67 percent move still fails the stock 2 percent floor");
+assert(pairSwingCovers(0.598, 0.604, true) === true, "a 1 percent move covers the ETF 1 percent floor");
+assert(pairSwingCovers(0.598, 0.603, true) === false, "0.84 percent on an ETF pair is below the 1 percent swing");
+assert(pairSwingCovers(0.598, 0.602, true) === false, "0.67 percent on an ETF pair is below the 1 percent swing");
+assert(pairSwingCovers(0.598, 0.601, true) === false, "0.5 percent on an ETF pair is below the 1 percent swing");
+assert(pairSwingCovers(0.598, 0.59801, true) === false, "a 0.001 fen ETF pair is not a 1 percent swing");
 assert(sessionRangeAfter([{ time: "09:30", price: 30, volume: 1, avg: 30 }]) == null, "the open auction window alone has no 9:45 range");
 const afterOpen = sessionRangeAfter([
   { time: "09:30", price: 30, volume: 1, avg: 30 },
@@ -89,7 +90,7 @@ const topMarks = shapeExtremes(easingRise);
 assert(topMarks[0]?.side === "top" && topMarks[0].time === "10:16", "a rise that is still up but slowing is a top");
 assert(
   topMarks.length === 2 && topMarks[1].side === "bottom" && pairSwingCovers(topMarks[1].price, topMarks[0].price),
-  "after that top, a 0.7 percent drop can mark the opposite bottom without a weakening-slope shape",
+  "after that top, a 2 percent drop can mark the opposite bottom without a weakening-slope shape",
 );
 assert(Math.abs(topMarks[0].price - 22.55) < 1e-9, "the top is the minute both slopes and both short EMAs weaken");
 const topPrices = easingRise.map((point) => point.price);
@@ -125,7 +126,7 @@ const bottomMarks = shapeExtremes(easingDrop);
 assert(bottomMarks[0]?.side === "bottom" && bottomMarks[0].time === "10:18", "a drop that is still down but slowing is a bottom");
 assert(
   bottomMarks.length === 2 && bottomMarks[1].side === "top" && pairSwingCovers(bottomMarks[0].price, bottomMarks[1].price),
-  "after that bottom, a 0.7 percent bounce can mark the opposite top without a weakening-slope shape",
+  "after that bottom, a 2 percent bounce can mark the opposite top without a weakening-slope shape",
 );
 assert(Math.abs(bottomMarks[0].price - 17.12) < 1e-9, "the bottom is the minute the decline weakens");
 const bottomPrices = easingDrop.map((point) => point.price);
@@ -196,10 +197,10 @@ const paired = shapeExtremes(
 );
 assert(
   paired.length === 2 && paired[0].side === "top" && paired[1].side === "bottom",
-  "a weakening drop after a top closes the pair when the swing is at least 0.7 percent",
+  "a weakening drop after a top closes the pair when the swing is at least 2 percent",
 );
 assert(Math.abs(paired[0].price - 22.5) < 1e-9 && Math.abs(paired[1].price - 20.35) < 1e-9, "the pair keeps that top and that bottom");
-assert(pairSwingCovers(paired[1].price, paired[0].price), "the kept stock pair has at least a 0.7 percent swing");
+assert(pairSwingCovers(paired[1].price, paired[0].price), "the kept stock pair has at least a 2 percent swing");
 assert(paired[0].position != null && paired[0].position >= 80, "the kept top sits in the upper part of the 9:45 range");
 assert(paired[1].position != null && paired[1].position <= 20, "the kept bottom sits in the lower part of the 9:45 range");
 assert(paired[0].confidence === paired[0].position, "top confidence equals the position index");
@@ -215,15 +216,15 @@ assert(
   swingFromBottom.length === 2 && swingFromBottom[0].side === "bottom" && swingFromBottom[1].side === "top",
   "a bounce after a morphological bottom marks a top even if the slope is not weakening",
 );
-assert(pairSwingCovers(swingFromBottom[0].price, swingFromBottom[1].price), "that bounce covers the stock 0.7 percent floor");
-const shyBounce = shapeExtremes(session([...dropThenBounce, { n: 1, step: 0.5 }], 20));
-assert(shyBounce.length === 1 && shyBounce[0].side === "bottom", "a bounce under 0.7 percent does not mint a stock top");
+assert(pairSwingCovers(swingFromBottom[0].price, swingFromBottom[1].price), "that bounce covers the stock 2 percent floor");
+const shyBounce = shapeExtremes(session([...dropThenBounce, { n: 1, step: 0.3 }], 20));
+assert(shyBounce.length === 1 && shyBounce[0].side === "bottom", "a bounce under 2 percent does not mint a stock top");
 const etfBounce = shapeExtremes(session([...dropThenBounce, { n: 1, step: 0.6 }], 20), { etf: true });
 assert(
   etfBounce.length === 2 && etfBounce[0].side === "bottom" && etfBounce[1].side === "top",
-  "a 0.7 percent bounce after a morphological bottom is enough to pair an ETF top",
+  "a 1 percent bounce after a morphological bottom is enough to pair an ETF top",
 );
-assert(shapeExtremes(session([...dropThenBounce, { n: 1, step: 0.1 }], 20), { etf: true }).length === 1, "a bounce under 0.7 percent does not mint an ETF top");
+assert(shapeExtremes(session([...dropThenBounce, { n: 1, step: 0.1 }], 20), { etf: true }).length === 1, "a bounce under 1 percent does not mint an ETF top");
 
 const steadyRise = shapeExtremes(
   session(
@@ -303,14 +304,14 @@ const liveTop = intradayExtremes(
     [
       { n: 15, step: 0 },
       { n: 1, step: 0 },
-      { n: 4, step: 0.1 },
+      { n: 5, step: 0.1 },
     ],
     20,
   ),
 );
 assert(
   liveTop[0]?.side === "bottom" && liveTop[0].time === "09:45" && liveTop.every((mark) => mark.side !== "top"),
-  "after 9:45 a 0.7 percent rise locks the session low as a bottom, but does not stamp a top until price pulls back 0.7 percent",
+  "after 9:45 a 2 percent rise locks the session low as a bottom, but does not stamp a top until price pulls back 2 percent",
 );
 assert(liveTop.find((mark) => mark.side === "bottom")?.confidence === 100, "the locked bottom keeps 100 confidence against the range at confirmation");
 
@@ -319,26 +320,26 @@ const liveBottom = intradayExtremes(
     [
       { n: 15, step: 0 },
       { n: 1, step: 0 },
-      { n: 4, step: -0.1 },
+      { n: 5, step: -0.1 },
     ],
     20,
   ),
 );
-assert(liveBottom.length >= 1 && liveBottom[0].side === "top" && liveBottom[0].time >= "09:45", "after 9:45 a 0.7 percent drop locks a top first, without waiting for MACD shape");
+assert(liveBottom.length >= 1 && liveBottom[0].side === "top" && liveBottom[0].time >= "09:45", "after 9:45 a 2 percent drop locks a top first, without waiting for MACD shape");
 const liveBottomThenTop = intradayExtremes(
   session(
     [
       { n: 15, step: 0 },
       { n: 1, step: 0 },
-      { n: 4, step: -0.1 },
-      { n: 4, step: 0.12 },
+      { n: 5, step: -0.1 },
+      { n: 5, step: 0.12 },
     ],
     20,
   ),
 );
 assert(
   liveBottomThenTop[0]?.side === "top" && liveBottomThenTop.some((mark) => mark.side === "bottom"),
-  "after a locked top, a 0.7 percent bounce still marks the opposite bottom",
+  "after a locked top, a 2 percent bounce still marks the opposite bottom",
 );
 
 const beforeOpenRange = intradayExtremes(session([{ n: 14, step: 0.3 }], 20));
@@ -353,23 +354,23 @@ const livePair = intradayExtremes(
     [
       { n: 15, step: 0 },
       { n: 1, step: 0 },
-      { n: 4, step: 0.1 },
-      { n: 4, step: -0.12 },
+      { n: 5, step: 0.1 },
+      { n: 5, step: -0.12 },
     ],
     20,
   ),
 );
 assert(
   livePair[0]?.side === "bottom" && livePair.some((mark) => mark.side === "top"),
-  "a rise then drop locks a bottom first, then locks the swing high as a top once price pulls back 0.7 percent",
+  "a rise then drop locks a bottom first, then locks the swing high as a top once price pulls back 2 percent",
 );
 
 const laterHigherHigh = session(
   [
     { n: 15, step: 0 },
     { n: 1, step: 0 },
-    { n: 4, step: 0.1 },
-    { n: 4, step: -0.12 },
+    { n: 5, step: 0.1 },
+    { n: 5, step: -0.12 },
     { n: 20, step: 0.5 },
   ],
   20,
@@ -416,7 +417,7 @@ const dumpOnly = session(
   [
     { n: 15, step: 0 },
     { n: 1, step: 0 },
-    { n: 8, step: 0.05 },
+    { n: 10, step: 0.05 },
   ],
   20,
 );
@@ -456,8 +457,8 @@ const alreadyHasTop = intradayExtremes(
       [
         { n: 15, step: 0 },
         { n: 1, step: 0 },
-        { n: 4, step: 0.1 },
-        { n: 4, step: -0.12 },
+        { n: 5, step: 0.1 },
+        { n: 5, step: -0.12 },
       ],
       20,
     ),
@@ -474,7 +475,7 @@ const liveTopPastDeadline = withDeadline(
     [
       { n: 15, step: 0 },
       { n: 1, step: 0 },
-      { n: 4, step: 0.1 },
+      { n: 5, step: 0.1 },
     ],
     20,
   ),
@@ -483,7 +484,7 @@ const liveTopPastDeadline = withDeadline(
 assert(
   intradayExtremes(liveTopPastDeadline).some((mark) => mark.side === "bottom") &&
     intradayExtremes(liveTopPastDeadline).some((mark) => mark.side === "top" && mark.origin === "forced"),
-  "a 0.7 percent live rise that never pulled back still only has a locked bottom, so 14:50 forces a sell top",
+  "a 2 percent live rise that never pulled back still only has a locked bottom, so 14:50 forces a sell top",
 );
 const clearExit = intradayExtremes(liveTopPastDeadline, { belowDailyMa4AndMa7: true });
 assert(
@@ -514,7 +515,7 @@ const etfPop = session(
 const openSpikeDump = session(
   [
     { n: 1, step: 0 },
-    { n: 10, step: 0.04 },
+    { n: 10, step: 0.05 },
     { n: 5, step: -0.05 },
     { n: 15, step: -0.04 },
     { n: 12, step: -0.08 },
@@ -523,9 +524,9 @@ const openSpikeDump = session(
 );
 assert(
   openSpikeDump[0]?.time === "09:30" &&
-    openSpikeDump.some((point) => point.time === "09:40" && point.price === 20.4) &&
+    openSpikeDump.some((point) => point.time === "09:40" && point.price === 20.5) &&
     openSpikeDump.some((point) => point.time === "10:00"),
-  "the open-spike tape pops 2 percent by 9:40 then dumps through 10:00",
+  "the open-spike tape pops 2.5 percent by 9:40 then dumps through 10:00",
 );
 assert(
   intradayExtremes(openSpikeDump).every((mark) => mark.time > "10:00") &&
@@ -539,7 +540,7 @@ assert(
 );
 
 const etfLive = intradayExtremes(etfPop, { etf: true });
-assert(etfLive.length === 0, "an ETF 0.6 percent pop is below the 0.7 percent floor, so it does not lock a live pair");
+assert(etfLive.length === 0, "an ETF 0.6 percent pop is below the 1 percent floor, so it does not lock a live pair");
 assert(intradayExtremes(etfPop).length === 0, "the same 0.6 percent pop is not enough to open a stock pair");
 assert(shapeExtremes(etfPop, { etf: true }).length === 0, "without the live swing door that small ETF pop is not a shape top");
 
@@ -555,7 +556,7 @@ const etfPair = session(
 const etfPairMarks = intradayExtremes(etfPair, { etf: true });
 assert(
   etfPairMarks[0]?.side === "bottom" && etfPairMarks.some((mark) => mark.side === "top"),
-  "an ETF 1.2 percent rise then 0.7 percent pullback locks a bottom then a top",
+  "an ETF 1.2 percent rise then 1 percent pullback locks a bottom then a top",
 );
 
 const coldOpen = Array.from({ length: 40 }, (_, i) => 10 + i * 0.01);
@@ -592,7 +593,7 @@ const rallyFromOpenRange = session(
   [
     { n: 15, step: 0 },
     { n: 1, step: 0 },
-    { n: 10, step: 0.04 },
+    { n: 12, step: 0.04 },
   ],
   20,
 );
@@ -600,7 +601,7 @@ const rallyMarks = intradayExtremes(rallyFromOpenRange);
 assert(
   rallyMarks.some((mark) => mark.side === "bottom" && mark.time === "09:45" && mark.confidence === 100) &&
     rallyMarks.every((mark) => mark.side !== "top"),
-  "a 9:45 low that then rallies 0.7 percent locks that past low as a bottom, and waits for a 0.7 percent pullback before locking a top",
+  "a 9:45 low that then rallies 2 percent locks that past low as a bottom, and waits for a 2 percent pullback before locking a top",
 );
 
 function tMark(
@@ -622,8 +623,8 @@ function tMark(
   };
 }
 
-const pairedT = tagTTrades([tMark(40, "10:10", "bottom", 10), tMark(80, "10:50", "top", 10.2)]);
-assert(pairedT.map((mark) => mark.t).join(",") === "t-buy,t-sell", "a 10:00+ bottom then a paired 0.7%+ top is T-buy then T-sell");
+const pairedT = tagTTrades([tMark(40, "10:10", "bottom", 10), tMark(80, "10:50", "top", 10.25)]);
+assert(pairedT.map((mark) => mark.t).join(",") === "t-buy,t-sell", "a 10:00+ bottom then a paired 2%+ top is T-buy then T-sell");
 
 assert(
   tagTTrades([tMark(50, "10:20", "top", 11)])[0]?.t === "t-sell",
@@ -663,7 +664,7 @@ assert(
 const stacked = tagTTrades([
   tMark(40, "10:10", "bottom", 10),
   tMark(50, "10:20", "bottom", 9.9),
-  tMark(80, "10:50", "top", 10.2),
+  tMark(80, "10:50", "top", 10.25),
 ]);
 assert(
   stacked.map((mark) => mark.t).join(",") === "t-buy,ignore,t-sell",
@@ -672,9 +673,9 @@ assert(
 
 const twoLaps = tagTTrades([
   tMark(40, "10:10", "bottom", 10),
-  tMark(80, "10:50", "top", 10.2),
+  tMark(80, "10:50", "top", 10.25),
   tMark(140, "13:10", "bottom", 10.05),
-  tMark(170, "13:40", "top", 10.25),
+  tMark(170, "13:40", "top", 10.3),
 ]);
 assert(
   twoLaps.map((mark) => mark.t).join(",") === "t-buy,t-sell,t-rebuy,t-sell",
@@ -682,7 +683,7 @@ assert(
 );
 
 const thinTop = tagTTrades([tMark(40, "10:10", "bottom", 10), tMark(80, "10:50", "top", 10.06)]);
-assert(thinTop[1]?.t === "ignore", "a top that does not cover the 0.7 percent pair swing is not a T-sell");
+assert(thinTop[1]?.t === "ignore", "a top that does not cover the 2 percent pair swing is not a T-sell");
 
 const forced = tagTTrades([
   tMark(40, "10:10", "bottom", 10),
