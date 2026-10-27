@@ -279,8 +279,13 @@ function BoardPicker({
   onPick: (code: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const rootRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const grouped = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    const match = (item: SectorItem) =>
+      !needle || item.name.toLowerCase().includes(needle) || item.code.includes(needle);
     const sortGroup = (items: SectorItem[]) =>
       [...items].sort((a, b) => {
         const byLive = Number(!liveCodes.has(a.code)) - Number(!liveCodes.has(b.code));
@@ -288,10 +293,10 @@ function BoardPicker({
         return a.name.localeCompare(b.name, "zh-CN");
       });
     return [
-      { label: "行业", items: sortGroup(boards.filter((item) => !isTonghuashunConcept(item.code))) },
-      { label: "概念", items: sortGroup(boards.filter((item) => isTonghuashunConcept(item.code))) },
+      { label: "行业", items: sortGroup(boards.filter((item) => !isTonghuashunConcept(item.code) && match(item))) },
+      { label: "概念", items: sortGroup(boards.filter((item) => isTonghuashunConcept(item.code) && match(item))) },
     ].filter((group) => group.items.length > 0);
-  }, [boards, liveCodes]);
+  }, [boards, liveCodes, query]);
   const current = boards.find((item) => item.code === code);
 
   useEffect(() => {
@@ -304,8 +309,10 @@ function BoardPicker({
     };
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
+    setQuery("");
     const currentRow = rootRef.current?.querySelector("[data-current='true']");
     currentRow?.scrollIntoView({ block: "nearest" });
+    requestAnimationFrame(() => searchRef.current?.focus());
     return () => {
       document.removeEventListener("mousedown", onDown);
       document.removeEventListener("keydown", onKey);
@@ -328,6 +335,17 @@ function BoardPicker({
       </button>
       {open ? (
         <div className="absolute right-0 z-30 mt-1 max-h-80 w-72 overflow-auto rounded bg-panel py-1 shadow-lg ring-1 ring-line scroll-thin">
+          <div className="sticky top-0 bg-panel px-2 pb-1 pt-1">
+            <input
+              ref={searchRef}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              onClick={(event) => event.stopPropagation()}
+              placeholder="搜索行业或概念"
+              className="w-full rounded bg-panel-2 px-2 py-1 text-sm text-ink outline-none ring-1 ring-line"
+            />
+          </div>
+          {grouped.length === 0 ? <div className="px-3 py-2 text-xs text-mute">没有匹配的板块</div> : null}
           {grouped.map((group) => (
             <div key={group.label}>
               <div className="px-3 py-1 text-[10px] text-mute">{group.label}</div>

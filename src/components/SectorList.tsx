@@ -27,14 +27,21 @@ export default function SectorList({
       <PanelTitle
         title="行业板块"
         extra={
-          <span className="text-[10px] text-mute">
-            {items[0]?.source === "ths"
-              ? "同花顺行业"
-              : items[0]?.source === "etf"
-                ? "行业ETF"
-                : items[0]?.source === "sina"
-                  ? "证监会行业"
-                  : "涨幅排序"}
+          <span className="flex items-center gap-2 text-[10px] text-mute">
+            <span>
+              {items[0]?.source === "ths"
+                ? "同花顺行业 · 涨幅前20"
+                : items[0]?.source === "etf"
+                  ? "行业ETF"
+                  : items[0]?.source === "sina"
+                    ? "证监会行业"
+                    : "涨幅排序"}
+            </span>
+            {items[0]?.source === "ths" ? (
+              <Link href="/sector" className="text-gold">
+                全部
+              </Link>
+            ) : null}
           </span>
         }
       />
