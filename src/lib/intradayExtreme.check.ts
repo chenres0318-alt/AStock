@@ -753,6 +753,32 @@ assert(
     intradayExtremes(forceTopThenLate).every((mark) => mark.side !== "bottom" || mark.origin !== "forced"),
   "a 14:45 补顶 is not a T-sell, so 14:55 does not mint a rebuy bottom",
 );
+const soldThenIgnoredBottom = withDeadline(
+  session(
+    [
+      { n: 15, step: 0 },
+      { n: 1, step: 0 },
+      { n: 5, step: -0.1 },
+      { n: 5, step: 0.12 },
+    ],
+    20,
+  ),
+  [{ time: "14:55", price: 18.6 }],
+);
+const soldThenIgnoredMarks = intradayExtremes(soldThenIgnoredBottom);
+const soldThenIgnoredT = tagTTrades(soldThenIgnoredMarks);
+assert(
+  soldThenIgnoredMarks.some((mark) => mark.side === "top" && mark.origin !== "forced") &&
+    soldThenIgnoredMarks.some((mark) => mark.side === "bottom" && mark.origin !== "forced") &&
+    soldThenIgnoredT.some((mark) => mark.t === "t-sell") &&
+    soldThenIgnoredT.some((mark) => mark.side === "bottom" && mark.origin !== "forced" && mark.t === "ignore"),
+  "a bounce after a T-sell can still lock a bottom that is too expensive to 接回",
+);
+assert(
+  soldThenIgnoredMarks.some((mark) => mark.side === "bottom" && mark.origin === "forced" && mark.time === "14:55" && mark.price === 18.6) &&
+    soldThenIgnoredT.some((mark) => mark.origin === "forced" && mark.t === "t-rebuy"),
+  "14:55 still 接回 when earlier bottoms after the T-sell were ignore",
+);
 
 const grindDown = session(
   [
