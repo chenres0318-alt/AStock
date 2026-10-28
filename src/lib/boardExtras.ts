@@ -17,7 +17,10 @@ export const BOARD_MEMBER_EXTRAS: Array<{
   boardName: string;
   code: string;
   name: string;
-}> = [{ boardCode: "881121", boardName: "半导体", code: "600206", name: "有研新材" }];
+}> = [
+  { boardCode: "881121", boardName: "半导体", code: "600206", name: "有研新材" },
+  { boardCode: "881126", boardName: "汽车零部件", code: "600523", name: "贵航股份" },
+];
 
 function extraRows(boardCode: string): ExtraMember[] {
   return BOARD_MEMBER_EXTRAS.filter((item) => item.boardCode === boardCode).map((item) => ({

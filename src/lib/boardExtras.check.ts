@@ -24,4 +24,10 @@ assert(forcedBoardForStock("600206")?.sectorCode === "881121", "bare 有研新�
 assert(forcedBoardForStock("sh600206")?.sector === "半导体", "prefixed 有研新材 still maps to 半导体");
 assert(forcedBoardForStock("sh600519") == null, "茅台 is not forced onto 半导体");
 
+const autoParts = mergeBoardMembers("881126", [member("000625", "长安汽车")]);
+assert(autoParts[0].code === "600523" && autoParts[0].name === "贵航股份", "贵航股份 is prepended to 汽车零部件");
+assert(forcedBoardForStock("sh600523")?.sector === "汽车零部件", "贵航股份 maps to 汽车零部件");
+assert(forcedBoardForStock("600523")?.sectorCode === "881126", "bare 贵航股份 still maps to 汽车零部件");
+assert(mergeBoardMembers("881121", [member("002185", "华天科技")]).every((row) => row.code !== "600523"), "半导体 does not get the 汽车零部件 extra");
+
 console.log("boardExtras checks passed");

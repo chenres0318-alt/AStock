@@ -3,6 +3,7 @@ import type { KBar, SectorItem } from "./types";
 const INDUSTRY_ALIASES: Record<string, string[]> = {
   酿酒: ["白酒"],
   白酒: ["酿酒"],
+  汽车行业: ["汽车零部件"],
 };
 
 export function matchIndustryBoard(industry: string, boards: SectorItem[]): SectorItem | null {
