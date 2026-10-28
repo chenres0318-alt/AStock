@@ -1,5 +1,6 @@
 import {
   keepTonghuashunHoldingBoard,
+  matchBoardFromHoldingName,
   matchTonghuashunIndustry,
   parseTonghuashunSwIndustry,
   swIndustryCandidates,
@@ -76,6 +77,47 @@ assert(
   "a bank leaf that is not on the 881 list still uses 银行",
 );
 assert(matchTonghuashunIndustry("汽车", boards) == null, "a bare 汽车 parent does not pick 汽车服务及其他");
+
+const oilBoards = [board("881107", "油气开采及服务"), board("881180", "石油加工贸易"), board("881268", "工程机械"), ...boards];
+assert(
+  parseTonghuashunSwIndustry(
+    `<td><strong class="hltip fl">所属申万行业：</strong><span>石油石化 — 油服工程</span></td>`,
+  ) === "石油石化 — 油服工程",
+  "海油工程 keeps the Shenwan 油服工程 path",
+);
+assert(
+  parseTonghuashunSwIndustry(`所属申万行业：</span> <span class="tip f14">油服工程</span>`) === "油服工程",
+  "the F10 home page still yields the Shenwan leaf",
+);
+assert(
+  matchTonghuashunIndustry("石油石化 — 油服工程", oilBoards)?.name === "油气开采及服务",
+  "油服工程 maps onto 油气开采及服务 rather than 石油加工贸易 or 工程机械",
+);
+assert(
+  matchTonghuashunIndustry("电子 — 元件", [board("881270", "元件"), board("881123", "其他电子"), ...boards])?.name ===
+    "元件",
+  "东山精密 maps onto 元件",
+);
+
+const etfBoards = [
+  board("881121", "半导体"),
+  board("881129", "通信设备"),
+  board("881162", "通信服务"),
+  board("881270", "元件"),
+  ...boards,
+];
+assert(
+  matchBoardFromHoldingName("半导体ETF国联安", etfBoards)?.name === "半导体",
+  "国联安半导体 ETF maps onto 半导体",
+);
+assert(
+  matchBoardFromHoldingName("半导体设备ETF国泰", etfBoards)?.name === "半导体",
+  "半导体设备 ETF still uses 半导体 rather than a unique fuzzy miss",
+);
+assert(
+  matchBoardFromHoldingName("通信ETF国泰", etfBoards)?.name === "通信设备",
+  "通信 ETF maps onto 通信设备 rather than 通信服务",
+);
 
 const ths = keepTonghuashunHoldingBoard(
   { sector: "汽车行业", sectorCode: "BK0476" },

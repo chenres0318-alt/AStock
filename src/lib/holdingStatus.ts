@@ -1,24 +1,36 @@
 import { forcedBoardForStock } from "./boardExtras";
 import { listAllIndustryBoards } from "./boards";
 import { cached } from "./cache";
-import { bareCode, toTencentCode } from "./codes";
+import { bareCode, isEtf, toTencentCode } from "./codes";
 import { adviseHolding, closeStandsOnMa4, consecutiveMa4Days, sectorHasOpenRedBox } from "./holdingAdvice";
 import { getKline } from "./market";
 import { mapPool } from "./pool";
 import { getSectorTrend, type SectorTrendReport } from "./sectorTrendData";
 import { fetchTonghuashunStockIndustry } from "./sources/tonghuashun";
-import { keepTonghuashunHoldingBoard, matchTonghuashunIndustry } from "./thsSwIndustry";
+import {
+  keepTonghuashunHoldingBoard,
+  matchBoardFromHoldingName,
+  matchTonghuashunIndustry,
+} from "./thsSwIndustry";
 import type { HoldingItem, HoldingStatus, KBar } from "./types";
 
-export async function resolveHoldingBoard(code: string): Promise<{ sector: string; sectorCode: string } | null> {
+export async function resolveHoldingBoard(
+  code: string,
+  name = "",
+): Promise<{ sector: string; sectorCode: string } | null> {
   const forced = forcedBoardForStock(code);
   if (forced) return forced;
   try {
-    const industry = await cached(`holding-ths-industry:v1:${bareCode(code)}`, 6 * 60 * 60_000, () =>
+    const boards = await listAllIndustryBoards();
+    if (isEtf(code, name)) {
+      const board = matchBoardFromHoldingName(name, boards);
+      if (!board) return null;
+      return { sector: board.name, sectorCode: board.code };
+    }
+    const industry = await cached(`holding-ths-industry:v2:${bareCode(code)}`, 6 * 60 * 60_000, () =>
       fetchTonghuashunStockIndustry(code),
     );
     if (!industry) return null;
-    const boards = await listAllIndustryBoards();
     const board = matchTonghuashunIndustry(industry, boards);
     if (!board) return null;
     return { sector: board.name, sectorCode: board.code };
@@ -35,7 +47,7 @@ export async function evaluateHoldings(items: HoldingItem[]): Promise<HoldingSta
     sectorCode: item.sectorCode?.trim() || null,
   }));
   const rows = await mapPool(seeded, 4, async (item) => {
-    const board = await resolveHoldingBoard(item.code);
+    const board = await resolveHoldingBoard(item.code, item.name);
     return { ...item, ...keepTonghuashunHoldingBoard(item, board) };
   });
   const unique = [...new Set(rows.map((row) => row.sectorCode).filter((code): code is string => Boolean(code)))];
