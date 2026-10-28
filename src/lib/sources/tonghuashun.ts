@@ -76,8 +76,10 @@ export async function fetchTonghuashunStockIndustry(code: string): Promise<strin
   const referer = `https://stockpage.10jqka.com.cn/${id}/`;
   try {
     const html = await firstOk([
+      () => readHtml(`https://basic.10jqka.com.cn/16/${id}/company.html`, referer),
       () => readHtml(`https://basic.10jqka.com.cn/${id}/company.html`, referer),
       () => readHtml(`https://basic.10jqka.com.cn/new/${id}/company.html`, referer),
+      () => readHtml(`https://basic.10jqka.com.cn/${id}/`, referer),
     ]);
     return parseTonghuashunSwIndustry(html);
   } catch {
