@@ -1,12 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { HOLDINGS_EVENT, loadHoldings, saveHoldings } from "@/lib/storage";
 import type { HoldingItem } from "@/lib/types";
 
 export function useHoldings() {
   const [items, setItems] = useState<HoldingItem[]>([]);
   const [ready, setReady] = useState(false);
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
 
   useEffect(() => {
     const refresh = () => setItems(loadHoldings());
@@ -42,6 +44,21 @@ export function useHoldings() {
     [items, persist],
   );
 
+  const applySectors = useCallback(
+    (rows: Array<{ code: string; sector: string | null; sectorCode: string | null }>) => {
+      const current = itemsRef.current;
+      let changed = false;
+      const next = current.map((item) => {
+        const row = rows.find((entry) => entry.code === item.code);
+        if (!row?.sectorCode || row.sectorCode === item.sectorCode) return item;
+        changed = true;
+        return { ...item, sector: row.sector, sectorCode: row.sectorCode };
+      });
+      if (changed) persist(next);
+    },
+    [persist],
+  );
+
   const has = useCallback((code: string) => items.some((row) => row.code === code), [items]);
 
   const toggle = useCallback(
@@ -55,5 +72,5 @@ export function useHoldings() {
     [items, persist],
   );
 
-  return { items, ready, add, remove, has, toggle };
+  return { items, ready, add, remove, applySectors, has, toggle };
 }

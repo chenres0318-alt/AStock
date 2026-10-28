@@ -2,6 +2,7 @@ import {
   keepTonghuashunHoldingBoard,
   matchBoardFromHoldingName,
   matchTonghuashunIndustry,
+  parseTonghuashunFieldIndustry,
   parseTonghuashunSwIndustry,
   swIndustryCandidates,
 } from "./thsSwIndustry.ts";
@@ -45,6 +46,17 @@ assert(
 );
 assert(parseTonghuashunSwIndustry(`<strong>所属申万行业：</strong><span>-</span>`) == null, "a blank Shenwan field is ignored");
 assert(parseTonghuashunSwIndustry("<div>no field</div>") == null, "a page without Shenwan industry returns null");
+assert(
+  parseTonghuashunFieldIndustry(`<a href="http://index.10jqka.com.cn/list/field/0881134/" class="fr more">更多</a>`) ===
+    "881134",
+  "the field news page keeps the Tonghuashun 881 board",
+);
+assert(
+  parseTonghuashunFieldIndustry(`<a href="https://q.10jqka.com.cn/thshy/detail/code/881126/">汽车零部件</a>`) ===
+    "881126",
+  "an industry detail link still yields the 881 board",
+);
+assert(parseTonghuashunFieldIndustry("<div>no board</div>") == null, "a page without a 881 board is ignored");
 
 assert(
   swIndustryCandidates("汽车 — 汽车零部件").join(",") === "汽车零部件,汽车",
