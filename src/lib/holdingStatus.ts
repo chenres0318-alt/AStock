@@ -6,7 +6,7 @@ import { adviseHolding, closeStandsOnMa4, consecutiveMa4Days, sectorHasOpenRedBo
 import { getKline } from "./market";
 import { mapPool } from "./pool";
 import { getSectorTrend, type SectorTrendReport } from "./sectorTrendData";
-import { fetchTonghuashunStockIndustry } from "./sources/tonghuashun";
+import { fetchTonghuashunFieldIndustry, fetchTonghuashunStockIndustry } from "./sources/tonghuashun";
 import {
   keepTonghuashunHoldingBoard,
   matchBoardFromHoldingName,
@@ -27,9 +27,20 @@ export async function resolveHoldingBoard(
       if (!board) return null;
       return { sector: board.name, sectorCode: board.code };
     }
-    const industry = await cached(`holding-ths-industry:v2:${bareCode(code)}`, 6 * 60 * 60_000, () =>
-      fetchTonghuashunStockIndustry(code),
-    );
+    const fieldCode = await cached(`holding-ths-field:v1:${bareCode(code)}`, 6 * 60 * 60_000, async () => {
+      const found = await fetchTonghuashunFieldIndustry(code);
+      if (!found) throw new Error("no ths field");
+      return found;
+    }).catch(() => null);
+    if (fieldCode) {
+      const board = boards.find((item) => item.code === fieldCode);
+      return { sector: board?.name ?? fieldCode, sectorCode: fieldCode };
+    }
+    const industry = await cached(`holding-ths-industry:v2:${bareCode(code)}`, 6 * 60 * 60_000, async () => {
+      const found = await fetchTonghuashunStockIndustry(code);
+      if (!found) throw new Error("no shenwan industry");
+      return found;
+    }).catch(() => null);
     if (!industry) return null;
     const board = matchTonghuashunIndustry(industry, boards);
     if (!board) return null;

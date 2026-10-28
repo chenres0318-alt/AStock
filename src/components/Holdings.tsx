@@ -113,7 +113,10 @@ function HoldingSearch({
 }
 
 export default function Holdings() {
-  const { items, ready, add, remove } = useHoldings();
+  const { items, ready, add, remove, applySectors } = useHoldings();
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
+  const codesKey = items.map((item) => item.code).join(",");
   const [selected, setSelected] = useState<string | null>(null);
   const [quotes, setQuotes] = useState<Map<string, Quote>>(new Map());
   const [statuses, setStatuses] = useState<Map<string, HoldingStatus>>(new Map());
@@ -139,11 +142,12 @@ export default function Holdings() {
   }, [items, ready]);
 
   const loadQuotes = useCallback(async () => {
-    if (!items.length) {
+    const list = itemsRef.current;
+    if (!list.length) {
       setQuotes(new Map());
       return;
     }
-    const res = await fetch(`/api/market/overview?codes=${items.map((item) => item.code).join(",")}`, {
+    const res = await fetch(`/api/market/overview?codes=${list.map((item) => item.code).join(",")}`, {
       cache: "no-store",
     });
     const data = (await res.json()) as { quotes?: Quote[]; error?: string };
@@ -151,10 +155,11 @@ export default function Holdings() {
     const map = new Map<string, Quote>();
     for (const quote of data.quotes ?? []) map.set(quote.code, quote);
     setQuotes(map);
-  }, [items]);
+  }, [codesKey]);
 
   const loadStatus = useCallback(async () => {
-    if (!items.length) {
+    const list = itemsRef.current;
+    if (!list.length) {
       setStatuses(new Map());
       return;
     }
@@ -163,7 +168,7 @@ export default function Holdings() {
       const res = await fetch("/api/holdings/status", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ items }),
+        body: JSON.stringify({ items: list }),
         cache: "no-store",
       });
       const data = (await res.json()) as StatusResponse;
@@ -171,11 +176,12 @@ export default function Holdings() {
       const map = new Map<string, HoldingStatus>();
       for (const row of data.items ?? []) map.set(row.code, row);
       setStatuses(map);
+      applySectors(data.items ?? []);
       setError(null);
     } finally {
       setStatusLoading(false);
     }
-  }, [items]);
+  }, [applySectors, codesKey]);
 
   useEffect(() => {
     if (!ready) return;

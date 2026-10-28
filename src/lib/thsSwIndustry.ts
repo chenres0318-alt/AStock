@@ -10,6 +10,12 @@ function decodeText(value: string): string {
     .trim();
 }
 
+/** 同花顺行业新闻页里的 881 板块，例如 list/field/0881134。 */
+export function parseTonghuashunFieldIndustry(html: string): string | null {
+  const match = html.match(/list\/field\/0?(881\d{3})/i) ?? html.match(/thshy\/detail\/code\/(881\d{3})/i);
+  return match?.[1] ?? null;
+}
+
 /** 同花顺公司页「所属申万行业」，例如「汽车 — 汽车零部件」。 */
 export function parseTonghuashunSwIndustry(html: string): string | null {
   const patterns = [
