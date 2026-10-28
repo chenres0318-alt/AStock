@@ -1,25 +1,25 @@
 import { forcedBoardForStock } from "./boardExtras";
 import { listAllIndustryBoards } from "./boards";
 import { cached } from "./cache";
-import { toTencentCode } from "./codes";
+import { bareCode, toTencentCode } from "./codes";
 import { adviseHolding, closeStandsOnMa4, consecutiveMa4Days, sectorHasOpenRedBox } from "./holdingAdvice";
 import { getKline } from "./market";
 import { mapPool } from "./pool";
-import { matchIndustryBoard } from "./screenerLogic";
 import { getSectorTrend, type SectorTrendReport } from "./sectorTrendData";
-import { fetchEastMoneyIndustry } from "./sources/eastmoney";
+import { fetchTonghuashunStockIndustry } from "./sources/tonghuashun";
+import { keepTonghuashunHoldingBoard, matchTonghuashunIndustry } from "./thsSwIndustry";
 import type { HoldingItem, HoldingStatus, KBar } from "./types";
 
 export async function resolveHoldingBoard(code: string): Promise<{ sector: string; sectorCode: string } | null> {
   const forced = forcedBoardForStock(code);
   if (forced) return forced;
   try {
-    const industry = await cached(`holding-industry:${toTencentCode(code)}`, 6 * 60 * 60_000, () =>
-      fetchEastMoneyIndustry(code),
+    const industry = await cached(`holding-ths-industry:v1:${bareCode(code)}`, 6 * 60 * 60_000, () =>
+      fetchTonghuashunStockIndustry(code),
     );
     if (!industry) return null;
     const boards = await listAllIndustryBoards();
-    const board = matchIndustryBoard(industry, boards);
+    const board = matchTonghuashunIndustry(industry, boards);
     if (!board) return null;
     return { sector: board.name, sectorCode: board.code };
   } catch {
@@ -35,11 +35,8 @@ export async function evaluateHoldings(items: HoldingItem[]): Promise<HoldingSta
     sectorCode: item.sectorCode?.trim() || null,
   }));
   const rows = await mapPool(seeded, 4, async (item) => {
-    const forced = forcedBoardForStock(item.code);
-    if (forced) return { ...item, sector: forced.sector, sectorCode: forced.sectorCode };
-    if (item.sectorCode) return item;
     const board = await resolveHoldingBoard(item.code);
-    return board ? { ...item, sector: board.sector, sectorCode: board.sectorCode } : item;
+    return { ...item, ...keepTonghuashunHoldingBoard(item, board) };
   });
   const unique = [...new Set(rows.map((row) => row.sectorCode).filter((code): code is string => Boolean(code)))];
   const reports = new Map<string, SectorTrendReport | null>();

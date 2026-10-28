@@ -1,7 +1,8 @@
 import { cached } from "../cache";
-import { isTonghuashunBoard, isTonghuashunConcept, isTonghuashunIndustry } from "../codes";
+import { bareCode, isTonghuashunBoard, isTonghuashunConcept, isTonghuashunIndustry } from "../codes";
 import { toNumber } from "../format";
 import { fetchGbk, fetchUtf, firstOk, retryOk, UpstreamError } from "../http";
+import { parseTonghuashunSwIndustry } from "../thsSwIndustry";
 import { mapPool } from "../pool";
 import { isShanghaiWeekend, thsRealtimeTradeDate, withToday } from "../thsRealtime";
 import type { BoardMember, KBar, SectorItem } from "../types";
@@ -67,6 +68,21 @@ function directoryNames(html: string): Map<string, string> {
 
 export function parseTonghuashunIndustryHtml(html: string): SectorItem[] {
   return parseBoardRows(html);
+}
+
+export async function fetchTonghuashunStockIndustry(code: string): Promise<string | null> {
+  const id = bareCode(code);
+  if (!/^\d{6}$/.test(id)) return null;
+  const referer = `https://stockpage.10jqka.com.cn/${id}/`;
+  try {
+    const html = await firstOk([
+      () => readHtml(`https://basic.10jqka.com.cn/${id}/company.html`, referer),
+      () => readHtml(`https://basic.10jqka.com.cn/new/${id}/company.html`, referer),
+    ]);
+    return parseTonghuashunSwIndustry(html);
+  } catch {
+    return null;
+  }
 }
 
 function parseBoardRows(html: string): SectorItem[] {
