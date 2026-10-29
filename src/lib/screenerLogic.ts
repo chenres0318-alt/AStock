@@ -42,6 +42,10 @@ export type SectorMa4Cross = {
   weekDays?: number;
   /** 月 K 连续站上 MA4 的月数。 */
   monthDays?: number;
+  /** MA4 上叉 MA7 已持续的交易日数；未上叉为 0。 */
+  crossDays?: number;
+  /** 当前这些条件同时成立的交易日数。 */
+  holdDays?: number;
 };
 
 export type SectorMa4Member = {
@@ -77,6 +81,10 @@ export type Ma4StandHit = {
   monthOnMa4: boolean;
   weekDays: number;
   monthDays: number;
+  /** MA4 上叉 MA7 已持续的交易日数；未上叉为 0。 */
+  crossDays: number;
+  /** 右侧这些条件同时成立的交易日数。 */
+  holdDays: number;
 };
 
 function maAt(values: number[], period: number, index: number): number | null {
@@ -173,20 +181,98 @@ export function consecutiveOnMa4(closes: number[], spot?: number | null): number
   return n;
 }
 
-function periodStand(bars: KBar[], price?: number | null): { on: boolean; days: number } {
+function periodStand(bars: KBar[], price?: number | null): { on: boolean; days: number; since: string } {
   const closes = bars.map((bar) => bar.close);
   const days = consecutiveOnMa4(closes, price);
-  return { on: days > 0, days };
+  if (!days) return { on: false, days: 0, since: "" };
+  return { on: true, days, since: bars[bars.length - days]?.time ?? "" };
+}
+
+function ma4AboveMa7(closes: number[], index: number): boolean {
+  const ma4 = maAt(closes, 4, index);
+  const ma7 = maAt(closes, 7, index);
+  return ma4 != null && ma7 != null && ma4 > ma7;
 }
 
 /** 最新一根日线：前一日 MA4 还在 MA7 下方或持平，当日 MA4 站上 MA7。 */
 export function ma4CrossedUpMa7(closes: number[], index = closes.length - 1): boolean {
-  const ma4 = maAt(closes, 4, index);
   const ma4Prev = maAt(closes, 4, index - 1);
-  const ma7 = maAt(closes, 7, index);
   const ma7Prev = maAt(closes, 7, index - 1);
-  if (ma4 == null || ma4Prev == null || ma7 == null || ma7Prev == null) return false;
-  return ma4Prev <= ma7Prev && ma4 > ma7;
+  if (ma4Prev == null || ma7Prev == null) return false;
+  return ma4Prev <= ma7Prev && ma4AboveMa7(closes, index);
+}
+
+/** MA4 持续在 MA7 上方的交易日数；未站上则为 0。 */
+export function consecutiveMa4AboveMa7(closes: number[]): number {
+  if (closes.length < 7) return 0;
+  const last = closes.length - 1;
+  if (!ma4AboveMa7(closes, last)) return 0;
+  let n = 1;
+  for (let i = last - 1; i >= 6; i -= 1) {
+    if (!ma4AboveMa7(closes, i)) break;
+    n += 1;
+  }
+  return n;
+}
+
+/**
+ * 当前这些条件同时成立的交易日数：取上叉 / 周K / 月K / 日线站上里最晚开始的那段。
+ * 没有日线时按各周期根数近似。
+ */
+export function conditionHoldDays(opts: {
+  dailyDays: number;
+  dailySince?: string;
+  weekOn?: boolean;
+  weekDays?: number;
+  weekSince?: string;
+  monthOn?: boolean;
+  monthDays?: number;
+  monthSince?: string;
+  cross?: boolean;
+  crossDays?: number;
+  lastTime?: string;
+  bars?: KBar[];
+}): number {
+  const starts: string[] = [];
+  if (opts.dailySince) starts.push(opts.dailySince);
+  if (opts.weekOn && opts.weekSince) starts.push(opts.weekSince);
+  if (opts.monthOn && opts.monthSince) starts.push(opts.monthSince);
+  if (opts.cross && opts.lastTime) {
+    starts.push(opts.lastTime);
+  } else if (opts.cross && opts.crossDays && opts.bars?.length) {
+    const from = opts.bars.length - opts.crossDays;
+    const time = opts.bars[Math.max(from, 0)]?.time;
+    if (time) starts.push(time);
+  }
+  if (opts.bars?.length && starts.length) {
+    const since = starts.reduce((a, b) => (a >= b ? a : b));
+    return Math.max(
+      opts.bars.filter((bar) => bar.time >= since).length,
+      1,
+    );
+  }
+  let n = Math.max(opts.dailyDays, 1);
+  if (opts.weekOn && (opts.weekDays ?? 0) > 0) n = Math.min(n, (opts.weekDays ?? 0) * 5);
+  if (opts.monthOn && (opts.monthDays ?? 0) > 0) n = Math.min(n, (opts.monthDays ?? 0) * 20);
+  if (opts.cross) n = Math.min(n, Math.max(opts.crossDays ?? 1, 1));
+  return Math.max(n, 1);
+}
+
+export function signalDurationLines(hit: {
+  ma4CrossUpMa7: boolean;
+  crossDays: number;
+  weekOnMa4: boolean;
+  weekDays: number;
+  monthOnMa4: boolean;
+  monthDays: number;
+  days: number;
+}): string[] {
+  const lines: string[] = [];
+  if (hit.ma4CrossUpMa7) lines.push(`上叉${Math.max(hit.crossDays, 1)}日`);
+  if (hit.weekOnMa4) lines.push(`周${Math.max(hit.weekDays, 1)}周`);
+  if (hit.monthOnMa4) lines.push(`月${Math.max(hit.monthDays, 1)}月`);
+  lines.push(`日${hit.days}日`);
+  return lines;
 }
 
 export function weekStandsOnMa4(bars: KBar[], price?: number | null): boolean {
@@ -205,18 +291,47 @@ export function decorateMa4Crosses(
   return crosses.map((cross) => {
     const stock = byCode.get(cross.code);
     if (!stock) {
-      return { ...cross, ma4CrossUpMa7: false, weekOnMa4: false, monthOnMa4: false, weekDays: 0, monthDays: 0 };
+      return {
+        ...cross,
+        ma4CrossUpMa7: false,
+        weekOnMa4: false,
+        monthOnMa4: false,
+        weekDays: 0,
+        monthDays: 0,
+        crossDays: 0,
+        holdDays: cross.days,
+      };
     }
     const closes = stock.bars.map((bar) => bar.close);
     const week = periodStand(dailyToWeekly(stock.bars), stock.price);
     const month = periodStand(dailyToMonthly(stock.bars), stock.price);
+    const crossed = ma4CrossedUpMa7(closes);
+    const crossDays = crossed ? consecutiveMa4AboveMa7(closes) : 0;
+    const lastTime = stock.bars.at(-1)?.time;
+    const weekSince = week.on && week.since ? weekStart(week.since) : "";
+    const monthSince = month.on && month.since.length >= 7 ? `${month.since.slice(0, 7)}-01` : "";
     return {
       ...cross,
-      ma4CrossUpMa7: ma4CrossedUpMa7(closes),
+      ma4CrossUpMa7: crossed,
       weekOnMa4: week.on,
       monthOnMa4: month.on,
       weekDays: week.days,
       monthDays: month.days,
+      crossDays,
+      holdDays: conditionHoldDays({
+        dailyDays: cross.days,
+        dailySince: cross.time,
+        weekOn: week.on,
+        weekDays: week.days,
+        weekSince,
+        monthOn: month.on,
+        monthDays: month.days,
+        monthSince,
+        cross: crossed,
+        crossDays,
+        lastTime,
+        bars: stock.bars,
+      }),
     };
   });
 }
@@ -226,8 +341,10 @@ function hitRank(hit: Ma4StandHit): number[] {
     hit.ma4CrossUpMa7 ? 0 : 1,
     hit.weekOnMa4 ? 0 : 1,
     hit.monthOnMa4 ? 0 : 1,
+    hit.ma4CrossUpMa7 ? hit.crossDays : 0,
     hit.weekOnMa4 ? hit.weekDays : 0,
     hit.monthOnMa4 ? hit.monthDays : 0,
+    hit.holdDays,
     hit.days,
   ];
 }
@@ -245,7 +362,7 @@ function betterHit(next: Ma4StandHit, prev: Ma4StandHit | undefined): boolean {
 /**
  * 红框覆盖最新一根、且板块指数站上 MA4 的行业里，
  * 收盘站上 MA4 的成分股：MA4 上叉 MA7、周 K 站上 MA4、月 K 站上 MA4 更靠前，
- * 同类信号里持续时间越短越靠前。同一只股票只留排序更靠前的那条。不含科创、创业、北交所、ST。
+ * 再按这些条件的持续天数从短到长。同一只股票只留排序更靠前的那条。不含科创、创业、北交所、ST。
  */
 export function collectMa4StandHits(sectors: SectorMa4Screen[]): Ma4StandHit[] {
   const best = new Map<string, Ma4StandHit>();
@@ -258,6 +375,12 @@ export function collectMa4StandHits(sectors: SectorMa4Screen[]): Ma4StandHit[] {
       const member = members.get(cross.code);
       const name = cross.name || member?.name || cross.code;
       if (!isScreenerShare(cross.code, name)) continue;
+      const ma4CrossUpMa7 = Boolean(cross.ma4CrossUpMa7);
+      const weekOnMa4 = Boolean(cross.weekOnMa4);
+      const monthOnMa4 = Boolean(cross.monthOnMa4);
+      const weekDays = cross.weekDays ?? 0;
+      const monthDays = cross.monthDays ?? 0;
+      const crossDays = ma4CrossUpMa7 ? Math.max(cross.crossDays ?? 1, 1) : 0;
       const hit: Ma4StandHit = {
         code: cross.code,
         name,
@@ -268,11 +391,25 @@ export function collectMa4StandHits(sectors: SectorMa4Screen[]): Ma4StandHit[] {
         price: member?.price ?? null,
         pct: member?.pct ?? null,
         turnover: member?.turnover ?? null,
-        ma4CrossUpMa7: Boolean(cross.ma4CrossUpMa7),
-        weekOnMa4: Boolean(cross.weekOnMa4),
-        monthOnMa4: Boolean(cross.monthOnMa4),
-        weekDays: cross.weekDays ?? 0,
-        monthDays: cross.monthDays ?? 0,
+        ma4CrossUpMa7,
+        weekOnMa4,
+        monthOnMa4,
+        weekDays,
+        monthDays,
+        crossDays,
+        holdDays:
+          cross.holdDays ??
+          conditionHoldDays({
+            dailyDays: cross.days,
+            dailySince: cross.time,
+            weekOn: weekOnMa4,
+            weekDays,
+            monthOn: monthOnMa4,
+            monthDays,
+            cross: ma4CrossUpMa7,
+            crossDays,
+            lastTime: sector.lastTime,
+          }),
       };
       if (betterHit(hit, best.get(hit.code))) best.set(hit.code, hit);
     }
