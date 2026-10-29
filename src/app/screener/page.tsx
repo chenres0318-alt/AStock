@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "选股 · AStock 看盘",
-  description: "红框行业且指数站上MA4，成分股按站上MA4持续时间从短到长",
+  description: "红框行业且指数站上MA4，成分股按上叉/周K/月K及持续时间从短到长",
 };
 
 export default function ScreenerPage() {
