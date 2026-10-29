@@ -138,7 +138,7 @@ export async function loadBoardMa4Screen(code: string): Promise<SectorMa4Screen 
   }
   const members = await loadMembers(boardCode);
   if (members.length < 5) return null;
-  const stocks = await memberSeries(members, 40, 3);
+  const stocks = await memberSeries(members, 120, 3);
   if (stocks.length < 5) return null;
   const quoted = fillMemberQuotes(members, stocks);
   const paths = toMemberPaths(stocks);

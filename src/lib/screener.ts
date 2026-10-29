@@ -12,7 +12,8 @@ const FIRST_WAIT_MS = 2_000;
 function hitReasons(row: ReturnType<typeof collectMa4StandHits>[number]): string[] {
   const reasons: string[] = [];
   if (row.ma4CrossUpMa7) reasons.push("MA4上叉MA7");
-  if (row.weekOnMa4) reasons.push("周K站上MA4");
+  if (row.weekOnMa4) reasons.push(row.weekDays > 1 ? `周K站上MA4共${row.weekDays}周` : "周K站上MA4");
+  if (row.monthOnMa4) reasons.push(row.monthDays > 1 ? `月K站上MA4共${row.monthDays}月` : "月K站上MA4");
   reasons.push(`站上MA4共${row.days}日`, "板块红框", "板块指数站上MA4");
   return reasons;
 }

@@ -267,7 +267,7 @@ export default function Screener() {
           选股：板块当前红框（不限第几天）、指数站上 MA4 的同花顺行业，再列出收盘站上 MA4 的成分股
         </div>
         <div className="mt-2 max-w-4xl text-xs leading-5 text-mute">
-          先找当前红框、且指数收盘站上 4 日线的同花顺行业，不区分红框第几天。再列出里面收盘站上 MA4 的股票。扫到就显示，并按 MA4 上叉 MA7、周 K 站上 MA4、站上 MA4 天数越短重新排序。不含科创板、创业板、北交所、ST。同一只股票只出现一次。结果带所属板块，可点进板块页核对红框。
+          先找当前红框、且指数收盘站上 4 日线的同花顺行业，不区分红框第几天。再列出里面收盘站上 MA4 的股票。MA4 上叉 MA7、周 K 站上 MA4、月 K 站上 MA4 更好；同类信号持续时间越短越靠前。扫到就显示。不含科创板、创业板、北交所、ST。同一只股票只出现一次。结果带所属板块，可点进板块页核对红框。
         </div>
       </section>
 
@@ -300,7 +300,7 @@ export default function Screener() {
         />
         {loading ? (
           <div className="border-b border-line px-4 py-2 text-xs text-mute">
-            边扫边显示，扫到就按上叉 / 周K / 天数重新排序。已扫 {meta?.scanned ?? 0}
+            边扫边显示，扫到就按上叉 / 周K / 月K / 持续天数重新排序。已扫 {meta?.scanned ?? 0}
             {meta?.universe ? `/${meta.universe}` : ""} · 命中 {hits.length}
           </div>
         ) : null}
