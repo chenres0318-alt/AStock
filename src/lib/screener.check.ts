@@ -1,5 +1,7 @@
 import {
   collectMa4StandHits,
+  conditionHoldDays,
+  consecutiveMa4AboveMa7,
   consecutiveOnMa4,
   dailyToMonthly,
   dailyToWeekly,
@@ -8,6 +10,7 @@ import {
   ma4CrossedUpMa7,
   matchIndustryBoard,
   monthStandsOnMa4,
+  signalDurationLines,
   weekStandsOnMa4,
   type SectorMa4Screen,
 } from "./screenerLogic.ts";
@@ -210,6 +213,69 @@ const freshMonth = collectMa4StandHits([
 ]);
 assert(freshMonth[0]?.name === "月新", "a newly standing monthly MA4 ranks ahead of a longer monthly stand");
 
+const sameFlagsHold = collectMa4StandHits([
+  screen({
+    code: "881121",
+    name: "半导体",
+    crosses: [
+      {
+        code: "sh600032",
+        name: "横店样",
+        days: 4,
+        time: "2026-10-26",
+        ma4CrossUpMa7: true,
+        weekOnMa4: true,
+        monthOnMa4: true,
+        weekDays: 1,
+        monthDays: 2,
+        crossDays: 1,
+      },
+      {
+        code: "sh600033",
+        name: "平安样",
+        days: 1,
+        time: "2026-10-29",
+        ma4CrossUpMa7: true,
+        weekOnMa4: true,
+        monthOnMa4: true,
+        weekDays: 1,
+        monthDays: 3,
+        crossDays: 1,
+      },
+    ],
+    members: [
+      { code: "sh600032", name: "横店样", price: 10, pct: 1, turnover: 1 },
+      { code: "sh600033", name: "平安样", price: 11, pct: 1, turnover: 1 },
+    ],
+  }),
+]);
+assert(sameFlagsHold[0]?.holdDays === 1 && sameFlagsHold[1]?.holdDays === 1, "a fresh MA4/MA7 cross means the whole set has only held for one day");
+assert(
+  sameFlagsHold.map((row) => row.name).join(",") === "横店样,平安样",
+  "among the same 上叉/周K/月K set, the shorter monthly stand still ranks first",
+);
+assert(
+  signalDurationLines(sameFlagsHold[0]).join(",") === "上叉1日,周1周,月2月,日4日",
+  "duration lines list every condition on the right",
+);
+
+const sameWeekMonth = collectMa4StandHits([
+  screen({
+    code: "881121",
+    name: "半导体",
+    crosses: [
+      { code: "sh600034", name: "贵阳样", days: 4, time: "2026-10-26", weekOnMa4: true, monthOnMa4: true, weekDays: 1, monthDays: 3 },
+      { code: "sh600035", name: "苏州样", days: 1, time: "2026-10-29", weekOnMa4: true, monthOnMa4: true, weekDays: 1, monthDays: 3 },
+    ],
+    members: [
+      { code: "sh600034", name: "贵阳样", price: 10, pct: 1, turnover: 1 },
+      { code: "sh600035", name: "苏州样", price: 11, pct: 1, turnover: 1 },
+    ],
+  }),
+]);
+assert(sameWeekMonth[0]?.name === "苏州样", "the same 周K/月K set ranks by how long those conditions have all been true");
+assert(sameWeekMonth[0]?.holdDays === 1 && sameWeekMonth[1]?.holdDays === 4, "one-day daily stand is the shorter hold of the set");
+
 const wave1 = collectMa4StandHits([
   screen({
     code: "881121",
@@ -272,6 +338,24 @@ assert(consecutiveOnMa4([10, 11, 12, 13]) === 1, "four rising closes are the fir
 const crossCloses = [10, 10, 10, 10, 10, 10, 10, 14];
 assert(ma4CrossedUpMa7(crossCloses), "a jump that lifts MA4 through MA7 is a golden cross");
 assert(!ma4CrossedUpMa7([10, 10, 10, 10, 10, 10, 10, 10]), "a flat tape is not a MA4/MA7 cross");
+assert(consecutiveMa4AboveMa7(crossCloses) === 1, "the cross day is the first day MA4 stays above MA7");
+assert(
+  conditionHoldDays({
+    dailyDays: 4,
+    dailySince: "2026-10-26",
+    weekOn: true,
+    weekDays: 1,
+    weekSince: "2026-10-26",
+    monthOn: true,
+    monthDays: 2,
+    monthSince: "2026-09-30",
+    cross: true,
+    crossDays: 1,
+    lastTime: "2026-10-29",
+    bars: ["2026-10-26", "2026-10-27", "2026-10-28", "2026-10-29"].map((time) => bar(time, 13)),
+  }) === 1,
+  "the latest condition (the cross) caps how long the whole set has held",
+);
 
 const decorated = decorateMa4Crosses(
   [{ code: "sh600030", name: "装饰", days: 2, time: "2026-10-27" }],
@@ -286,6 +370,7 @@ const monthDecorated = decorateMa4Crosses(
 );
 assert(monthDecorated[0]?.monthOnMa4 === true, "decorate fills monthly MA4 from the daily tape");
 assert(monthDecorated[0]?.monthDays === 1, "the first qualified month counts as one month on MA4");
+assert((monthDecorated[0]?.holdDays ?? 0) >= 1, "decorate fills how long the current conditions have held");
 
 {
   const missed = await raceDeadline(new Promise((resolve) => setTimeout(() => resolve("late"), 80)), 15);

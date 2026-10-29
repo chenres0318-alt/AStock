@@ -129,8 +129,16 @@ export type ScreenerHit = {
   dif: number;
   dea: number;
   hist: number;
-  /** 连续收盘站上 MA4 的交易日数（含当天）。 */
+  /** 右侧这些条件同时成立的交易日数（含当天）。 */
   standDays: number;
+  /** 日线连续收盘站上 MA4 的交易日数。 */
+  dailyDays?: number;
+  /** MA4 上叉 MA7 已持续的交易日数；未上叉为 0。 */
+  crossDays?: number;
+  /** 周 K 连续站上 MA4 的周数；未站上为 0。 */
+  weekDays?: number;
+  /** 月 K 连续站上 MA4 的月数；未站上为 0。 */
+  monthDays?: number;
   reasons: string[];
   sector: string | null;
   sectorCode: string | null;
