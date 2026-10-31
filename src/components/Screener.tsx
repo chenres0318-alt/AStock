@@ -72,15 +72,6 @@ async function readJson<T>(url: string, signal?: AbortSignal): Promise<T> {
   }
 }
 
-function durationHint(item: ScreenerHit): string {
-  const parts: string[] = [];
-  if (item.crossDays) parts.push(`上叉${item.crossDays}日`);
-  if (item.weekDays) parts.push(`周${item.weekDays}周`);
-  if (item.monthDays) parts.push(`月${item.monthDays}月`);
-  if (item.dailyDays != null) parts.push(`日${item.dailyDays}日`);
-  return parts.join(" · ");
-}
-
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
@@ -151,10 +142,7 @@ function HitTable({
                 {formatPrice(item.price, priceDigits(item.code, item.name))}
               </td>
               <td className={`num px-3 py-2 text-right ${toneClass(item.pct)}`}>{formatPct(item.pct)}</td>
-              <td className="px-3 py-2 text-right">
-                <div className="num">{item.standDays}日</div>
-                <div className="mt-0.5 text-[10px] leading-4 text-mute">{durationHint(item)}</div>
-              </td>
+              <td className="num px-3 py-2 text-right">{item.standDays}日</td>
               <td className="px-3 py-2">
                 <div className="flex flex-wrap gap-1">
                   {item.reasons.map((reason) => (
@@ -279,7 +267,7 @@ export default function Screener() {
           选股：板块当前红框（不限第几天）、指数站上 MA4 的同花顺行业，再列出收盘站上 MA4 的成分股
         </div>
         <div className="mt-2 max-w-4xl text-xs leading-5 text-mute">
-          先找当前红框、且指数收盘站上 4 日线的同花顺行业，不区分红框第几天。再列出里面收盘站上 MA4 的股票。MA4 上叉 MA7、周 K 站上 MA4、月 K 站上 MA4 更好；排序和持续天数按右侧这些条件同时成立的天数，以及各条件自己的持续（短的在前）。扫到就显示。不含科创板、创业板、北交所、ST。同一只股票只出现一次。结果带所属板块，可点进板块页核对红框。
+          先找当前红框、且指数收盘站上 4 日线的同花顺行业，不区分红框第几天。再列出里面收盘站上 MA4 的股票。持续天数是日 K 收盘站上 MA4 的天数。条件按满足了哪些显示。满足的条件越多、MA4 持续越短，越靠前。扫到就显示。不含科创板、创业板、北交所、ST。同一只股票只出现一次。结果带所属板块，可点进板块页核对红框。
         </div>
       </section>
 
@@ -312,7 +300,7 @@ export default function Screener() {
         />
         {loading ? (
           <div className="border-b border-line px-4 py-2 text-xs text-mute">
-            边扫边显示，扫到就按上叉 / 周K / 月K / 条件持续重新排序。已扫 {meta?.scanned ?? 0}
+            边扫边显示，扫到就按条件数量、日 K 站上 MA4 天数重新排序。已扫 {meta?.scanned ?? 0}
             {meta?.universe ? `/${meta.universe}` : ""} · 命中 {hits.length}
           </div>
         ) : null}

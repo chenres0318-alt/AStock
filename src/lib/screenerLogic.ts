@@ -336,17 +336,12 @@ export function decorateMa4Crosses(
   });
 }
 
+function extraConditionCount(hit: Pick<Ma4StandHit, "ma4CrossUpMa7" | "weekOnMa4" | "monthOnMa4">): number {
+  return (hit.ma4CrossUpMa7 ? 1 : 0) + (hit.weekOnMa4 ? 1 : 0) + (hit.monthOnMa4 ? 1 : 0);
+}
+
 function hitRank(hit: Ma4StandHit): number[] {
-  return [
-    hit.ma4CrossUpMa7 ? 0 : 1,
-    hit.weekOnMa4 ? 0 : 1,
-    hit.monthOnMa4 ? 0 : 1,
-    hit.ma4CrossUpMa7 ? hit.crossDays : 0,
-    hit.weekOnMa4 ? hit.weekDays : 0,
-    hit.monthOnMa4 ? hit.monthDays : 0,
-    hit.holdDays,
-    hit.days,
-  ];
+  return [-extraConditionCount(hit), hit.days];
 }
 
 function betterHit(next: Ma4StandHit, prev: Ma4StandHit | undefined): boolean {
@@ -361,8 +356,8 @@ function betterHit(next: Ma4StandHit, prev: Ma4StandHit | undefined): boolean {
 
 /**
  * 红框覆盖最新一根、且板块指数站上 MA4 的行业里，
- * 收盘站上 MA4 的成分股：MA4 上叉 MA7、周 K 站上 MA4、月 K 站上 MA4 更靠前，
- * 再按这些条件的持续天数从短到长。同一只股票只留排序更靠前的那条。不含科创、创业、北交所、ST。
+ * 收盘站上 MA4 的成分股：满足的加分条件（MA4 上叉 MA7、周 K 站上 MA4、月 K 站上 MA4）越多越靠前，
+ * 同样条数再按日 K 收盘站上 MA4 的天数从短到长。同一只股票只留排序更靠前的那条。不含科创、创业、北交所、ST。
  */
 export function collectMa4StandHits(sectors: SectorMa4Screen[]): Ma4StandHit[] {
   const best = new Map<string, Ma4StandHit>();
