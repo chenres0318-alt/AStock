@@ -7,6 +7,8 @@ import type { KBar, KlinePeriod } from "@/lib/types";
 
 const UP = "#ff5c5c";
 const DOWN = "#1ecb93";
+const MA4 = "#e4b454";
+const MA4_STAND = "#2ad4c8";
 
 function formatChartTime(time: unknown, withDate: boolean, period: KlinePeriod): string {
   let value = "";
@@ -24,10 +26,12 @@ export default function IndexKlineChart({
   bars,
   digits = 2,
   period = "day",
+  stand = false,
 }: {
   bars: KBar[];
   digits?: number;
   period?: KlinePeriod;
+  stand?: boolean;
 }) {
   const boxRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -72,8 +76,8 @@ export default function IndexKlineChart({
       wickDownColor: DOWN,
     });
     const ma4 = chart.addLineSeries({
-      color: UP,
-      lineWidth: 1,
+      color: MA4,
+      lineWidth: 2,
       priceLineVisible: false,
       lastValueVisible: true,
       crosshairMarkerVisible: false,
@@ -96,7 +100,10 @@ export default function IndexKlineChart({
     if (!candle || !ma4 || !chart) return;
     const minMove = digits >= 3 ? 0.001 : 0.01;
     candle.applyOptions({ priceFormat: { type: "price", precision: digits, minMove } });
-    ma4.applyOptions({ priceFormat: { type: "price", precision: digits, minMove } });
+    ma4.applyOptions({
+      color: stand ? MA4_STAND : MA4,
+      priceFormat: { type: "price", precision: digits, minMove },
+    });
     const closes = bars.map((bar) => bar.close);
     candle.setData(
       bars.map((bar) => ({
@@ -114,7 +121,7 @@ export default function IndexKlineChart({
       }),
     );
     requestAnimationFrame(() => chart.timeScale().fitContent());
-  }, [bars, digits]);
+  }, [bars, digits, stand]);
 
   return <div ref={boxRef} className="h-[220px] w-full" />;
 }
