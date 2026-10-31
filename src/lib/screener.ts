@@ -11,10 +11,10 @@ const FIRST_WAIT_MS = 2_000;
 
 function hitReasons(row: ReturnType<typeof collectMa4StandHits>[number]): string[] {
   const reasons: string[] = [];
-  if (row.ma4CrossUpMa7) reasons.push(`MA4上叉MA7共${Math.max(row.crossDays, 1)}日`);
-  if (row.weekOnMa4) reasons.push(`周K站上MA4共${Math.max(row.weekDays, 1)}周`);
-  if (row.monthOnMa4) reasons.push(`月K站上MA4共${Math.max(row.monthDays, 1)}月`);
-  reasons.push(`站上MA4共${row.days}日`, "板块红框", "板块指数站上MA4");
+  if (row.ma4CrossUpMa7) reasons.push("MA4上叉MA7");
+  if (row.weekOnMa4) reasons.push("周K站上MA4");
+  if (row.monthOnMa4) reasons.push("月K站上MA4");
+  reasons.push("板块红框", "板块指数站上MA4");
   return reasons;
 }
 
@@ -33,11 +33,7 @@ function toHit(row: ReturnType<typeof collectMa4StandHits>[number]): ScreenerHit
     dif: 0,
     dea: 0,
     hist: 0,
-    standDays: row.holdDays,
-    dailyDays: row.days,
-    crossDays: row.crossDays,
-    weekDays: row.weekOnMa4 ? row.weekDays : 0,
-    monthDays: row.monthOnMa4 ? row.monthDays : 0,
+    standDays: row.days,
     reasons: hitReasons(row),
     sector: row.sector,
     sectorCode: row.sectorCode,
