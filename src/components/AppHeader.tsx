@@ -7,6 +7,7 @@ import { useHoldings } from "@/lib/useHoldings";
 const LINKS = [
   { href: "/", label: "看盘" },
   { href: "/sector", label: "板块" },
+  { href: "/quotes", label: "行情" },
   { href: "/screener", label: "选股" },
   { href: "/holdings", label: "持仓" },
   { href: "/analyze", label: "分析" },

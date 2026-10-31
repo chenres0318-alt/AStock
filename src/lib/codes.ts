@@ -74,8 +74,16 @@ export function marketOf(input: string): Market {
   return "SZ";
 }
 
+/** 腾讯外盘代码：usIXIC / usINX / hf_GC / hkHSI。 */
+export function isForeignTencentCode(input: string): boolean {
+  return /^(us[a-z0-9]+|hk[a-z0-9]+|hf_[a-z0-9]+|nf_[a-z0-9]+)$/i.test(input.trim());
+}
+
 export function toTencentCode(input: string): string {
-  const raw = input.trim().toLowerCase();
+  const trimmed = input.trim();
+  if (/^us[a-z0-9]+$/i.test(trimmed)) return `us${trimmed.slice(2).toUpperCase()}`;
+  if (/^(hk[a-z0-9]+|hf_[a-z0-9]+|nf_[a-z0-9]+)$/i.test(trimmed)) return trimmed;
+  const raw = trimmed.toLowerCase();
   if (/^(sh|sz|bj)\d{6}$/.test(raw)) return raw;
   const code = bareCode(raw);
   if (INDEX_CODES.has(`sh${code}`) && (raw.includes("sh") || raw.startsWith("1."))) {

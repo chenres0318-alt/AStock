@@ -1,6 +1,8 @@
 import { listAllIndustryBoards } from "./boards";
 import { cached } from "./cache";
-import { DEFAULT_WATCHLIST, INDICES, SECTOR_ETFS, limitPercent, toTencentCode } from "./codes";
+import { DEFAULT_WATCHLIST, INDICES, SECTOR_ETFS, isForeignTencentCode, limitPercent, toTencentCode } from "./codes";
+import { quotesInstrument } from "./quotesBoard";
+import { fetchSinaFuturesKline } from "./sources/sinaFutures";
 import { firstOk } from "./http";
 import { getMarketStatus } from "./market-status";
 import { fetchEastMoneyMainNet, fetchEastMoneySearch } from "./sources/eastmoney";
@@ -36,10 +38,18 @@ export async function getOverview(codes: string[]) {
 }
 
 export async function getKline(code: string, period: KlinePeriod): Promise<KBar[]> {
+  const spec = quotesInstrument(code);
+  if (spec?.source === "sina" && spec.sinaSymbol) {
+    const count = period === "day" ? 400 : 180;
+    return cached(`kline:sina:${spec.sinaSymbol}:${period}:${count}`, 60_000, () =>
+      fetchSinaFuturesKline(spec.sinaSymbol!, period, count),
+    );
+  }
   const count = period === "day" ? 500 : 180;
-  return cached(`kline:${toTencentCode(code)}:${period}:${count}:flow`, 20_000, async () => {
+  const tx = toTencentCode(code);
+  return cached(`kline:${tx}:${period}:${count}:flow`, 20_000, async () => {
     const bars = await fetchTencentKline(code, period, count);
-    if (period !== "day") return bars;
+    if (period !== "day" || isForeignTencentCode(tx)) return bars;
     try {
       const flow = await fetchEastMoneyMainNet(code, count);
       return bars.map((bar) => ({ ...bar, mainNet: flow.get(bar.time) ?? null }));
