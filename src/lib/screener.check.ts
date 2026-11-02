@@ -137,8 +137,8 @@ const rankedBoost = collectMa4StandHits([
   }),
 ]);
 assert(
-  rankedBoost.map((row) => row.name).join(",") === "周线,上叉,短站无加成",
-  "the same extra-condition count ranks by shorter daily MA4 stand, then names with fewer extras",
+  rankedBoost.map((row) => row.name).join(",") === "上叉,周线,短站无加成",
+  "one extra condition ranks by shorter hold of that set, then names with none",
 );
 
 const weekBeatsShort = collectMa4StandHits([
@@ -176,8 +176,8 @@ const monthRank = collectMa4StandHits([
   }),
 ]);
 assert(
-  monthRank.map((row) => row.name).join(",") === "周线,月线,上叉,短",
-  "one extra condition ranks by shorter daily MA4 stand, then names with none",
+  monthRank.map((row) => row.name).join(",") === "上叉,周线,月线,短",
+  "one extra condition ranks by shorter hold of that set, then names with none",
 );
 
 const freshWeek = collectMa4StandHits([
@@ -194,7 +194,7 @@ const freshWeek = collectMa4StandHits([
     ],
   }),
 ]);
-assert(freshWeek[0]?.name === "周旧", "the same extra conditions rank by shorter daily MA4 stand");
+assert(freshWeek[0]?.name === "周旧", "the same extra conditions rank by shorter simultaneous hold");
 
 const freshMonth = collectMa4StandHits([
   screen({
@@ -210,7 +210,7 @@ const freshMonth = collectMa4StandHits([
     ],
   }),
 ]);
-assert(freshMonth[0]?.name === "月旧", "the same extra conditions rank by shorter daily MA4 stand");
+assert(freshMonth[0]?.name === "月旧", "the same extra conditions rank by shorter simultaneous hold");
 
 const sameFlagsHold = collectMa4StandHits([
   screen({
@@ -250,9 +250,10 @@ const sameFlagsHold = collectMa4StandHits([
 ]);
 assert(
   sameFlagsHold.map((row) => row.name).join(",") === "平安样,横店样",
-  "the same three extras rank by shorter daily MA4 stand",
+  "the same three extras rank by shorter simultaneous hold, then shorter daily MA4",
 );
-assert(sameFlagsHold[0]?.days === 1 && sameFlagsHold[1]?.days === 4, "持续天数 is the daily close-on-MA4 streak");
+assert(sameFlagsHold[0]?.holdDays === 1 && sameFlagsHold[1]?.holdDays === 1, "上叉 caps how long the three extras have held");
+assert(sameFlagsHold[0]?.days === 1 && sameFlagsHold[1]?.days === 4, "daily MA4 days still break a holdDays tie");
 
 const sameWeekMonth = collectMa4StandHits([
   screen({
@@ -268,8 +269,8 @@ const sameWeekMonth = collectMa4StandHits([
     ],
   }),
 ]);
-assert(sameWeekMonth[0]?.name === "苏州样", "the same 周K/月K set ranks by shorter daily MA4 stand");
-assert(sameWeekMonth[0]?.days === 1 && sameWeekMonth[1]?.days === 4, "持续天数 is the daily close-on-MA4 streak");
+assert(sameWeekMonth[0]?.name === "苏州样", "the same 周K/月K set ranks by shorter simultaneous hold");
+assert(sameWeekMonth[0]?.holdDays === 1 && sameWeekMonth[1]?.holdDays === 4, "持续天数 is how long the current extras have all held");
 
 const moreExtras = collectMa4StandHits([
   screen({
@@ -286,6 +287,23 @@ const moreExtras = collectMa4StandHits([
   }),
 ]);
 assert(moreExtras[0]?.name === "三条件长", "more extra conditions rank first even with a longer daily MA4 stand");
+
+const sameCountShorterHold = collectMa4StandHits([
+  screen({
+    code: "881121",
+    name: "半导体",
+    crosses: [
+      { code: "sh600038", name: "周线已久", days: 10, time: "2026-10-12", weekOnMa4: true, weekDays: 8 },
+      { code: "sh600039", name: "上叉刚成", days: 10, time: "2026-10-12", ma4CrossUpMa7: true, crossDays: 1 },
+    ],
+    members: [
+      { code: "sh600038", name: "周线已久", price: 10, pct: 1, turnover: 1 },
+      { code: "sh600039", name: "上叉刚成", price: 11, pct: 1, turnover: 1 },
+    ],
+  }),
+]);
+assert(sameCountShorterHold[0]?.name === "上叉刚成", "the same extra count ranks the newer condition set first");
+assert(sameCountShorterHold[0]?.holdDays === 1 && sameCountShorterHold[1]?.holdDays === 10, "holdDays follows the latest extra");
 
 const wave1 = collectMa4StandHits([
   screen({
