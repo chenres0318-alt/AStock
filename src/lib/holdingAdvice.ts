@@ -42,52 +42,41 @@ export function adviseHolding(input: {
   sectorResolved: boolean;
   standDays?: number | null;
 }): HoldingAdvice {
-  if (!input.hasSector) {
-    return {
-      action: "exit",
-      label: "需要离场",
-      stockOnMa4: input.stockOnMa4,
-      sectorOnMa4: false,
-      sectorInRedBox: false,
-      notes: ["缺少所属板块，无法按选股条件核对"],
-    };
-  }
-  if (!input.sectorResolved) {
-    return {
-      action: "exit",
-      label: "需要离场",
-      stockOnMa4: input.stockOnMa4,
-      sectorOnMa4: false,
-      sectorInRedBox: false,
-      notes: ["板块状态暂无法核对"],
-    };
-  }
+  const sectorKnown = input.hasSector && input.sectorResolved;
+  const bothBroken = sectorKnown && !input.stockOnMa4 && !input.sectorOnMa4;
 
-  const hold = input.stockOnMa4 && input.sectorOnMa4 && input.sectorInRedBox;
-  if (hold) {
+  if (bothBroken) {
     return {
-      action: "hold",
-      label: "继续持仓",
-      stockOnMa4: true,
-      sectorOnMa4: true,
-      sectorInRedBox: true,
-      notes: [
-        "板块红框",
-        "板块指数站上MA4",
-        input.standDays ? `个股站上MA4共${input.standDays}日` : "个股站上MA4",
-      ],
+      action: "exit",
+      label: "需要离场",
+      stockOnMa4: false,
+      sectorOnMa4: false,
+      sectorInRedBox: input.sectorInRedBox,
+      notes: ["股价收盘跌破MA4", "板块指数跌破MA4"],
     };
   }
 
   const notes: string[] = [];
-  if (!input.sectorInRedBox) notes.push("板块已离开红色趋势区间");
-  if (!input.sectorOnMa4) notes.push("板块指数跌破MA4");
-  if (!input.stockOnMa4) notes.push("股价收盘跌破MA4");
+  if (input.stockOnMa4) {
+    notes.push(input.standDays ? `个股站上MA4共${input.standDays}日` : "个股站上MA4");
+  } else {
+    notes.push("股价收盘跌破MA4");
+  }
+  if (!input.hasSector) {
+    notes.push("缺少所属板块，板块指数未核对");
+  } else if (!input.sectorResolved) {
+    notes.push("板块指数暂无法核对");
+  } else if (input.sectorOnMa4) {
+    notes.push("板块指数站上MA4");
+  } else {
+    notes.push("板块指数跌破MA4");
+  }
+
   return {
-    action: "exit",
-    label: "需要离场",
+    action: "hold",
+    label: "继续持仓",
     stockOnMa4: input.stockOnMa4,
-    sectorOnMa4: input.sectorOnMa4,
+    sectorOnMa4: sectorKnown ? input.sectorOnMa4 : false,
     sectorInRedBox: input.sectorInRedBox,
     notes,
   };
