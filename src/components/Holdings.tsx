@@ -312,7 +312,7 @@ export default function Holdings() {
                     {status ? (
                       <div className={`mt-1 text-xs ${hold ? "text-down" : "text-up"}`}>{status.label}</div>
                     ) : (
-                      <div className="mt-1 text-xs text-mute">{statusLoading ? "按选股条件核对…" : "待核对"}</div>
+                      <div className="mt-1 text-xs text-mute">{statusLoading ? "按 MA4 核对…" : "待核对"}</div>
                     )}
                     {status?.notes.length ? (
                       <div className="mt-0.5 text-[11px] leading-4 text-mute">{status.notes.join(" · ")}</div>
@@ -355,7 +355,7 @@ export default function Holdings() {
       </div>
 
       <p className="pb-1 text-center text-[11px] text-mute">
-        搜索加入或从选股点 + 。继续持仓 / 需要离场按当前选股条件核对：板块红框、板块指数站上 MA4、个股收盘站上 MA4。仅供看盘学习，不构成投资建议。
+        搜索加入或从选股点 + 。需要离场仅当个股跌破 MA4 且板块指数同时跌破 MA4；不看板块是否还在红色趋势区间。仅供看盘学习，不构成投资建议。
       </p>
     </div>
   );

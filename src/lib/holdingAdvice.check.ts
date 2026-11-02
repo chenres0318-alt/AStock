@@ -24,8 +24,9 @@ const keep = adviseHolding({
   sectorResolved: true,
   standDays: 2,
 });
-assert(keep.action === "hold" && keep.label === "继续持仓", "all three screener conditions still hold");
-assert(keep.notes.includes("板块红框"), "hold notes keep the red-box condition");
+assert(keep.action === "hold" && keep.label === "继续持仓", "stock and sector both on MA4 is a hold");
+assert(!keep.notes.includes("板块红框"), "red-box trend is not part of the hold check");
+assert(keep.notes.includes("板块指数站上MA4"), "hold notes keep the sector MA4");
 assert(keep.notes.some((note) => note.includes("2日")), "hold notes keep the MA4 stand days");
 
 const stockBreak = adviseHolding({
@@ -35,9 +36,9 @@ const stockBreak = adviseHolding({
   hasSector: true,
   sectorResolved: true,
 });
-assert(stockBreak.action === "exit" && stockBreak.label === "需要离场", "stock off MA4 means exit");
-assert(stockBreak.notes.includes("股价收盘跌破MA4"), "stock break is named");
-assert(!stockBreak.notes.includes("板块已离开红色趋势区间"), "still-true sector conditions are not listed as exit reasons");
+assert(stockBreak.action === "hold", "stock off MA4 alone is not an exit");
+assert(stockBreak.notes.includes("股价收盘跌破MA4"), "stock break is still named");
+assert(stockBreak.notes.includes("板块指数站上MA4"), "sector still on MA4 is named");
 
 const indexBreak = adviseHolding({
   stockOnMa4: true,
@@ -46,7 +47,21 @@ const indexBreak = adviseHolding({
   hasSector: true,
   sectorResolved: true,
 });
+assert(indexBreak.action === "hold", "sector off MA4 alone is not an exit");
 assert(indexBreak.notes.includes("板块指数跌破MA4"), "index break is named");
+assert(indexBreak.notes.some((note) => note.includes("个股站上MA4")), "stock still on MA4 is named");
+
+const bothBreak = adviseHolding({
+  stockOnMa4: false,
+  sectorOnMa4: false,
+  sectorInRedBox: true,
+  hasSector: true,
+  sectorResolved: true,
+});
+assert(bothBreak.action === "exit" && bothBreak.label === "需要离场", "stock and sector both off MA4 means exit");
+assert(bothBreak.notes.includes("股价收盘跌破MA4"), "exit names the stock break");
+assert(bothBreak.notes.includes("板块指数跌破MA4"), "exit names the index break");
+assert(!bothBreak.notes.includes("板块已离开红色趋势区间"), "red-box trend is not an exit reason");
 
 const boxEnd = adviseHolding({
   stockOnMa4: true,
@@ -55,7 +70,8 @@ const boxEnd = adviseHolding({
   hasSector: true,
   sectorResolved: true,
 });
-assert(boxEnd.notes.includes("板块已离开红色趋势区间"), "a closed box means exit");
+assert(boxEnd.action === "hold", "leaving the red box does not force an exit");
+assert(!boxEnd.notes.includes("板块已离开红色趋势区间"), "red-box status is ignored");
 
 const missing = adviseHolding({
   stockOnMa4: true,
@@ -64,17 +80,18 @@ const missing = adviseHolding({
   hasSector: false,
   sectorResolved: false,
 });
-assert(missing.action === "exit", "no sector cannot be confirmed as a hold");
-assert(missing.notes[0].includes("缺少所属板块"), "missing sector is explained");
+assert(missing.action === "hold", "a missing sector is not treated as both broken");
+assert(missing.notes.some((note) => note.includes("缺少所属板块")), "missing sector is explained");
 
 const unresolved = adviseHolding({
-  stockOnMa4: true,
+  stockOnMa4: false,
   sectorOnMa4: false,
   sectorInRedBox: false,
   hasSector: true,
   sectorResolved: false,
 });
-assert(unresolved.notes[0].includes("暂无法核对"), "a failed sector fetch is explained");
+assert(unresolved.action === "hold", "an unresolved sector is not treated as both broken");
+assert(unresolved.notes.some((note) => note.includes("暂无法核对")), "a failed sector fetch is explained");
 
 assert(!closeStandsOnMa4(bars([10, 11, 12])), "fewer than 4 bars cannot stand on MA4");
 assert(closeStandsOnMa4(bars([8, 9, 10, 11, 12])), "a rising close stands on MA4");
