@@ -341,7 +341,7 @@ function extraConditionCount(hit: Pick<Ma4StandHit, "ma4CrossUpMa7" | "weekOnMa4
 }
 
 function hitRank(hit: Ma4StandHit): number[] {
-  return [-extraConditionCount(hit), hit.days];
+  return [-extraConditionCount(hit), hit.holdDays, hit.days];
 }
 
 function betterHit(next: Ma4StandHit, prev: Ma4StandHit | undefined): boolean {
@@ -355,9 +355,10 @@ function betterHit(next: Ma4StandHit, prev: Ma4StandHit | undefined): boolean {
 }
 
 /**
- * 红框覆盖最新一根、且板块指数站上 MA4 的行业里，
- * 收盘站上 MA4 的成分股：满足的加分条件（MA4 上叉 MA7、周 K 站上 MA4、月 K 站上 MA4）越多越靠前，
- * 同样条数再按日 K 收盘站上 MA4 的天数从短到长。同一只股票只留排序更靠前的那条。不含科创、创业、北交所、ST。
+ * 必须：红框覆盖最新一根、板块指数日 K 站上 MA4、个股日 K 站上 MA4。
+ * 加分（非必须）：MA4 上叉 MA7、周 K 站上 MA4、月 K 站上 MA4。
+ * 加分条件越多越靠前；条数相同再按这些条件同时成立的时间从短到长。
+ * 同一只股票只留排序更靠前的那条。不含科创、创业、北交所、ST。
  */
 export function collectMa4StandHits(sectors: SectorMa4Screen[]): Ma4StandHit[] {
   const best = new Map<string, Ma4StandHit>();

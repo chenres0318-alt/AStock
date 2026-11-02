@@ -129,7 +129,7 @@ export type ScreenerHit = {
   dif: number;
   dea: number;
   hist: number;
-  /** 日 K 收盘连续站上 MA4 的交易日数（含当天）。 */
+  /** 当前已达成条件同时成立的交易日数（含当天）。 */
   standDays: number;
   reasons: string[];
   sector: string | null;

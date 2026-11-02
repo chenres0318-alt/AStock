@@ -264,10 +264,10 @@ export default function Screener() {
 
       <section className="panel px-4 py-3">
         <div className="text-sm">
-          选股：板块当前红框（不限第几天）、指数站上 MA4 的同花顺行业，再列出收盘站上 MA4 的成分股
+          选股：必须板块在红色趋势区间、板块指数日 K 站上 MA4、个股日 K 站上 MA4
         </div>
         <div className="mt-2 max-w-4xl text-xs leading-5 text-mute">
-          先找当前红框、且指数收盘站上 4 日线的同花顺行业，不区分红框第几天。再列出里面收盘站上 MA4 的股票。持续天数是日 K 收盘站上 MA4 的天数。条件按满足了哪些显示。满足的条件越多、MA4 持续越短，越靠前。扫到就显示。不含科创板、创业板、北交所、ST。同一只股票只出现一次。结果带所属板块，可点进板块页核对红框。
+          红框不限第几天。周 K 站上 MA4、MA4 上叉 MA7、月 K 站上 MA4 不是必须，有则更好。达成的加分条件越多越靠前；条件数相同则这些条件同时成立的时间越短越靠前。持续天数是当前标签这些条件一起成立的天数。扫到就显示。不含科创板、创业板、北交所、ST。同一只股票只出现一次。所属板块可点进板块页核对红框。
         </div>
       </section>
 
@@ -300,7 +300,7 @@ export default function Screener() {
         />
         {loading ? (
           <div className="border-b border-line px-4 py-2 text-xs text-mute">
-            边扫边显示，扫到就按条件数量、日 K 站上 MA4 天数重新排序。已扫 {meta?.scanned ?? 0}
+            边扫边显示，扫到就按加分条件数量、条件同时成立天数重新排序。已扫 {meta?.scanned ?? 0}
             {meta?.universe ? `/${meta.universe}` : ""} · 命中 {hits.length}
           </div>
         ) : null}

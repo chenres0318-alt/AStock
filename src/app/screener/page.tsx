@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "选股 · AStock 看盘",
-  description: "红框行业且指数站上MA4，成分股按满足条件数量和日K站上MA4天数从短到长",
+  description: "红框且板块指数、个股日K站上MA4；周K、上叉、月K加分，条件越多、同时成立越短越靠前",
 };
 
 export default function ScreenerPage() {
