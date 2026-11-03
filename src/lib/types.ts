@@ -134,6 +134,7 @@ export type ScreenerHit = {
   reasons: string[];
   sector: string | null;
   sectorCode: string | null;
+  boards?: Array<{ code: string; name: string }>;
 };
 
 export type HoldingItem = {

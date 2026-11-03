@@ -66,6 +66,11 @@ export type SectorMa4Screen = {
   members: SectorMa4Member[];
 };
 
+export type ScreenerBoardRef = {
+  code: string;
+  name: string;
+};
+
 export type Ma4StandHit = {
   code: string;
   name: string;
@@ -73,6 +78,8 @@ export type Ma4StandHit = {
   since: string;
   sector: string;
   sectorCode: string;
+  /** 同时满足红框+指数MA4的行业和概念，行业在前。 */
+  boards: ScreenerBoardRef[];
   price: number | null;
   pct: number | null;
   turnover: number | null;
@@ -340,6 +347,31 @@ function extraConditionCount(hit: Pick<Ma4StandHit, "ma4CrossUpMa7" | "weekOnMa4
   return (hit.ma4CrossUpMa7 ? 1 : 0) + (hit.weekOnMa4 ? 1 : 0) + (hit.monthOnMa4 ? 1 : 0);
 }
 
+function isIndustryBoard(code: string): boolean {
+  return /^881\d{3}$/.test(code.trim());
+}
+
+function sortScreenerBoards(boards: ScreenerBoardRef[]): ScreenerBoardRef[] {
+  const seen = new Set<string>();
+  const unique: ScreenerBoardRef[] = [];
+  for (const board of boards) {
+    if (!board.code || seen.has(board.code)) continue;
+    seen.add(board.code);
+    unique.push(board);
+  }
+  return unique.sort((a, b) => {
+    const byKind = Number(isIndustryBoard(b.code)) - Number(isIndustryBoard(a.code));
+    if (byKind !== 0) return byKind;
+    return a.name.localeCompare(b.name, "zh-CN");
+  });
+}
+
+function withBoards(hit: Ma4StandHit, boards: ScreenerBoardRef[]): Ma4StandHit {
+  const ordered = sortScreenerBoards(boards);
+  const primary = ordered.find((item) => isIndustryBoard(item.code)) ?? ordered[0] ?? { code: hit.sectorCode, name: hit.sector };
+  return { ...hit, boards: ordered, sector: primary.name, sectorCode: primary.code };
+}
+
 function hitRank(hit: Ma4StandHit): number[] {
   return [-extraConditionCount(hit), hit.holdDays, hit.days];
 }
@@ -356,9 +388,10 @@ function betterHit(next: Ma4StandHit, prev: Ma4StandHit | undefined): boolean {
 
 /**
  * 必须：红框覆盖最新一根、板块指数日 K 站上 MA4、个股日 K 站上 MA4。
+ * 行业、概念都按这三条，缺一条不要。
  * 加分（非必须）：MA4 上叉 MA7、周 K 站上 MA4、月 K 站上 MA4。
  * 加分条件越多越靠前；条数相同再按这些条件同时成立的时间从短到长。
- * 同一只股票只留排序更靠前的那条。不含科创、创业、北交所、ST。
+ * 同一只股票只留一条，所属板块列出同时满足条件的行业和概念。不含科创、创业、北交所、ST。
  */
 export function collectMa4StandHits(sectors: SectorMa4Screen[]): Ma4StandHit[] {
   const best = new Map<string, Ma4StandHit>();
@@ -377,37 +410,47 @@ export function collectMa4StandHits(sectors: SectorMa4Screen[]): Ma4StandHit[] {
       const weekDays = cross.weekDays ?? 0;
       const monthDays = cross.monthDays ?? 0;
       const crossDays = ma4CrossUpMa7 ? Math.max(cross.crossDays ?? 1, 1) : 0;
-      const hit: Ma4StandHit = {
-        code: cross.code,
-        name,
-        days: cross.days,
-        since: cross.time,
-        sector: sector.name,
-        sectorCode: sector.code,
-        price: member?.price ?? null,
-        pct: member?.pct ?? null,
-        turnover: member?.turnover ?? null,
-        ma4CrossUpMa7,
-        weekOnMa4,
-        monthOnMa4,
-        weekDays,
-        monthDays,
-        crossDays,
-        holdDays:
-          cross.holdDays ??
-          conditionHoldDays({
-            dailyDays: cross.days,
-            dailySince: cross.time,
-            weekOn: weekOnMa4,
-            weekDays,
-            monthOn: monthOnMa4,
-            monthDays,
-            cross: ma4CrossUpMa7,
-            crossDays,
-            lastTime: sector.lastTime,
-          }),
-      };
-      if (betterHit(hit, best.get(hit.code))) best.set(hit.code, hit);
+      const hit = withBoards(
+        {
+          code: cross.code,
+          name,
+          days: cross.days,
+          since: cross.time,
+          sector: sector.name,
+          sectorCode: sector.code,
+          boards: [{ code: sector.code, name: sector.name }],
+          price: member?.price ?? null,
+          pct: member?.pct ?? null,
+          turnover: member?.turnover ?? null,
+          ma4CrossUpMa7,
+          weekOnMa4,
+          monthOnMa4,
+          weekDays,
+          monthDays,
+          crossDays,
+          holdDays:
+            cross.holdDays ??
+            conditionHoldDays({
+              dailyDays: cross.days,
+              dailySince: cross.time,
+              weekOn: weekOnMa4,
+              weekDays,
+              monthOn: monthOnMa4,
+              monthDays,
+              cross: ma4CrossUpMa7,
+              crossDays,
+              lastTime: sector.lastTime,
+            }),
+        },
+        [{ code: sector.code, name: sector.name }],
+      );
+      const prev = best.get(hit.code);
+      if (!prev) {
+        best.set(hit.code, hit);
+        continue;
+      }
+      const merged = withBoards(betterHit(hit, prev) ? hit : prev, [...prev.boards, ...hit.boards]);
+      best.set(hit.code, merged);
     }
   }
   return [...best.values()].sort((a, b) => {

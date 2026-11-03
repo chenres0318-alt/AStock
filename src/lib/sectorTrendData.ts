@@ -245,7 +245,7 @@ async function scanOpenTrend(boards: SectorItem[], concurrency: number): Promise
 /**
  * 最新一根还落在趋势区间里的板块代码。
  * 下拉标红只看指数价格是否还能把红框留到最后一根，避免对全市场成分股再扫一遍把当前板块拖死。
- * 选股默认只扫行业；板块页下拉再扫概念，进入页面就开始，不用点进去才变红。
+ * 选股扫行业和概念；板块页下拉也扫概念，进入页面就开始，不用点进去才变红。
  * 点进某个板块后，仍用成分股做完整捕捉。
  */
 export async function listBoardsInTrend(scope: "industry" | "concept" | "all" = "industry"): Promise<TrendScan> {
