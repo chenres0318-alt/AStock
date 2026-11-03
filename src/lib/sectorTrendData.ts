@@ -1,4 +1,5 @@
-import { listAllIndustryBoards, listBoardMembers, listSelectableBoards } from "./boards";
+import { mergeTrendScan, type TrendScan } from "./boardLive";
+import { listAllIndustryBoards, listBoardMembers, listSelectableBoards, listTonghuashunConcepts } from "./boards";
 import { cached } from "./cache";
 import { bareCode, isGrowthBoardShare, isStName, isTonghuashunBoard } from "./codes";
 import { UpstreamError } from "./http";
@@ -222,31 +223,47 @@ async function loadSectorTrend(boardCode: string): Promise<SectorTrendReport> {
   };
 }
 
+async function scanOpenTrend(boards: SectorItem[], concurrency: number): Promise<TrendScan> {
+  const klines = await mapPool(boards, concurrency, async (board) => {
+    try {
+      const series = await industrySeries(board.code);
+      return { code: board.code, bars: series.bars };
+    } catch {
+      return { code: board.code, bars: [] as KBar[] };
+    }
+  });
+  if (boards.length && klines.every((item) => item.bars.length < 3)) {
+    throw new UpstreamError("板块日线暂时取不到");
+  }
+  const live = klines.filter((item) => indexCouldBeOpen(item.bars));
+  return {
+    codes: live.map((item) => item.code),
+    offMa4: live.filter((item) => !standsOnMa4(item.bars)).map((item) => item.code),
+  };
+}
+
 /**
- * 最新一根还落在趋势区间里的行业代码。
+ * 最新一根还落在趋势区间里的板块代码。
  * 下拉标红只看指数价格是否还能把红框留到最后一根，避免对全市场成分股再扫一遍把当前板块拖死。
- * 点进某个行业后，仍用成分股做完整捕捉。
+ * 选股默认只扫行业；板块页下拉再扫概念，进入页面就开始，不用点进去才变红。
+ * 点进某个板块后，仍用成分股做完整捕捉。
  */
-export async function listBoardsInTrend(): Promise<{ codes: string[]; offMa4: string[] }> {
+export async function listBoardsInTrend(scope: "industry" | "concept" | "all" = "industry"): Promise<TrendScan> {
   try {
+    if (scope === "all") {
+      const [industry, concept] = await Promise.all([listBoardsInTrend("industry"), listBoardsInTrend("concept")]);
+      return mergeTrendScan(industry, concept);
+    }
+    if (scope === "concept") {
+      return await cached("boards-in-open-trend:concept:v1", 10 * 60_000, async () => {
+        const boards = await listTonghuashunConcepts().catch(() => [] as SectorItem[]);
+        if (!boards.length) return { codes: [] as string[], offMa4: [] as string[] };
+        return scanOpenTrend(boards, 8);
+      });
+    }
     return await cached("boards-in-open-trend:v5", 10 * 60_000, async () => {
       const boards = await listAllIndustryBoards();
-      const klines = await mapPool(boards, 6, async (board) => {
-        try {
-          const series = await industrySeries(board.code);
-          return { code: board.code, bars: series.bars };
-        } catch {
-          return { code: board.code, bars: [] as KBar[] };
-        }
-      });
-      if (klines.every((item) => item.bars.length < 3)) {
-        throw new UpstreamError("板块日线暂时取不到");
-      }
-      const live = klines.filter((item) => indexCouldBeOpen(item.bars));
-      return {
-        codes: live.map((item) => item.code),
-        offMa4: live.filter((item) => !standsOnMa4(item.bars)).map((item) => item.code),
-      };
+      return scanOpenTrend(boards, 6);
     });
   } catch {
     return { codes: [], offMa4: [] };
