@@ -93,6 +93,7 @@ assert(ranked.length === 2, "both names standing on MA4 are kept");
 assert(ranked[0].name === "短站" && ranked[0].days === 1, "the shortest MA4 stand comes first");
 assert(ranked[1].name === "长站", "the longer stand is still listed after");
 assert(ranked[0].sectorCode === "881121", "the hit keeps the industry board");
+assert(ranked[0].boards.map((item) => item.name).join(",") === "半导体", "a single board is listed as-is");
 assert(ranked[0].price === 10, "price comes from the board roster");
 
 const dup = collectMa4StandHits([
@@ -100,7 +101,42 @@ const dup = collectMa4StandHits([
   screen({ code: "881157", name: "白酒", crosses: [short], members }),
 ]);
 assert(dup.length === 1, "the same name is not listed twice");
-assert(dup[0].days === 1 && dup[0].sector === "白酒", "the shorter stand wins when a name sits in two boxes");
+assert(dup[0].days === 1, "the shorter stand still ranks the row");
+assert(dup[0].boards.map((item) => item.name).join(",") === "白酒,半导体", "both qualifying industries stay on 所属板块");
+
+const withConcept = collectMa4StandHits([
+  screen({ code: "881107", name: "中药", crosses: [short], members }),
+  screen({ code: "885799", name: "中药概念", crosses: [short], members }),
+]);
+assert(withConcept.length === 1, "industry plus concept still collapse to one row");
+assert(withConcept[0].sector === "中药" && withConcept[0].sectorCode === "881107", "the industry stays the primary board");
+assert(
+  withConcept[0].boards.map((item) => `${item.code}:${item.name}`).join(",") === "881107:中药,885799:中药概念",
+  "所属板块 lists the industry then the concept",
+);
+
+const conceptOnly = collectMa4StandHits([
+  screen({ code: "885333", name: "移动支付", crosses: [short], members }),
+]);
+assert(conceptOnly[0]?.sector === "移动支付" && conceptOnly[0]?.sectorCode === "885333", "a concept-only hit still shows the concept");
+assert(
+  collectMa4StandHits([
+    screen({ code: "885333", name: "移动支付", onMa4: false, crosses: [short], members }),
+  ]).length === 0,
+  "a concept off MA4 is not a hit",
+);
+assert(
+  collectMa4StandHits([
+    screen({
+      code: "885333",
+      name: "移动支付",
+      openTrend: { start: "2026-10-01", end: "2026-10-10", status: "closed" },
+      crosses: [short],
+      members,
+    }),
+  ]).length === 0,
+  "a concept without a live red box is not a hit",
+);
 
 assert(isScreenerShare("sh600519", "贵州茅台"), "a Shanghai main-board name stays in the screener");
 assert(isScreenerShare("sz000858", "五粮液"), "a Shenzhen main-board name stays in the screener");

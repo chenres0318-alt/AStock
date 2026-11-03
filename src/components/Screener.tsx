@@ -130,13 +130,35 @@ function HitTable({
                 </button>
               </td>
               <td className="px-3 py-2">
-                {item.sectorCode ? (
-                  <Link href={`/sector?code=${item.sectorCode}`} className="text-gold hover:underline" onClick={(event) => event.stopPropagation()}>
-                    {item.sector}
-                  </Link>
-                ) : (
-                  <span className="text-mute">{item.sector ?? "--"}</span>
-                )}
+                {(() => {
+                  const boards =
+                    item.boards?.length
+                      ? item.boards
+                      : item.sector
+                        ? [{ code: item.sectorCode ?? "", name: item.sector }]
+                        : [];
+                  if (!boards.length) return <span className="text-mute">--</span>;
+                  return (
+                    <div className="flex flex-col gap-0.5">
+                      {boards.map((board) =>
+                        board.code ? (
+                          <Link
+                            key={board.code}
+                            href={`/sector?code=${board.code}`}
+                            className="text-gold hover:underline"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            {board.name}
+                          </Link>
+                        ) : (
+                          <span key={board.name} className="text-mute">
+                            {board.name}
+                          </span>
+                        ),
+                      )}
+                    </div>
+                  );
+                })()}
               </td>
               <td className={`num px-3 py-2 text-right ${toneClass(item.pct)}`}>
                 {formatPrice(item.price, priceDigits(item.code, item.name))}
@@ -264,10 +286,10 @@ export default function Screener() {
 
       <section className="panel px-4 py-3">
         <div className="text-sm">
-          选股：必须板块在红色趋势区间、板块指数日 K 站上 MA4、个股日 K 站上 MA4
+          选股：必须板块在红色趋势区间、板块指数日 K 站上 MA4、个股日 K 站上 MA4。行业、概念都要这三条全满足。
         </div>
         <div className="mt-2 max-w-4xl text-xs leading-5 text-mute">
-          红框不限第几天。周 K 站上 MA4、MA4 上叉 MA7、月 K 站上 MA4 不是必须，有则更好。达成的加分条件越多越靠前；条件数相同则这些条件同时成立的时间越短越靠前。持续天数是当前标签这些条件一起成立的天数。扫到就显示。不含科创板、创业板、北交所、ST。同一只股票只出现一次。所属板块可点进板块页核对红框。
+          红框不限第几天。周 K 站上 MA4、MA4 上叉 MA7、月 K 站上 MA4 不是必须，有则更好。达成的加分条件越多越靠前；条件数相同则这些条件同时成立的时间越短越靠前。持续天数是当前标签这些条件一起成立的天数。扫到就显示。不含科创板、创业板、北交所、ST。同一只股票只出现一次。所属板块列出同时满足条件的行业和概念，可点进板块页核对红框。
         </div>
       </section>
 
@@ -282,8 +304,8 @@ export default function Screener() {
             <div className="flex flex-wrap items-center justify-end gap-2">
               {meta ? (
                 <span className="text-[10px] text-mute">
-                  红框行业 {meta.liveBoards ?? "--"} · 站上MA4 {meta.universe ?? meta.scanned} · 扫描 {meta.scanned} · 命中 {hits.length}
-                  {meta.source === "ths-industry" ? " · 同花顺行业" : ""}
+                  红框板块 {meta.liveBoards ?? "--"} · 站上MA4 {meta.universe ?? meta.scanned} · 扫描 {meta.scanned} · 命中 {hits.length}
+                  {meta.source === "ths-board" || meta.source === "ths-industry" ? " · 同花顺行业+概念" : ""}
                   {meta.elapsedMs ? ` · ${Math.round(meta.elapsedMs / 1000)}s` : ""}
                 </span>
               ) : null}

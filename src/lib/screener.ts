@@ -4,9 +4,9 @@ import { collectMa4StandHits, isScreenerShare, type SectorMa4Screen } from "./sc
 import { mapPool, raceDeadline } from "./pool";
 import type { ScreenerHit } from "./types";
 
-const BOARD_CONCURRENCY = 2;
+const BOARD_CONCURRENCY = 4;
 const RESULT_TTL_MS = 2 * 60_000;
-const SCAN_MAX_MS = 180_000;
+const SCAN_MAX_MS = 300_000;
 const FIRST_WAIT_MS = 2_000;
 
 function hitReasons(row: ReturnType<typeof collectMa4StandHits>[number]): string[] {
@@ -37,6 +37,7 @@ function toHit(row: ReturnType<typeof collectMa4StandHits>[number]): ScreenerHit
     reasons: hitReasons(row),
     sector: row.sector,
     sectorCode: row.sectorCode,
+    boards: row.boards,
   };
 }
 
@@ -88,18 +89,23 @@ function startJob(): ScanJob {
     items: collectMa4StandHits(state.sectors)
       .filter((row) => isScreenerShare(row.code, row.name))
       .map(toHit),
-    source: "ths-industry",
+    source: "ths-board",
     scanning: !state.done,
     timedOut: state.done && state.universe > 0 && state.scanned < state.universe,
   });
   const deadline = startedAt + SCAN_MAX_MS;
   const promise = (async () => {
-    const { codes, offMa4 } = await listBoardsInTrend();
-    const off = new Set(offMa4);
-    const liveOnMa4 = codes.filter((code) => !off.has(code));
-    state.universe = liveOnMa4.length;
-    state.liveBoards = codes.length;
-    await mapPool(liveOnMa4, BOARD_CONCURRENCY, async (code) => {
+    const liveOnMa4 = (scan: { codes: string[]; offMa4: string[] }) => {
+      const off = new Set(scan.offMa4);
+      return scan.codes.filter((code) => !off.has(code));
+    };
+    const industry = await listBoardsInTrend("industry");
+    const concept = await listBoardsInTrend("concept");
+    const industryLive = liveOnMa4(industry);
+    const conceptLive = liveOnMa4(concept);
+    state.universe = industryLive.length + conceptLive.length;
+    state.liveBoards = industry.codes.length + concept.codes.length;
+    const scanBoard = async (code: string) => {
       if (Date.now() > deadline) return;
       try {
         const screen = await loadBoardMa4Screen(code);
@@ -109,7 +115,9 @@ function startJob(): ScanJob {
       } finally {
         state.scanned += 1;
       }
-    });
+    };
+    await mapPool(industryLive, BOARD_CONCURRENCY, scanBoard);
+    await mapPool(conceptLive, BOARD_CONCURRENCY, scanBoard);
     state.done = true;
     return snapshot();
   })()
