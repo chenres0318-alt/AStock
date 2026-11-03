@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { fail } from "@/lib/api";
+import { parseActiveListScope } from "@/lib/boardLive";
 import { getSectorTrend, listBoardsInTrend } from "@/lib/sectorTrendData";
 
 export const dynamic = "force-dynamic";
@@ -9,7 +10,7 @@ export async function GET(request: Request) {
   try {
     const params = new URL(request.url).searchParams;
     if (params.get("list") === "active") {
-      return NextResponse.json(await listBoardsInTrend());
+      return NextResponse.json(await listBoardsInTrend(parseActiveListScope(params.get("scope"))));
     }
     const code = params.get("code")?.trim() ?? "";
     if (!code) return NextResponse.json({ error: "缺少板块代码" }, { status: 400 });

@@ -1,4 +1,4 @@
-/** 下拉里标红的行业代码。切板块时只改当前这一只，别把已经确认的抹掉。 */
+/** 下拉里标红的板块代码。切板块时只改当前这一只，别把已经确认的抹掉。 */
 export function applyBoardLive(codes: readonly string[], board: string, live: boolean): string[] {
   const set = new Set(codes);
   if (live) set.add(board);
@@ -8,6 +8,20 @@ export function applyBoardLive(codes: readonly string[], board: string, live: bo
 
 export function mergeLiveCodes(base: readonly string[], extra: readonly string[]): string[] {
   return [...new Set([...base, ...extra])];
+}
+
+export type TrendScan = { codes: string[]; offMa4: string[] };
+
+export function mergeTrendScan(base: TrendScan, extra: TrendScan): TrendScan {
+  return {
+    codes: mergeLiveCodes(base.codes, extra.codes),
+    offMa4: mergeLiveCodes(base.offMa4, extra.offMa4),
+  };
+}
+
+export function parseActiveListScope(raw: string | null | undefined): "industry" | "concept" | "all" {
+  if (raw === "concept" || raw === "all") return raw;
+  return "industry";
 }
 
 const STORAGE_KEY = "astock.boards-in-trend";

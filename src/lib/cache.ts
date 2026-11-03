@@ -1,6 +1,7 @@
 type Entry<T> = { value: T; expireAt: number };
 
-const MAX_ENTRIES = 300;
+/** Industry plus concept klines for the live-board scan. */
+const MAX_ENTRIES = 4000;
 const store = new Map<string, Entry<unknown>>();
 const inflight = new Map<string, Promise<unknown>>();
 

@@ -66,7 +66,7 @@ export default function SectorTrendView() {
   const [liveCodes, setLiveCodes] = useState<string[]>([]);
   const [offMa4Codes, setOffMa4Codes] = useState<string[]>([]);
   const [liveHydrated, setLiveHydrated] = useState(false);
-  const liveListStarted = useRef(false);
+  const [conceptLiveReady, setConceptLiveReady] = useState(false);
   const settledBoards = useRef(new Set<string>());
 
   useEffect(() => {
@@ -124,29 +124,39 @@ export default function SectorTrendView() {
   }, [code]);
 
   useEffect(() => {
-    if (!report || liveListStarted.current) return;
-    liveListStarted.current = true;
-    const load = (attempt: number) => {
-      readJson<{ codes: string[]; offMa4?: string[] }>("/api/market/sector-trend?list=active", 120_000)
+    let cancelled = false;
+    const ingest = (data: { codes?: string[]; offMa4?: string[] }) => {
+      if (cancelled) return;
+      const incoming = (data.codes ?? []).filter((item) => !settledBoards.current.has(item));
+      const incomingOff = new Set((data.offMa4 ?? []).filter((item) => !settledBoards.current.has(item)));
+      setLiveCodes((prev) => mergeLiveCodes(prev, incoming));
+      setOffMa4Codes((prev) => {
+        const next = new Set(prev);
+        for (const item of incoming) {
+          if (incomingOff.has(item)) next.add(item);
+          else next.delete(item);
+        }
+        return [...next];
+      });
+    };
+    const load = (url: string, attempt: number, onDone?: () => void) => {
+      readJson<{ codes: string[]; offMa4?: string[] }>(url, 120_000)
         .then((data) => {
-          const incoming = (data.codes ?? []).filter((item) => !settledBoards.current.has(item));
-          const incomingOff = new Set((data.offMa4 ?? []).filter((item) => !settledBoards.current.has(item)));
-          setLiveCodes((prev) => mergeLiveCodes(prev, incoming));
-          setOffMa4Codes((prev) => {
-            const next = new Set(prev);
-            for (const item of incoming) {
-              if (incomingOff.has(item)) next.add(item);
-              else next.delete(item);
-            }
-            return [...next];
-          });
+          ingest(data);
+          if (!cancelled) onDone?.();
         })
         .catch(() => {
-          if (attempt < 2) window.setTimeout(() => load(attempt + 1), 2000);
+          if (cancelled) return;
+          if (attempt < 2) window.setTimeout(() => load(url, attempt + 1, onDone), 2000);
+          else onDone?.();
         });
     };
-    load(0);
-  }, [report]);
+    load("/api/market/sector-trend?list=active", 0);
+    load("/api/market/sector-trend?list=active&scope=concept", 0, () => setConceptLiveReady(true));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const liveSet = useMemo(() => new Set(liveCodes), [liveCodes]);
   const offMa4Set = useMemo(() => new Set(offMa4Codes), [offMa4Codes]);
@@ -172,6 +182,7 @@ export default function SectorTrendView() {
             code={code}
             liveCodes={liveSet}
             offMa4Codes={offMa4Set}
+            conceptLiveReady={conceptLiveReady}
             onPick={(next) => router.push(`/sector?code=${next}`)}
           />
         </div>
@@ -270,12 +281,14 @@ function BoardPicker({
   code,
   liveCodes,
   offMa4Codes,
+  conceptLiveReady,
   onPick,
 }: {
   boards: SectorItem[];
   code: string;
   liveCodes: Set<string>;
   offMa4Codes: Set<string>;
+  conceptLiveReady: boolean;
   onPick: (code: string) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -348,7 +361,10 @@ function BoardPicker({
           {grouped.length === 0 ? <div className="px-3 py-2 text-xs text-mute">没有匹配的板块</div> : null}
           {grouped.map((group) => (
             <div key={group.label}>
-              <div className="px-3 py-1 text-[10px] text-mute">{group.label}</div>
+              <div className="px-3 py-1 text-[10px] text-mute">
+                {group.label}
+                {group.label === "概念" && !conceptLiveReady ? " · 核对中" : ""}
+              </div>
               {group.items.map((item) => {
                 const live = liveCodes.has(item.code);
                 const selected = item.code === code;
