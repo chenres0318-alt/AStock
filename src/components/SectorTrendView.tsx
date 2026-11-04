@@ -67,19 +67,53 @@ export default function SectorTrendView() {
   const [offMa4Codes, setOffMa4Codes] = useState<string[]>([]);
   const [liveHydrated, setLiveHydrated] = useState(false);
   const [conceptLiveReady, setConceptLiveReady] = useState(false);
+  const [conceptCatalogReady, setConceptCatalogReady] = useState(false);
   const settledBoards = useRef(new Set<string>());
+  const liveScanStarted = useRef(false);
+  const codeRef = useRef(code);
+  codeRef.current = code;
 
   useEffect(() => {
-    readJson<{ items: SectorItem[] }>("/api/market/sectors?scope=all")
+    let cancelled = false;
+    const mergeBoards = (incoming: SectorItem[]) => {
+      setBoards((prev) => {
+        const seen = new Set(prev.map((item) => item.code));
+        const extra = incoming.filter((item) => item.code && !seen.has(item.code));
+        return extra.length ? [...prev, ...extra] : prev.length ? prev : incoming;
+      });
+    };
+    readJson<{ items: SectorItem[] }>("/api/market/sectors?scope=industry")
       .then((data) => {
-        setBoards(data.items);
-        if (isTonghuashunBoard(code) && data.items.some((item) => item.code === code)) return;
-        const preferred =
-          data.items.find((item) => item.code === "881121" || item.name === "半导体") ?? data.items[0];
-        if (preferred && preferred.code !== code) router.replace(`/sector?code=${preferred.code}`);
+        if (cancelled) return;
+        const items = data.items ?? [];
+        mergeBoards(items);
+        const current = codeRef.current;
+        if (isTonghuashunConcept(current)) return;
+        if (isTonghuashunBoard(current) && items.some((item) => item.code === current)) return;
+        const preferred = items.find((item) => item.code === "881121" || item.name === "半导体") ?? items[0];
+        if (preferred && preferred.code !== current) router.replace(`/sector?code=${preferred.code}`);
       })
-      .catch((err) => setError(err instanceof Error ? err.message : "板块列表失败"));
-  }, [code, router]);
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : "板块列表失败");
+      });
+    const loadConcepts = (attempt: number) => {
+      readJson<{ items: SectorItem[] }>("/api/market/sectors?scope=concept")
+        .then((data) => {
+          if (cancelled) return;
+          mergeBoards(data.items ?? []);
+          setConceptCatalogReady(true);
+        })
+        .catch(() => {
+          if (cancelled) return;
+          if (attempt < 2) window.setTimeout(() => loadConcepts(attempt + 1), 1500);
+          else setConceptCatalogReady(true);
+        });
+    };
+    loadConcepts(0);
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
 
   useEffect(() => {
     setLiveCodes((prev) => mergeLiveCodes(readStoredLiveCodes(), prev));
@@ -124,6 +158,8 @@ export default function SectorTrendView() {
   }, [code]);
 
   useEffect(() => {
+    if (!report || liveScanStarted.current) return;
+    liveScanStarted.current = true;
     let cancelled = false;
     const ingest = (data: { codes?: string[]; offMa4?: string[] }) => {
       if (cancelled) return;
@@ -156,7 +192,7 @@ export default function SectorTrendView() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [report]);
 
   const liveSet = useMemo(() => new Set(liveCodes), [liveCodes]);
   const offMa4Set = useMemo(() => new Set(offMa4Codes), [offMa4Codes]);
@@ -183,6 +219,7 @@ export default function SectorTrendView() {
             liveCodes={liveSet}
             offMa4Codes={offMa4Set}
             conceptLiveReady={conceptLiveReady}
+            conceptCatalogReady={conceptCatalogReady}
             onPick={(next) => router.push(`/sector?code=${next}`)}
           />
         </div>
@@ -282,6 +319,7 @@ function BoardPicker({
   liveCodes,
   offMa4Codes,
   conceptLiveReady,
+  conceptCatalogReady,
   onPick,
 }: {
   boards: SectorItem[];
@@ -289,6 +327,7 @@ function BoardPicker({
   liveCodes: Set<string>;
   offMa4Codes: Set<string>;
   conceptLiveReady: boolean;
+  conceptCatalogReady: boolean;
   onPick: (code: string) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -305,11 +344,15 @@ function BoardPicker({
         if (byLive !== 0) return byLive;
         return a.name.localeCompare(b.name, "zh-CN");
       });
-    return [
-      { label: "行业", items: sortGroup(boards.filter((item) => !isTonghuashunConcept(item.code) && match(item))) },
-      { label: "概念", items: sortGroup(boards.filter((item) => isTonghuashunConcept(item.code) && match(item))) },
-    ].filter((group) => group.items.length > 0);
-  }, [boards, liveCodes, query]);
+    const industry = sortGroup(boards.filter((item) => !isTonghuashunConcept(item.code) && match(item)));
+    const concepts = sortGroup(boards.filter((item) => isTonghuashunConcept(item.code) && match(item)));
+    const groups = [{ label: "行业", items: industry, hint: "" }];
+    if (concepts.length || !needle) {
+      const hint = !conceptCatalogReady ? " · 加载中" : !concepts.length && !needle ? " · 暂无" : !conceptLiveReady ? " · 核对中" : "";
+      groups.push({ label: "概念", items: concepts, hint });
+    }
+    return groups.filter((group) => group.items.length > 0 || group.label === "概念");
+  }, [boards, liveCodes, query, conceptCatalogReady, conceptLiveReady]);
   const current = boards.find((item) => item.code === code);
 
   useEffect(() => {
@@ -363,8 +406,11 @@ function BoardPicker({
             <div key={group.label}>
               <div className="px-3 py-1 text-[10px] text-mute">
                 {group.label}
-                {group.label === "概念" && !conceptLiveReady ? " · 核对中" : ""}
+                {group.hint}
               </div>
+              {group.label === "概念" && !group.items.length ? (
+                <div className="px-3 py-1.5 text-xs text-mute">{conceptCatalogReady ? "名单暂时读不到" : "正在加载概念…"}</div>
+              ) : null}
               {group.items.map((item) => {
                 const live = liveCodes.has(item.code);
                 const selected = item.code === code;

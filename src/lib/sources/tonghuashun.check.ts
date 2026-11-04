@@ -1,4 +1,4 @@
-import { parseTonghuashunIndustryHtml } from "./tonghuashun.ts";
+import { conceptCatalogNeedsDetailCrawl, parseTonghuashunIndustryHtml } from "./tonghuashun.ts";
 
 function assert(cond: unknown, message: string) {
   if (!cond) throw new Error(message);
@@ -47,5 +47,7 @@ assert(fund[0].upCount == null, "the fund-flow table does not have up and down c
 const quote = parseTonghuashunIndustryHtml(quoted)[0];
 assert(quote?.code === "881121" && quote.pct === 2.92 && quote.leader === "恒玄科技", "the quote table still reads percent from the third cell");
 assert(quote.upCount === 120 && quote.downCount === 10, "the quote table still keeps the up and down counts");
+assert(!conceptCatalogNeedsDetailCrawl(120), "a full gnSection list does not open every concept page");
+assert(conceptCatalogNeedsDetailCrawl(20), "a short gnSection list still fills in from the directory");
 
 console.log("tonghuashun.check ok", fund[0].name, quote.name);
