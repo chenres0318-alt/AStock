@@ -323,29 +323,36 @@ async function loadConceptCatalog(): Promise<ConceptCatalog> {
       source: "ths",
     });
   }
-  const missing = parseConceptDirectory(html).filter((item) => !quoted.has(item.cid));
-  const resolved = await mapPool(missing, 8, async (item) => {
-    const plate = await conceptPlateCode(item.cid);
-    return plate ? { ...item, plate } : null;
-  });
-  for (const item of resolved) {
-    if (!item || seen.has(item.plate)) continue;
-    seen.add(item.plate);
-    detailCodes[item.plate] = item.cid;
-    items.push({
-      code: item.plate,
-      name: item.name,
-      pct: null,
-      price: null,
-      leader: null,
-      leaderCode: null,
-      upCount: null,
-      downCount: null,
-      source: "ths",
+  if (conceptCatalogNeedsDetailCrawl(quoted.size)) {
+    const missing = parseConceptDirectory(html).filter((item) => !quoted.has(item.cid));
+    const resolved = await mapPool(missing, 8, async (item) => {
+      const plate = await conceptPlateCode(item.cid);
+      return plate ? { ...item, plate } : null;
     });
+    for (const item of resolved) {
+      if (!item || seen.has(item.plate)) continue;
+      seen.add(item.plate);
+      detailCodes[item.plate] = item.cid;
+      items.push({
+        code: item.plate,
+        name: item.name,
+        pct: null,
+        price: null,
+        leader: null,
+        leaderCode: null,
+        upCount: null,
+        downCount: null,
+        source: "ths",
+      });
+    }
   }
-  if (items.length < 100) throw new UpstreamError("同花顺概念名单暂时读不到");
+  if (items.length < 50) throw new UpstreamError("同花顺概念名单暂时读不到");
   return { items, detailCodes };
+}
+
+/** 首页 gnSection 已经够用时，不再逐个打开概念详情页。 */
+export function conceptCatalogNeedsDetailCrawl(quotedCount: number): boolean {
+  return quotedCount < 100;
 }
 
 export async function fetchTonghuashunConcepts(): Promise<SectorItem[]> {

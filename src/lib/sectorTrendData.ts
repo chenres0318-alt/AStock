@@ -1,7 +1,7 @@
 import { mergeTrendScan, type TrendScan } from "./boardLive";
-import { listAllIndustryBoards, listBoardMembers, listSelectableBoards, listTonghuashunConcepts } from "./boards";
+import { listAllIndustryBoards, listBoardMembers, listTonghuashunConcepts } from "./boards";
 import { cached } from "./cache";
-import { bareCode, isGrowthBoardShare, isStName, isTonghuashunBoard } from "./codes";
+import { bareCode, isGrowthBoardShare, isStName, isTonghuashunBoard, isTonghuashunConcept } from "./codes";
 import { UpstreamError } from "./http";
 import { mapPool } from "./pool";
 import {
@@ -114,7 +114,12 @@ async function loadMembers(code: string): Promise<BoardMember[]> {
 export async function getSectorTrend(code: string): Promise<SectorTrendReport> {
   const boardCode = code.trim();
   if (!isTonghuashunBoard(boardCode)) throw new UpstreamError("请从同花顺行业或概念里选择一个板块", 400);
-  return cached(`sector-trend-report:v2:${boardCode}`, 10 * 60_000, () => loadSectorTrend(boardCode));
+  return cached(
+    `sector-trend-report:v3:${boardCode}`,
+    10 * 60_000,
+    () => loadSectorTrend(boardCode),
+    (report) => report.memberCount >= 5 || report.trends.length > 0,
+  );
 }
 
 /** 选股用：只要红框、MA4 和成分股站上天数，不缓存整份板块报告。 */
@@ -172,11 +177,15 @@ export async function loadBoardMa4Screen(code: string): Promise<SectorMa4Screen 
 }
 
 async function loadSectorTrend(boardCode: string): Promise<SectorTrendReport> {
-  const [boards, series, members] = await Promise.all([
-    listSelectableBoards().catch(() => [] as SectorItem[]),
+  const [boards, series, seededMembers] = await Promise.all([
+    (isTonghuashunConcept(boardCode) ? listTonghuashunConcepts() : listAllIndustryBoards()).catch(
+      () => [] as SectorItem[],
+    ),
     industrySeries(boardCode),
     loadMembers(boardCode),
   ]);
+  let members = seededMembers;
+  if (members.length < 5) members = await loadMembers(boardCode);
   const bars = series.bars;
   const found = boards.find((item) => item.code === boardCode);
   const last = bars.at(-1);
@@ -245,7 +254,7 @@ async function scanOpenTrend(boards: SectorItem[], concurrency: number): Promise
 /**
  * 最新一根还落在趋势区间里的板块代码。
  * 下拉标红只看指数价格是否还能把红框留到最后一根，避免对全市场成分股再扫一遍把当前板块拖死。
- * 选股扫行业和概念；板块页下拉也扫概念，进入页面就开始，不用点进去才变红。
+ * 选股扫行业和概念。板块页下拉先出行业，概念名单单独加载；当前板块趋势算完再扫概念标红。
  * 点进某个板块后，仍用成分股做完整捕捉。
  */
 export async function listBoardsInTrend(scope: "industry" | "concept" | "all" = "industry"): Promise<TrendScan> {

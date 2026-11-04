@@ -19,7 +19,12 @@ function prune(now = Date.now()) {
   }
 }
 
-export function cached<T>(key: string, ttlMs: number, loader: () => Promise<T>): Promise<T> {
+export function cached<T>(
+  key: string,
+  ttlMs: number,
+  loader: () => Promise<T>,
+  shouldStore: (value: T) => boolean = () => true,
+): Promise<T> {
   const now = Date.now();
   const hit = store.get(key);
   if (hit && hit.expireAt > now) {
@@ -29,8 +34,10 @@ export function cached<T>(key: string, ttlMs: number, loader: () => Promise<T>):
   if (pending) return pending as Promise<T>;
   const promise = loader()
     .then((value) => {
-      prune();
-      store.set(key, { value, expireAt: Date.now() + ttlMs });
+      if (shouldStore(value)) {
+        prune();
+        store.set(key, { value, expireAt: Date.now() + ttlMs });
+      }
       inflight.delete(key);
       return value;
     })
