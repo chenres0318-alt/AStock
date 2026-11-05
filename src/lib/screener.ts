@@ -14,7 +14,7 @@ function hitReasons(row: ReturnType<typeof collectMa4StandHits>[number]): string
   if (row.ma4CrossUpMa7) reasons.push("MA4上叉MA7");
   if (row.weekOnMa4) reasons.push("周K站上MA4");
   if (row.monthOnMa4) reasons.push("月K站上MA4");
-  reasons.push("板块红框", "板块指数站上MA4");
+  reasons.push("行业红框", "概念红框", "板块指数站上MA4");
   return reasons;
 }
 
@@ -116,8 +116,13 @@ function startJob(): ScanJob {
         state.scanned += 1;
       }
     };
-    await mapPool(industryLive, BOARD_CONCURRENCY, scanBoard);
-    await mapPool(conceptLive, BOARD_CONCURRENCY, scanBoard);
+    const queued: string[] = [];
+    const rounds = Math.max(industryLive.length, conceptLive.length);
+    for (let i = 0; i < rounds; i += 1) {
+      if (i < industryLive.length) queued.push(industryLive[i]);
+      if (i < conceptLive.length) queued.push(conceptLive[i]);
+    }
+    await mapPool(queued, BOARD_CONCURRENCY, scanBoard);
     state.done = true;
     return snapshot();
   })()

@@ -63,6 +63,29 @@ function screen(partial: Partial<SectorMa4Screen> & Pick<SectorMa4Screen, "code"
   };
 }
 
+/** 排名用例默认再挂一个过线概念，避免只测行业时被新规则滤掉。 */
+function plusConcept(sectors: SectorMa4Screen[]): SectorMa4Screen[] {
+  const crosses = new Map<string, SectorMa4Screen["crosses"][number]>();
+  const roster = new Map<string, SectorMa4Screen["members"][number]>();
+  for (const sector of sectors) {
+    for (const cross of sector.crosses) crosses.set(cross.code, cross);
+    for (const member of sector.members) roster.set(member.code, member);
+  }
+  return [
+    ...sectors,
+    screen({
+      code: "885001",
+      name: "测试概念",
+      crosses: [...crosses.values()],
+      members: [...roster.values()],
+    }),
+  ];
+}
+
+function hits(sectors: SectorMa4Screen[]) {
+  return collectMa4StandHits(plusConcept(sectors));
+}
+
 const short = { code: "sh600001", name: "短站", days: 1, time: "2026-10-23" };
 const long = { code: "sh600002", name: "长站", days: 4, time: "2026-10-20" };
 const members = [
@@ -81,7 +104,12 @@ assert(
 );
 assert(collectMa4StandHits([screen({ openTrend: null, crosses: [short] })]).length === 0, "no open box means no hits");
 
-const ranked = collectMa4StandHits([
+assert(
+  collectMa4StandHits([screen({ code: "881121", name: "半导体", crosses: [short], members })]).length === 0,
+  "an industry without a live concept is not a hit",
+);
+
+const ranked = hits([
   screen({
     code: "881121",
     name: "半导体",
@@ -93,16 +121,16 @@ assert(ranked.length === 2, "both names standing on MA4 are kept");
 assert(ranked[0].name === "短站" && ranked[0].days === 1, "the shortest MA4 stand comes first");
 assert(ranked[1].name === "长站", "the longer stand is still listed after");
 assert(ranked[0].sectorCode === "881121", "the hit keeps the industry board");
-assert(ranked[0].boards.map((item) => item.name).join(",") === "半导体", "a single board is listed as-is");
+assert(ranked[0].boards.map((item) => item.name).join(",") === "半导体,测试概念", "所属板块 lists the industry then the concept");
 assert(ranked[0].price === 10, "price comes from the board roster");
 
-const dup = collectMa4StandHits([
+const dup = hits([
   screen({ code: "881121", name: "半导体", crosses: [{ ...short, days: 3 }], members }),
   screen({ code: "881157", name: "白酒", crosses: [short], members }),
 ]);
 assert(dup.length === 1, "the same name is not listed twice");
 assert(dup[0].days === 1, "the shorter stand still ranks the row");
-assert(dup[0].boards.map((item) => item.name).join(",") === "白酒,半导体", "both qualifying industries stay on 所属板块");
+assert(dup[0].boards.map((item) => item.name).join(",") === "白酒,半导体,测试概念", "both qualifying industries stay on 所属板块");
 
 const withConcept = collectMa4StandHits([
   screen({ code: "881107", name: "中药", crosses: [short], members }),
@@ -114,11 +142,18 @@ assert(
   withConcept[0].boards.map((item) => `${item.code}:${item.name}`).join(",") === "881107:中药,885799:中药概念",
   "所属板块 lists the industry then the concept",
 );
+assert(
+  collectMa4StandHits([
+    screen({ code: "881107", name: "中药", crosses: [short], members }),
+    screen({ code: "885799", name: "中药概念", onMa4: false, crosses: [short], members }),
+  ]).length === 0,
+  "industry plus a concept off MA4 is not a hit",
+);
 
 const conceptOnly = collectMa4StandHits([
   screen({ code: "885333", name: "移动支付", crosses: [short], members }),
 ]);
-assert(conceptOnly[0]?.sector === "移动支付" && conceptOnly[0]?.sectorCode === "885333", "a concept-only hit still shows the concept");
+assert(conceptOnly.length === 0, "a concept without a live industry is not a hit");
 assert(
   collectMa4StandHits([
     screen({ code: "885333", name: "移动支付", onMa4: false, crosses: [short], members }),
@@ -156,7 +191,7 @@ const stHit = collectMa4StandHits([
 ]);
 assert(stHit.length === 0, "ST names do not appear in the stand list");
 
-const rankedBoost = collectMa4StandHits([
+const rankedBoost = hits([
   screen({
     code: "881121",
     name: "半导体",
@@ -177,7 +212,7 @@ assert(
   "one extra condition ranks by shorter hold of that set, then names with none",
 );
 
-const weekBeatsShort = collectMa4StandHits([
+const weekBeatsShort = hits([
   screen({
     code: "881121",
     name: "半导体",
@@ -193,7 +228,7 @@ const weekBeatsShort = collectMa4StandHits([
 ]);
 assert(weekBeatsShort[0]?.name === "周", "weekly MA4 still ranks ahead of a shorter stand without it");
 
-const monthRank = collectMa4StandHits([
+const monthRank = hits([
   screen({
     code: "881121",
     name: "半导体",
@@ -216,7 +251,7 @@ assert(
   "one extra condition ranks by shorter hold of that set, then names with none",
 );
 
-const freshWeek = collectMa4StandHits([
+const freshWeek = hits([
   screen({
     code: "881121",
     name: "半导体",
@@ -232,7 +267,7 @@ const freshWeek = collectMa4StandHits([
 ]);
 assert(freshWeek[0]?.name === "周旧", "the same extra conditions rank by shorter simultaneous hold");
 
-const freshMonth = collectMa4StandHits([
+const freshMonth = hits([
   screen({
     code: "881121",
     name: "半导体",
@@ -248,7 +283,7 @@ const freshMonth = collectMa4StandHits([
 ]);
 assert(freshMonth[0]?.name === "月旧", "the same extra conditions rank by shorter simultaneous hold");
 
-const sameFlagsHold = collectMa4StandHits([
+const sameFlagsHold = hits([
   screen({
     code: "881121",
     name: "半导体",
@@ -291,7 +326,7 @@ assert(
 assert(sameFlagsHold[0]?.holdDays === 1 && sameFlagsHold[1]?.holdDays === 1, "上叉 caps how long the three extras have held");
 assert(sameFlagsHold[0]?.days === 1 && sameFlagsHold[1]?.days === 4, "daily MA4 days still break a holdDays tie");
 
-const sameWeekMonth = collectMa4StandHits([
+const sameWeekMonth = hits([
   screen({
     code: "881121",
     name: "半导体",
@@ -308,7 +343,7 @@ const sameWeekMonth = collectMa4StandHits([
 assert(sameWeekMonth[0]?.name === "苏州样", "the same 周K/月K set ranks by shorter simultaneous hold");
 assert(sameWeekMonth[0]?.holdDays === 1 && sameWeekMonth[1]?.holdDays === 4, "持续天数 is how long the current extras have all held");
 
-const moreExtras = collectMa4StandHits([
+const moreExtras = hits([
   screen({
     code: "881121",
     name: "半导体",
@@ -324,7 +359,7 @@ const moreExtras = collectMa4StandHits([
 ]);
 assert(moreExtras[0]?.name === "三条件长", "more extra conditions rank first even with a longer daily MA4 stand");
 
-const sameCountShorterHold = collectMa4StandHits([
+const sameCountShorterHold = hits([
   screen({
     code: "881121",
     name: "半导体",
@@ -349,8 +384,8 @@ const wave1 = collectMa4StandHits([
     members: [{ code: "sh600040", name: "先扫到", price: 8, pct: 1, turnover: 1 }],
   }),
 ]);
-assert(wave1.map((row) => row.name).join(",") === "先扫到", "the first wave only has what has been scanned");
-const wave2 = collectMa4StandHits([
+assert(wave1.length === 0, "an industry scanned before any live concept does not show yet");
+const wave2 = hits([
   screen({
     code: "881121",
     name: "食品加工制造",

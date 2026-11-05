@@ -78,7 +78,7 @@ export type Ma4StandHit = {
   since: string;
   sector: string;
   sectorCode: string;
-  /** 同时满足红框+指数MA4的行业和概念，行业在前。 */
+  /** 同时在红框且指数站上MA4的行业和概念，行业在前。命中必须两种都有。 */
   boards: ScreenerBoardRef[];
   price: number | null;
   pct: number | null;
@@ -351,6 +351,20 @@ function isIndustryBoard(code: string): boolean {
   return /^881\d{3}$/.test(code.trim());
 }
 
+function isConceptBoard(code: string): boolean {
+  return /^88[5-9]\d{3}$/.test(code.trim());
+}
+
+function hasIndustryAndConcept(hit: Ma4StandHit): boolean {
+  let industry = false;
+  let concept = false;
+  for (const board of hit.boards) {
+    if (isIndustryBoard(board.code)) industry = true;
+    else if (isConceptBoard(board.code)) concept = true;
+  }
+  return industry && concept;
+}
+
 function sortScreenerBoards(boards: ScreenerBoardRef[]): ScreenerBoardRef[] {
   const seen = new Set<string>();
   const unique: ScreenerBoardRef[] = [];
@@ -387,11 +401,11 @@ function betterHit(next: Ma4StandHit, prev: Ma4StandHit | undefined): boolean {
 }
 
 /**
- * 必须：红框覆盖最新一根、板块指数日 K 站上 MA4、个股日 K 站上 MA4。
- * 行业、概念都按这三条，缺一条不要。
+ * 必须：个股日 K 站上 MA4；所属行业和至少一个概念都要红框覆盖最新一根、指数日 K 站上 MA4。
+ * 只过行业或只过概念的不要。
  * 加分（非必须）：MA4 上叉 MA7、周 K 站上 MA4、月 K 站上 MA4。
  * 加分条件越多越靠前；条数相同再按这些条件同时成立的时间从短到长。
- * 同一只股票只留一条，所属板块列出同时满足条件的行业和概念。不含科创、创业、北交所、ST。
+ * 同一只股票只留一条，所属板块列出这些过线的行业和概念。不含科创、创业、北交所、ST。
  */
 export function collectMa4StandHits(sectors: SectorMa4Screen[]): Ma4StandHit[] {
   const best = new Map<string, Ma4StandHit>();
@@ -453,7 +467,7 @@ export function collectMa4StandHits(sectors: SectorMa4Screen[]): Ma4StandHit[] {
       best.set(hit.code, merged);
     }
   }
-  return [...best.values()].sort((a, b) => {
+  return [...best.values()].filter(hasIndustryAndConcept).sort((a, b) => {
     const left = hitRank(a);
     const right = hitRank(b);
     for (let i = 0; i < left.length; i += 1) {
