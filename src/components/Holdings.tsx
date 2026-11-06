@@ -355,7 +355,7 @@ export default function Holdings() {
       </div>
 
       <p className="pb-1 text-center text-[11px] text-mute">
-        搜索加入或从选股点 + 。需要离场仅当个股跌破 MA4 且板块指数同时跌破 MA4；不看板块是否还在红色趋势区间。仅供看盘学习，不构成投资建议。
+        搜索加入或从选股点 + 。需要离场仅当个股和板块指数日 K 都跌破 MA4，并且当天收盘都低于前一日；不看板块是否还在红色趋势区间。仅供看盘学习，不构成投资建议。
       </p>
     </div>
   );

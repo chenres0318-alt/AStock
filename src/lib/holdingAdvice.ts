@@ -15,6 +15,13 @@ export function closeStandsOnMa4(bars: KBar[]): boolean {
   return ma4 != null && ma4 > 0 && closes[last] >= ma4;
 }
 
+export function closeLowerThanPrev(bars: KBar[]): boolean {
+  if (bars.length < 2) return false;
+  const last = bars[bars.length - 1]?.close;
+  const prev = bars[bars.length - 2]?.close;
+  return last != null && prev != null && last < prev;
+}
+
 export function consecutiveMa4Days(bars: KBar[]): number {
   if (!closeStandsOnMa4(bars)) return 0;
   let days = 1;
@@ -41,18 +48,23 @@ export function adviseHolding(input: {
   hasSector: boolean;
   sectorResolved: boolean;
   standDays?: number | null;
+  stockCloseDown?: boolean;
+  sectorCloseDown?: boolean;
 }): HoldingAdvice {
   const sectorKnown = input.hasSector && input.sectorResolved;
+  const stockCloseDown = Boolean(input.stockCloseDown);
+  const sectorCloseDown = Boolean(input.sectorCloseDown);
   const bothBroken = sectorKnown && !input.stockOnMa4 && !input.sectorOnMa4;
+  const bothLower = stockCloseDown && sectorCloseDown;
 
-  if (bothBroken) {
+  if (bothBroken && bothLower) {
     return {
       action: "exit",
       label: "需要离场",
       stockOnMa4: false,
       sectorOnMa4: false,
       sectorInRedBox: input.sectorInRedBox,
-      notes: ["股价收盘跌破MA4", "板块指数跌破MA4"],
+      notes: ["股价收盘跌破MA4且低于昨日", "板块指数跌破MA4且低于昨日"],
     };
   }
 
@@ -60,7 +72,8 @@ export function adviseHolding(input: {
   if (input.stockOnMa4) {
     notes.push(input.standDays ? `个股站上MA4共${input.standDays}日` : "个股站上MA4");
   } else {
-    notes.push("股价收盘跌破MA4");
+    notes.push(stockCloseDown ? "股价收盘跌破MA4且低于昨日" : "股价收盘跌破MA4");
+    if (!stockCloseDown) notes.push("股价收盘未低于昨日");
   }
   if (!input.hasSector) {
     notes.push("缺少所属板块，板块指数未核对");
@@ -69,7 +82,8 @@ export function adviseHolding(input: {
   } else if (input.sectorOnMa4) {
     notes.push("板块指数站上MA4");
   } else {
-    notes.push("板块指数跌破MA4");
+    notes.push(sectorCloseDown ? "板块指数跌破MA4且低于昨日" : "板块指数跌破MA4");
+    if (!sectorCloseDown) notes.push("板块指数收盘未低于昨日");
   }
 
   return {

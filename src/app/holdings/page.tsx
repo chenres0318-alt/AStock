@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "持仓 · AStock 看盘",
-  description: "搜索或从选股加入持仓，个股与板块指数同时跌破MA4才提示离场",
+  description: "搜索或从选股加入持仓，个股和板块日K都跌破MA4且收盘都低于昨日才提示离场",
 };
 
 export default function HoldingsPage() {
