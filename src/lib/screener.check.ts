@@ -226,8 +226,40 @@ const rankedDays = hits([
     ],
   }),
 ]);
-assert(rankedDays.map((row) => row.name).join(",") === "平安样,横店样", "shorter daily MA4 stand ranks first");
+assert(rankedDays.map((row) => row.name).join(",") === "平安样,横店样", "without a cross, shorter daily MA4 stand ranks first");
 assert(rankedDays[0]?.days === 1 && rankedDays[1]?.days === 4, "持续天数 follows the daily MA4 stand");
+
+const crossBeatsShort = hits([
+  screen({
+    code: "881121",
+    name: "半导体",
+    crosses: [
+      { code: "sh600050", name: "无上叉短", days: 1, time: "2026-10-29", ...wm },
+      { code: "sh600051", name: "有上叉长", days: 8, time: "2026-10-16", ma4CrossUpMa7: true, ...wm },
+    ],
+    members: [
+      { code: "sh600050", name: "无上叉短", price: 10, pct: 1, turnover: 1 },
+      { code: "sh600051", name: "有上叉长", price: 11, pct: 1, turnover: 1 },
+    ],
+  }),
+]);
+assert(crossBeatsShort.map((row) => row.name).join(",") === "有上叉长,无上叉短", "MA4 cross above MA7 ranks ahead of a shorter stand without it");
+
+const twoCrosses = hits([
+  screen({
+    code: "881121",
+    name: "半导体",
+    crosses: [
+      { code: "sh600052", name: "上叉4日", days: 4, time: "2026-10-26", ma4CrossUpMa7: true, ...wm },
+      { code: "sh600053", name: "上叉1日", days: 1, time: "2026-10-29", ma4CrossUpMa7: true, ...wm },
+    ],
+    members: [
+      { code: "sh600052", name: "上叉4日", price: 10, pct: 1, turnover: 1 },
+      { code: "sh600053", name: "上叉1日", price: 11, pct: 1, turnover: 1 },
+    ],
+  }),
+]);
+assert(twoCrosses.map((row) => row.name).join(",") === "上叉1日,上叉4日", "among crosses, shorter daily MA4 stand still ranks first");
 
 const weekOnlyLonger = hits([
   screen({
@@ -269,8 +301,8 @@ const wave2 = hits([
   }),
 ]);
 assert(
-  wave2.map((row) => row.name).join(",") === "先扫到,后扫上叉",
-  "a later board still appears and shorter daily MA4 stays first",
+  wave2.map((row) => row.name).join(",") === "后扫上叉,先扫到",
+  "a later board with MA4 cross still jumps ahead of a shorter stand without it",
 );
 
 function bar(time: string, close: number): KBar {
