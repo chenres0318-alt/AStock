@@ -43,31 +43,33 @@ export function adviseHolding(input: {
   standDays?: number | null;
 }): HoldingAdvice {
   const sectorKnown = input.hasSector && input.sectorResolved;
-  const stockBroken = !input.stockOnMa4;
-  const boxGone = sectorKnown && !input.sectorInRedBox;
+  const bothBroken = sectorKnown && !input.stockOnMa4 && !input.sectorOnMa4;
 
-  if (stockBroken || boxGone) {
-    const notes: string[] = [];
-    if (stockBroken) notes.push("股价收盘跌破MA4");
-    if (boxGone) notes.push("板块已离开红色趋势区间");
+  if (bothBroken) {
     return {
       action: "exit",
       label: "需要离场",
-      stockOnMa4: input.stockOnMa4,
-      sectorOnMa4: sectorKnown ? input.sectorOnMa4 : false,
+      stockOnMa4: false,
+      sectorOnMa4: false,
       sectorInRedBox: input.sectorInRedBox,
-      notes,
+      notes: ["股价收盘跌破MA4", "板块指数跌破MA4"],
     };
   }
 
   const notes: string[] = [];
-  notes.push(input.standDays ? `个股站上MA4共${input.standDays}日` : "个股站上MA4");
-  if (!input.hasSector) {
-    notes.push("缺少所属板块，板块红框未核对");
-  } else if (!input.sectorResolved) {
-    notes.push("板块红框暂无法核对");
+  if (input.stockOnMa4) {
+    notes.push(input.standDays ? `个股站上MA4共${input.standDays}日` : "个股站上MA4");
   } else {
-    notes.push("板块仍在红色趋势区间");
+    notes.push("股价收盘跌破MA4");
+  }
+  if (!input.hasSector) {
+    notes.push("缺少所属板块，板块指数未核对");
+  } else if (!input.sectorResolved) {
+    notes.push("板块指数暂无法核对");
+  } else if (input.sectorOnMa4) {
+    notes.push("板块指数站上MA4");
+  } else {
+    notes.push("板块指数跌破MA4");
   }
 
   return {
