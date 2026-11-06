@@ -343,10 +343,6 @@ export function decorateMa4Crosses(
   });
 }
 
-function extraConditionCount(hit: Pick<Ma4StandHit, "ma4CrossUpMa7" | "weekOnMa4" | "monthOnMa4">): number {
-  return (hit.ma4CrossUpMa7 ? 1 : 0) + (hit.weekOnMa4 ? 1 : 0) + (hit.monthOnMa4 ? 1 : 0);
-}
-
 function isIndustryBoard(code: string): boolean {
   return /^881\d{3}$/.test(code.trim());
 }
@@ -387,7 +383,7 @@ function withBoards(hit: Ma4StandHit, boards: ScreenerBoardRef[]): Ma4StandHit {
 }
 
 function hitRank(hit: Ma4StandHit): number[] {
-  return [-extraConditionCount(hit), hit.holdDays, hit.days];
+  return [hit.days];
 }
 
 function betterHit(next: Ma4StandHit, prev: Ma4StandHit | undefined): boolean {
@@ -401,11 +397,10 @@ function betterHit(next: Ma4StandHit, prev: Ma4StandHit | undefined): boolean {
 }
 
 /**
- * 必须：个股日 K 站上 MA4；所属行业和至少一个概念都要红框覆盖最新一根、指数日 K 站上 MA4。
+ * 必须：个股日 K、周 K、月 K 都站上 MA4；所属行业和至少一个概念都要红框覆盖最新一根、指数日 K 站上 MA4。
  * 只过行业或只过概念的不要。
- * 加分（非必须）：MA4 上叉 MA7、周 K 站上 MA4、月 K 站上 MA4。
- * 加分条件越多越靠前；条数相同再按这些条件同时成立的时间从短到长。
- * 同一只股票只留一条，所属板块列出这些过线的行业和概念。不含科创、创业、北交所、ST。
+ * 按个股日 K 站上 MA4 的天数从短到长排。同一只股票只留一条，所属板块列出这些过线的行业和概念。
+ * 不含科创、创业、北交所、ST。
  */
 export function collectMa4StandHits(sectors: SectorMa4Screen[]): Ma4StandHit[] {
   const best = new Map<string, Ma4StandHit>();
@@ -418,6 +413,7 @@ export function collectMa4StandHits(sectors: SectorMa4Screen[]): Ma4StandHit[] {
       const member = members.get(cross.code);
       const name = cross.name || member?.name || cross.code;
       if (!isScreenerShare(cross.code, name)) continue;
+      if (!cross.weekOnMa4 || !cross.monthOnMa4) continue;
       const ma4CrossUpMa7 = Boolean(cross.ma4CrossUpMa7);
       const weekOnMa4 = Boolean(cross.weekOnMa4);
       const monthOnMa4 = Boolean(cross.monthOnMa4);

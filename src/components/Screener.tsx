@@ -104,7 +104,7 @@ function HitTable({
   onToggleHold: (item: ScreenerHit) => void;
 }) {
   if (!items.length) {
-    return <EmptyHint text={scanning ? "正在扫描，扫到的股票会马上出现并重新排序" : "没有符合条件的结果"} />;
+    return <EmptyHint text={scanning ? "正在扫描，扫到的股票会马上出现，并按个股站上MA4天数从短到长排" : "没有符合条件的结果"} />;
   }
   return (
     <div className="overflow-auto scroll-thin">
@@ -286,10 +286,10 @@ export default function Screener() {
 
       <section className="panel px-4 py-3">
         <div className="text-sm">
-          选股：必须个股日 K 站上 MA4，并且所属行业和至少一个概念都在红框、板块指数日 K 都站上 MA4。只过行业或只过概念的不要。
+          选股：必须个股日 K 站上 MA4，周 K 站上 MA4，月 K 站上 MA4，并且所属行业和至少一个概念都在红框、板块指数日 K 都站上 MA4。只过行业或只过概念的不要。
         </div>
         <div className="mt-2 max-w-4xl text-xs leading-5 text-mute">
-          红框不限第几天。周 K 站上 MA4、MA4 上叉 MA7、月 K 站上 MA4 不是必须，有则更好。达成的加分条件越多越靠前；条件数相同则这些条件同时成立的时间越短越靠前。持续天数是当前标签这些条件一起成立的天数。扫到就显示。不含科创板、创业板、北交所、ST。同一只股票只出现一次。所属板块同时列出过线的行业和概念，可点进板块页核对红框。
+          红框不限几天内。持续天数是个股站上 MA4 的持续时间。时间越短，排序越在前，扫到就显示。不含科创板、创业板、北交所、ST。同一只股票只出现一次。所属板块同时列出过线的行业和概念，可点进板块页核对红框。
         </div>
       </section>
 
@@ -322,7 +322,7 @@ export default function Screener() {
         />
         {loading ? (
           <div className="border-b border-line px-4 py-2 text-xs text-mute">
-            边扫边显示，扫到就按加分条件数量、条件同时成立天数重新排序。已扫 {meta?.scanned ?? 0}
+            边扫边显示，扫到就按个股站上 MA4 的天数从短到长排。已扫 {meta?.scanned ?? 0}
             {meta?.universe ? `/${meta.universe}` : ""} · 命中 {hits.length}
           </div>
         ) : null}
