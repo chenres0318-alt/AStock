@@ -86,8 +86,9 @@ function hits(sectors: SectorMa4Screen[]) {
   return collectMa4StandHits(plusConcept(sectors));
 }
 
-const short = { code: "sh600001", name: "短站", days: 1, time: "2026-10-23" };
-const long = { code: "sh600002", name: "长站", days: 4, time: "2026-10-20" };
+const wm = { weekOnMa4: true, monthOnMa4: true };
+const short = { code: "sh600001", name: "短站", days: 1, time: "2026-10-23", ...wm };
+const long = { code: "sh600002", name: "长站", days: 4, time: "2026-10-20", ...wm };
 const members = [
   { code: "sh600001", name: "短站", price: 10, pct: 1.2, turnover: 2 },
   { code: "sh600002", name: "长站", price: 20, pct: -0.5, turnover: 3 },
@@ -191,127 +192,33 @@ const stHit = collectMa4StandHits([
 ]);
 assert(stHit.length === 0, "ST names do not appear in the stand list");
 
-const rankedBoost = hits([
-  screen({
-    code: "881121",
-    name: "半导体",
-    crosses: [
-      { code: "sh600010", name: "短站无加成", days: 1, time: "2026-10-23" },
-      { code: "sh600011", name: "周线", days: 6, time: "2026-10-16", weekOnMa4: true },
-      { code: "sh600012", name: "上叉", days: 9, time: "2026-10-13", ma4CrossUpMa7: true },
-    ],
-    members: [
-      { code: "sh600010", name: "短站无加成", price: 10, pct: 1, turnover: 1 },
-      { code: "sh600011", name: "周线", price: 11, pct: 1, turnover: 1 },
-      { code: "sh600012", name: "上叉", price: 12, pct: 1, turnover: 1 },
-    ],
-  }),
-]);
 assert(
-  rankedBoost.map((row) => row.name).join(",") === "上叉,周线,短站无加成",
-  "one extra condition ranks by shorter hold of that set, then names with none",
+  hits([
+    screen({
+      code: "881121",
+      name: "半导体",
+      crosses: [
+        { code: "sh600010", name: "只有日K", days: 1, time: "2026-10-23" },
+        { code: "sh600011", name: "缺月K", days: 1, time: "2026-10-23", weekOnMa4: true },
+        { code: "sh600012", name: "缺周K", days: 1, time: "2026-10-23", monthOnMa4: true },
+      ],
+      members: [
+        { code: "sh600010", name: "只有日K", price: 10, pct: 1, turnover: 1 },
+        { code: "sh600011", name: "缺月K", price: 11, pct: 1, turnover: 1 },
+        { code: "sh600012", name: "缺周K", price: 12, pct: 1, turnover: 1 },
+      ],
+    }),
+  ]).length === 0,
+  "daily MA4 without both week and month is not a hit",
 );
 
-const weekBeatsShort = hits([
+const rankedDays = hits([
   screen({
     code: "881121",
     name: "半导体",
     crosses: [
-      { code: "sh600020", name: "短", days: 1, time: "2026-10-23" },
-      { code: "sh600021", name: "周", days: 8, time: "2026-10-14", weekOnMa4: true },
-    ],
-    members: [
-      { code: "sh600020", name: "短", price: 10, pct: 1, turnover: 1 },
-      { code: "sh600021", name: "周", price: 11, pct: 1, turnover: 1 },
-    ],
-  }),
-]);
-assert(weekBeatsShort[0]?.name === "周", "weekly MA4 still ranks ahead of a shorter stand without it");
-
-const monthRank = hits([
-  screen({
-    code: "881121",
-    name: "半导体",
-    crosses: [
-      { code: "sh600022", name: "短", days: 1, time: "2026-10-23" },
-      { code: "sh600023", name: "月线", days: 8, time: "2026-10-14", monthOnMa4: true, monthDays: 1 },
-      { code: "sh600024", name: "周线", days: 6, time: "2026-10-16", weekOnMa4: true, weekDays: 2 },
-      { code: "sh600025", name: "上叉", days: 9, time: "2026-10-13", ma4CrossUpMa7: true },
-    ],
-    members: [
-      { code: "sh600022", name: "短", price: 10, pct: 1, turnover: 1 },
-      { code: "sh600023", name: "月线", price: 11, pct: 1, turnover: 1 },
-      { code: "sh600024", name: "周线", price: 12, pct: 1, turnover: 1 },
-      { code: "sh600025", name: "上叉", price: 13, pct: 1, turnover: 1 },
-    ],
-  }),
-]);
-assert(
-  monthRank.map((row) => row.name).join(",") === "上叉,周线,月线,短",
-  "one extra condition ranks by shorter hold of that set, then names with none",
-);
-
-const freshWeek = hits([
-  screen({
-    code: "881121",
-    name: "半导体",
-    crosses: [
-      { code: "sh600026", name: "周旧", days: 2, time: "2026-10-22", weekOnMa4: true, weekDays: 5 },
-      { code: "sh600027", name: "周新", days: 12, time: "2026-10-08", weekOnMa4: true, weekDays: 1 },
-    ],
-    members: [
-      { code: "sh600026", name: "周旧", price: 10, pct: 1, turnover: 1 },
-      { code: "sh600027", name: "周新", price: 11, pct: 1, turnover: 1 },
-    ],
-  }),
-]);
-assert(freshWeek[0]?.name === "周旧", "the same extra conditions rank by shorter simultaneous hold");
-
-const freshMonth = hits([
-  screen({
-    code: "881121",
-    name: "半导体",
-    crosses: [
-      { code: "sh600028", name: "月旧", days: 2, time: "2026-10-22", monthOnMa4: true, monthDays: 5 },
-      { code: "sh600029", name: "月新", days: 12, time: "2026-10-08", monthOnMa4: true, monthDays: 1 },
-    ],
-    members: [
-      { code: "sh600028", name: "月旧", price: 10, pct: 1, turnover: 1 },
-      { code: "sh600029", name: "月新", price: 11, pct: 1, turnover: 1 },
-    ],
-  }),
-]);
-assert(freshMonth[0]?.name === "月旧", "the same extra conditions rank by shorter simultaneous hold");
-
-const sameFlagsHold = hits([
-  screen({
-    code: "881121",
-    name: "半导体",
-    crosses: [
-      {
-        code: "sh600032",
-        name: "横店样",
-        days: 4,
-        time: "2026-10-26",
-        ma4CrossUpMa7: true,
-        weekOnMa4: true,
-        monthOnMa4: true,
-        weekDays: 1,
-        monthDays: 2,
-        crossDays: 1,
-      },
-      {
-        code: "sh600033",
-        name: "平安样",
-        days: 1,
-        time: "2026-10-29",
-        ma4CrossUpMa7: true,
-        weekOnMa4: true,
-        monthOnMa4: true,
-        weekDays: 1,
-        monthDays: 3,
-        crossDays: 1,
-      },
+      { code: "sh600032", name: "横店样", days: 4, time: "2026-10-26", ...wm },
+      { code: "sh600033", name: "平安样", days: 1, time: "2026-10-29", ...wm },
     ],
     members: [
       { code: "sh600032", name: "横店样", price: 10, pct: 1, turnover: 1 },
@@ -319,62 +226,24 @@ const sameFlagsHold = hits([
     ],
   }),
 ]);
-assert(
-  sameFlagsHold.map((row) => row.name).join(",") === "平安样,横店样",
-  "the same three extras rank by shorter simultaneous hold, then shorter daily MA4",
-);
-assert(sameFlagsHold[0]?.holdDays === 1 && sameFlagsHold[1]?.holdDays === 1, "上叉 caps how long the three extras have held");
-assert(sameFlagsHold[0]?.days === 1 && sameFlagsHold[1]?.days === 4, "daily MA4 days still break a holdDays tie");
+assert(rankedDays.map((row) => row.name).join(",") === "平安样,横店样", "shorter daily MA4 stand ranks first");
+assert(rankedDays[0]?.days === 1 && rankedDays[1]?.days === 4, "持续天数 follows the daily MA4 stand");
 
-const sameWeekMonth = hits([
+const weekOnlyLonger = hits([
   screen({
     code: "881121",
     name: "半导体",
     crosses: [
-      { code: "sh600034", name: "贵阳样", days: 4, time: "2026-10-26", weekOnMa4: true, monthOnMa4: true, weekDays: 1, monthDays: 3 },
-      { code: "sh600035", name: "苏州样", days: 1, time: "2026-10-29", weekOnMa4: true, monthOnMa4: true, weekDays: 1, monthDays: 3 },
+      { code: "sh600036", name: "无月K短", days: 1, time: "2026-10-29", weekOnMa4: true },
+      { code: "sh600037", name: "日月周都有", days: 9, time: "2026-10-13", ...wm },
     ],
     members: [
-      { code: "sh600034", name: "贵阳样", price: 10, pct: 1, turnover: 1 },
-      { code: "sh600035", name: "苏州样", price: 11, pct: 1, turnover: 1 },
+      { code: "sh600036", name: "无月K短", price: 10, pct: 1, turnover: 1 },
+      { code: "sh600037", name: "日月周都有", price: 11, pct: 1, turnover: 1 },
     ],
   }),
 ]);
-assert(sameWeekMonth[0]?.name === "苏州样", "the same 周K/月K set ranks by shorter simultaneous hold");
-assert(sameWeekMonth[0]?.holdDays === 1 && sameWeekMonth[1]?.holdDays === 4, "持续天数 is how long the current extras have all held");
-
-const moreExtras = hits([
-  screen({
-    code: "881121",
-    name: "半导体",
-    crosses: [
-      { code: "sh600036", name: "两条件短", days: 1, time: "2026-10-29", ma4CrossUpMa7: true, weekOnMa4: true },
-      { code: "sh600037", name: "三条件长", days: 9, time: "2026-10-13", ma4CrossUpMa7: true, weekOnMa4: true, monthOnMa4: true },
-    ],
-    members: [
-      { code: "sh600036", name: "两条件短", price: 10, pct: 1, turnover: 1 },
-      { code: "sh600037", name: "三条件长", price: 11, pct: 1, turnover: 1 },
-    ],
-  }),
-]);
-assert(moreExtras[0]?.name === "三条件长", "more extra conditions rank first even with a longer daily MA4 stand");
-
-const sameCountShorterHold = hits([
-  screen({
-    code: "881121",
-    name: "半导体",
-    crosses: [
-      { code: "sh600038", name: "周线已久", days: 10, time: "2026-10-12", weekOnMa4: true, weekDays: 8 },
-      { code: "sh600039", name: "上叉刚成", days: 10, time: "2026-10-12", ma4CrossUpMa7: true, crossDays: 1 },
-    ],
-    members: [
-      { code: "sh600038", name: "周线已久", price: 10, pct: 1, turnover: 1 },
-      { code: "sh600039", name: "上叉刚成", price: 11, pct: 1, turnover: 1 },
-    ],
-  }),
-]);
-assert(sameCountShorterHold[0]?.name === "上叉刚成", "the same extra count ranks the newer condition set first");
-assert(sameCountShorterHold[0]?.holdDays === 1 && sameCountShorterHold[1]?.holdDays === 10, "holdDays follows the latest extra");
+assert(weekOnlyLonger.map((row) => row.name).join(",") === "日月周都有", "missing month MA4 is dropped even with a shorter daily stand");
 
 const wave1 = collectMa4StandHits([
   screen({
@@ -389,19 +258,19 @@ const wave2 = hits([
   screen({
     code: "881121",
     name: "食品加工制造",
-    crosses: [{ code: "sh600040", name: "先扫到", days: 2, time: "2026-10-22" }],
+    crosses: [{ code: "sh600040", name: "先扫到", days: 2, time: "2026-10-22", ...wm }],
     members: [{ code: "sh600040", name: "先扫到", price: 8, pct: 1, turnover: 1 }],
   }),
   screen({
     code: "881171",
     name: "医疗器械",
-    crosses: [{ code: "sh600041", name: "后扫上叉", days: 5, time: "2026-10-19", ma4CrossUpMa7: true, weekOnMa4: true }],
+    crosses: [{ code: "sh600041", name: "后扫上叉", days: 5, time: "2026-10-19", ma4CrossUpMa7: true, ...wm }],
     members: [{ code: "sh600041", name: "后扫上叉", price: 9, pct: 1, turnover: 1 }],
   }),
 ]);
 assert(
-  wave2.map((row) => row.name).join(",") === "后扫上叉,先扫到",
-  "a later board still jumps ahead when it ranks better",
+  wave2.map((row) => row.name).join(",") === "先扫到,后扫上叉",
+  "a later board still appears and shorter daily MA4 stays first",
 );
 
 function bar(time: string, close: number): KBar {
