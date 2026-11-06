@@ -1,4 +1,4 @@
-import { adviseHolding, closeStandsOnMa4, consecutiveMa4Days, sectorHasOpenRedBox } from "./holdingAdvice.ts";
+import { adviseHolding, closeLowerThanPrev, closeStandsOnMa4, consecutiveMa4Days, sectorHasOpenRedBox } from "./holdingAdvice.ts";
 import type { KBar } from "./types.ts";
 
 function assert(cond: unknown, message: string) {
@@ -58,11 +58,46 @@ const bothBreak = adviseHolding({
   sectorInRedBox: true,
   hasSector: true,
   sectorResolved: true,
+  stockCloseDown: true,
+  sectorCloseDown: true,
 });
-assert(bothBreak.action === "exit" && bothBreak.label === "需要离场", "stock and sector both off MA4 means exit");
-assert(bothBreak.notes.includes("股价收盘跌破MA4"), "exit names the stock break");
-assert(bothBreak.notes.includes("板块指数跌破MA4"), "exit names the index break");
+assert(bothBreak.action === "exit" && bothBreak.label === "需要离场", "both off MA4 with lower closes means exit");
+assert(bothBreak.notes.includes("股价收盘跌破MA4且低于昨日"), "exit names the stock break and lower close");
+assert(bothBreak.notes.includes("板块指数跌破MA4且低于昨日"), "exit names the index break and lower close");
 assert(!bothBreak.notes.includes("板块已离开红色趋势区间"), "red-box trend is not an exit reason");
+
+const bothBreakStockUp = adviseHolding({
+  stockOnMa4: false,
+  sectorOnMa4: false,
+  sectorInRedBox: true,
+  hasSector: true,
+  sectorResolved: true,
+  stockCloseDown: false,
+  sectorCloseDown: true,
+});
+assert(bothBreakStockUp.action === "hold", "both off MA4 but stock close not lower is a hold");
+assert(bothBreakStockUp.notes.includes("股价收盘未低于昨日"), "a rebound stock close is named");
+
+const bothBreakIndexUp = adviseHolding({
+  stockOnMa4: false,
+  sectorOnMa4: false,
+  sectorInRedBox: true,
+  hasSector: true,
+  sectorResolved: true,
+  stockCloseDown: true,
+  sectorCloseDown: false,
+});
+assert(bothBreakIndexUp.action === "hold", "both off MA4 but index close not lower is a hold");
+assert(bothBreakIndexUp.notes.includes("板块指数收盘未低于昨日"), "a rebound index close is named");
+
+const bothBreakNoDown = adviseHolding({
+  stockOnMa4: false,
+  sectorOnMa4: false,
+  sectorInRedBox: true,
+  hasSector: true,
+  sectorResolved: true,
+});
+assert(bothBreakNoDown.action === "hold", "both off MA4 without lower-close confirmation is a hold");
 
 const boxEnd = adviseHolding({
   stockOnMa4: true,
@@ -102,6 +137,11 @@ const unresolved = adviseHolding({
 });
 assert(unresolved.action === "hold", "an unresolved sector is not treated as both broken");
 assert(unresolved.notes.some((note) => note.includes("暂无法核对")), "a failed sector fetch is explained");
+
+assert(!closeLowerThanPrev(bars([10])), "one bar cannot be lower than yesterday");
+assert(!closeLowerThanPrev(bars([10, 10])), "a flat close is not lower");
+assert(!closeLowerThanPrev(bars([10, 11])), "a higher close is not lower");
+assert(closeLowerThanPrev(bars([11, 10])), "a lower close is lower than yesterday");
 
 assert(!closeStandsOnMa4(bars([10, 11, 12])), "fewer than 4 bars cannot stand on MA4");
 assert(closeStandsOnMa4(bars([8, 9, 10, 11, 12])), "a rising close stands on MA4");

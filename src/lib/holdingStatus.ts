@@ -2,7 +2,7 @@ import { forcedBoardForStock } from "./boardExtras";
 import { listAllIndustryBoards } from "./boards";
 import { cached } from "./cache";
 import { bareCode, isEtf, toTencentCode } from "./codes";
-import { adviseHolding, closeStandsOnMa4, consecutiveMa4Days, sectorHasOpenRedBox } from "./holdingAdvice";
+import { adviseHolding, closeLowerThanPrev, closeStandsOnMa4, consecutiveMa4Days, sectorHasOpenRedBox } from "./holdingAdvice";
 import { getKline } from "./market";
 import { mapPool } from "./pool";
 import { getSectorTrend, type SectorTrendReport } from "./sectorTrendData";
@@ -90,6 +90,8 @@ export async function evaluateHoldings(items: HoldingItem[]): Promise<HoldingSta
       hasSector: Boolean(item.sectorCode),
       sectorResolved: item.sectorCode ? report != null : false,
       standDays,
+      stockCloseDown: closeLowerThanPrev(bars),
+      sectorCloseDown: report ? closeLowerThanPrev(report.bars) : false,
     });
     return {
       code: item.code,
