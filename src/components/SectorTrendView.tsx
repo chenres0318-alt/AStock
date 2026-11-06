@@ -66,10 +66,10 @@ export default function SectorTrendView() {
   const [liveCodes, setLiveCodes] = useState<string[]>([]);
   const [offMa4Codes, setOffMa4Codes] = useState<string[]>([]);
   const [liveHydrated, setLiveHydrated] = useState(false);
+  const [industryLiveReady, setIndustryLiveReady] = useState(false);
   const [conceptLiveReady, setConceptLiveReady] = useState(false);
   const [conceptCatalogReady, setConceptCatalogReady] = useState(false);
   const settledBoards = useRef(new Set<string>());
-  const liveScanStarted = useRef(false);
   const codeRef = useRef(code);
   codeRef.current = code;
 
@@ -158,8 +158,6 @@ export default function SectorTrendView() {
   }, [code]);
 
   useEffect(() => {
-    if (!report || liveScanStarted.current) return;
-    liveScanStarted.current = true;
     let cancelled = false;
     const ingest = (data: { codes?: string[]; offMa4?: string[] }) => {
       if (cancelled) return;
@@ -187,12 +185,12 @@ export default function SectorTrendView() {
           else onDone?.();
         });
     };
-    load("/api/market/sector-trend?list=active", 0);
+    load("/api/market/sector-trend?list=active", 0, () => setIndustryLiveReady(true));
     load("/api/market/sector-trend?list=active&scope=concept", 0, () => setConceptLiveReady(true));
     return () => {
       cancelled = true;
     };
-  }, [report]);
+  }, []);
 
   const liveSet = useMemo(() => new Set(liveCodes), [liveCodes]);
   const offMa4Set = useMemo(() => new Set(offMa4Codes), [offMa4Codes]);
@@ -218,6 +216,7 @@ export default function SectorTrendView() {
             code={code}
             liveCodes={liveSet}
             offMa4Codes={offMa4Set}
+            industryLiveReady={industryLiveReady}
             conceptLiveReady={conceptLiveReady}
             conceptCatalogReady={conceptCatalogReady}
             onPick={(next) => router.push(`/sector?code=${next}`)}
@@ -318,6 +317,7 @@ function BoardPicker({
   code,
   liveCodes,
   offMa4Codes,
+  industryLiveReady,
   conceptLiveReady,
   conceptCatalogReady,
   onPick,
@@ -326,6 +326,7 @@ function BoardPicker({
   code: string;
   liveCodes: Set<string>;
   offMa4Codes: Set<string>;
+  industryLiveReady: boolean;
   conceptLiveReady: boolean;
   conceptCatalogReady: boolean;
   onPick: (code: string) => void;
@@ -346,13 +347,13 @@ function BoardPicker({
       });
     const industry = sortGroup(boards.filter((item) => !isTonghuashunConcept(item.code) && match(item)));
     const concepts = sortGroup(boards.filter((item) => isTonghuashunConcept(item.code) && match(item)));
-    const groups = [{ label: "行业", items: industry, hint: "" }];
+    const groups = [{ label: "行业", items: industry, hint: industryLiveReady ? "" : " · 核对中" }];
     if (concepts.length || !needle) {
       const hint = !conceptCatalogReady ? " · 加载中" : !concepts.length && !needle ? " · 暂无" : !conceptLiveReady ? " · 核对中" : "";
       groups.push({ label: "概念", items: concepts, hint });
     }
     return groups.filter((group) => group.items.length > 0 || group.label === "概念");
-  }, [boards, liveCodes, query, conceptCatalogReady, conceptLiveReady]);
+  }, [boards, liveCodes, query, industryLiveReady, conceptCatalogReady, conceptLiveReady]);
   const current = boards.find((item) => item.code === code);
 
   useEffect(() => {
