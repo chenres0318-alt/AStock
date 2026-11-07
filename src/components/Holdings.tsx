@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { displaySymbol, isIndexCode, isListedStockCode, priceDigits } from "@/lib/codes";
 import { formatClock, formatPct, formatPrice, toneClass } from "@/lib/format";
+import { holdingCheckRows } from "@/lib/holdingAdvice";
 import { useHoldings } from "@/lib/useHoldings";
 import type { HoldingItem, HoldingStatus, Quote, SearchItem } from "@/lib/types";
 import AppHeader from "./AppHeader";
@@ -14,6 +15,19 @@ type StatusResponse = {
   items: HoldingStatus[];
   error?: string;
 };
+
+function HoldingFlagRows({ status }: { status: HoldingStatus }) {
+  const rows = holdingCheckRows(status);
+  return (
+    <div className="mt-0.5 grid grid-cols-2 gap-x-1.5 gap-y-0.5 text-[10px] leading-4">
+      {rows.map((item) => (
+        <span key={item.label} className={`whitespace-nowrap ${item.on ? "text-up" : "text-mute"}`}>
+          {item.label}
+        </span>
+      ))}
+    </div>
+  );
+}
 
 function canHoldSearchHit(hit: SearchItem) {
   return isListedStockCode(hit.code) && !isIndexCode(hit.code);
@@ -220,7 +234,10 @@ export default function Holdings() {
     ? {
         label: selectedStatus.label,
         hold: selectedStatus.action === "hold",
-        detail: selectedStatus.notes.join(" · "),
+        detail: holdingCheckRows(selectedStatus)
+          .filter((row) => row.on)
+          .map((row) => row.label)
+          .join(" · "),
       }
     : null;
 
@@ -314,9 +331,7 @@ export default function Holdings() {
                     ) : (
                       <div className="mt-1 text-xs text-mute">{statusLoading ? "按 MA4 核对…" : "待核对"}</div>
                     )}
-                    {status?.notes.length ? (
-                      <div className="mt-0.5 text-[11px] leading-4 text-mute">{status.notes.join(" · ")}</div>
-                    ) : null}
+                    {status ? <HoldingFlagRows status={status} /> : null}
                   </button>
                   <div className="flex flex-col items-end gap-2">
                     <div className="text-right">

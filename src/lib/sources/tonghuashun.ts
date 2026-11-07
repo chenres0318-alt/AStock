@@ -85,6 +85,34 @@ export async function fetchTonghuashunFieldIndustry(code: string): Promise<strin
   }
 }
 
+export function parseTonghuashunStockConceptHtml(html: string): Array<{ code: string; name: string }> {
+  const found: Array<{ code: string; name: string }> = [];
+  const seen = new Set<string>();
+  for (const match of html.matchAll(/clid="(88[5-9]\d{3})"\s*>\s*([^<]+)/g)) {
+    const code = match[1];
+    const name = decodeText(match[2]);
+    if (!name || seen.has(code)) continue;
+    seen.add(code);
+    found.push({ code, name });
+  }
+  return found;
+}
+
+export async function fetchTonghuashunStockConcepts(code: string): Promise<Array<{ code: string; name: string }>> {
+  const id = bareCode(code);
+  if (!/^\d{6}$/.test(id)) return [];
+  const referer = `https://stockpage.10jqka.com.cn/${id}/`;
+  try {
+    const html = await firstOk([
+      () => readHtml(`https://basic.10jqka.com.cn/16/${id}/concept.html`, referer),
+      () => readHtml(`https://basic.10jqka.com.cn/${id}/concept.html`, referer),
+    ]);
+    return parseTonghuashunStockConceptHtml(html);
+  } catch {
+    return [];
+  }
+}
+
 export async function fetchTonghuashunStockIndustry(code: string): Promise<string | null> {
   const id = bareCode(code);
   if (!/^\d{6}$/.test(id)) return null;

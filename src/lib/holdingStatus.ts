@@ -5,8 +5,12 @@ import { bareCode, isEtf, toTencentCode } from "./codes";
 import { adviseHolding, closeLowerThanPrev, closeStandsOnMa4, consecutiveMa4Days, sectorHasOpenRedBox } from "./holdingAdvice";
 import { getKline } from "./market";
 import { mapPool } from "./pool";
-import { getSectorTrend, type SectorTrendReport } from "./sectorTrendData";
-import { fetchTonghuashunFieldIndustry, fetchTonghuashunStockIndustry } from "./sources/tonghuashun";
+import { getSectorTrend, listBoardsInTrend, type SectorTrendReport } from "./sectorTrendData";
+import {
+  fetchTonghuashunFieldIndustry,
+  fetchTonghuashunStockConcepts,
+  fetchTonghuashunStockIndustry,
+} from "./sources/tonghuashun";
 import {
   keepTonghuashunHoldingBoard,
   matchBoardFromHoldingName,
@@ -63,13 +67,19 @@ export async function evaluateHoldings(items: HoldingItem[]): Promise<HoldingSta
   });
   const unique = [...new Set(rows.map((row) => row.sectorCode).filter((code): code is string => Boolean(code)))];
   const reports = new Map<string, SectorTrendReport | null>();
-  await mapPool(unique, 3, async (code) => {
-    try {
-      reports.set(code, await getSectorTrend(code));
-    } catch {
-      reports.set(code, null);
-    }
-  });
+  const [industryLive, conceptLive] = await Promise.all([
+    listBoardsInTrend("industry"),
+    listBoardsInTrend("concept"),
+    mapPool(unique, 3, async (code) => {
+      try {
+        reports.set(code, await getSectorTrend(code));
+      } catch {
+        reports.set(code, null);
+      }
+    }),
+  ]);
+  const industryRed = new Set(industryLive.codes);
+  const conceptRed = new Set(conceptLive.codes);
 
   return mapPool(rows, 4, async (item) => {
     let bars: KBar[] = [];
@@ -82,7 +92,12 @@ export async function evaluateHoldings(items: HoldingItem[]): Promise<HoldingSta
     const standDays = consecutiveMa4Days(bars);
     const report = item.sectorCode ? reports.get(item.sectorCode) ?? null : null;
     const sectorOnMa4 = report?.onMa4 ?? false;
-    const sectorInRedBox = report ? sectorHasOpenRedBox(report) : false;
+    const sectorInRedBox = report
+      ? sectorHasOpenRedBox(report)
+      : Boolean(item.sectorCode && industryRed.has(item.sectorCode));
+    const concepts = await cached(`holding-ths-concepts:v1:${bareCode(item.code)}`, 6 * 60 * 60_000, () =>
+      fetchTonghuashunStockConcepts(item.code),
+    ).catch(() => [] as Array<{ code: string; name: string }>);
     const advice = adviseHolding({
       stockOnMa4,
       sectorOnMa4,
@@ -92,6 +107,7 @@ export async function evaluateHoldings(items: HoldingItem[]): Promise<HoldingSta
       standDays,
       stockCloseDown: closeLowerThanPrev(bars),
       sectorCloseDown: report ? closeLowerThanPrev(report.bars) : false,
+      conceptInRedBox: concepts.some((board) => conceptRed.has(board.code)),
     });
     return {
       code: item.code,

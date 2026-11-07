@@ -150,6 +150,9 @@ export type HoldingAdvice = {
   stockOnMa4: boolean;
   sectorOnMa4: boolean;
   sectorInRedBox: boolean;
+  conceptInRedBox: boolean;
+  stockCloseDown: boolean;
+  sectorCloseDown: boolean;
   notes: string[];
 };
 
