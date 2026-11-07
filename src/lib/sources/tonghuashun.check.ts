@@ -1,4 +1,4 @@
-import { conceptCatalogNeedsDetailCrawl, parseTonghuashunIndustryHtml } from "./tonghuashun.ts";
+import { conceptCatalogNeedsDetailCrawl, parseTonghuashunIndustryHtml, parseTonghuashunStockConceptHtml } from "./tonghuashun.ts";
 
 function assert(cond: unknown, message: string) {
   if (!cond) throw new Error(message);
@@ -47,6 +47,14 @@ assert(fund[0].upCount == null, "the fund-flow table does not have up and down c
 const quote = parseTonghuashunIndustryHtml(quoted)[0];
 assert(quote?.code === "881121" && quote.pct === 2.92 && quote.leader === "恒玄科技", "the quote table still reads percent from the third cell");
 assert(quote.upCount === 120 && quote.downCount === 10, "the quote table still keeps the up and down counts");
+const concepts = parseTonghuashunStockConceptHtml(
+  `<td class="gnName"  clid="885620">                 	 		参股券商                	 		                 	 	</td>
+   <td class="gnName"  clid="885690">PPP概念</td>
+   <td class="gnName"  clid="885620">参股券商</td>`,
+);
+assert(concepts.map((item) => item.code).join(",") === "885620,885690", "stock concept plates keep order and drop duplicates");
+assert(concepts[0]?.name === "参股券商" && concepts[1]?.name === "PPP概念", "stock concept names are trimmed");
+
 assert(!conceptCatalogNeedsDetailCrawl(120), "a full gnSection list does not open every concept page");
 assert(conceptCatalogNeedsDetailCrawl(20), "a short gnSection list still fills in from the directory");
 

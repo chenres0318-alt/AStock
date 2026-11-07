@@ -41,6 +41,24 @@ export function sectorHasOpenRedBox(report: {
   return report.trends.some((trend) => trend.status === "open" && trend.end === lastTime);
 }
 
+export function holdingCheckRows(flags: {
+  stockOnMa4: boolean;
+  sectorOnMa4: boolean;
+  sectorInRedBox: boolean;
+  conceptInRedBox: boolean;
+  stockCloseDown: boolean;
+  sectorCloseDown: boolean;
+}): Array<{ label: string; on: boolean }> {
+  return [
+    { label: "个股日K站上4日线", on: flags.stockOnMa4 },
+    { label: "板块指数站上4日线", on: flags.sectorOnMa4 },
+    { label: "板块红框", on: flags.sectorInRedBox },
+    { label: "概念红框", on: flags.conceptInRedBox },
+    { label: "个股日K是否低于昨日", on: flags.stockCloseDown },
+    { label: "板块日K是否低于昨日", on: flags.sectorCloseDown },
+  ];
+}
+
 export function adviseHolding(input: {
   stockOnMa4: boolean;
   sectorOnMa4: boolean;
@@ -50,20 +68,30 @@ export function adviseHolding(input: {
   standDays?: number | null;
   stockCloseDown?: boolean;
   sectorCloseDown?: boolean;
+  conceptInRedBox?: boolean;
 }): HoldingAdvice {
   const sectorKnown = input.hasSector && input.sectorResolved;
   const stockCloseDown = Boolean(input.stockCloseDown);
   const sectorCloseDown = Boolean(input.sectorCloseDown);
+  const conceptInRedBox = Boolean(input.conceptInRedBox);
   const bothBroken = sectorKnown && !input.stockOnMa4 && !input.sectorOnMa4;
   const bothLower = stockCloseDown && sectorCloseDown;
+  const flags = {
+    stockOnMa4: input.stockOnMa4,
+    sectorOnMa4: sectorKnown ? input.sectorOnMa4 : false,
+    sectorInRedBox: input.sectorInRedBox,
+    conceptInRedBox,
+    stockCloseDown,
+    sectorCloseDown,
+  };
 
   if (bothBroken && bothLower) {
     return {
       action: "exit",
       label: "需要离场",
+      ...flags,
       stockOnMa4: false,
       sectorOnMa4: false,
-      sectorInRedBox: input.sectorInRedBox,
       notes: ["股价收盘跌破MA4且低于昨日", "板块指数跌破MA4且低于昨日"],
     };
   }
@@ -89,9 +117,7 @@ export function adviseHolding(input: {
   return {
     action: "hold",
     label: "继续持仓",
-    stockOnMa4: input.stockOnMa4,
-    sectorOnMa4: sectorKnown ? input.sectorOnMa4 : false,
-    sectorInRedBox: input.sectorInRedBox,
+    ...flags,
     notes,
   };
 }

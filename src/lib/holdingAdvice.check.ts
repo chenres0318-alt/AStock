@@ -1,4 +1,4 @@
-import { adviseHolding, closeLowerThanPrev, closeStandsOnMa4, consecutiveMa4Days, sectorHasOpenRedBox } from "./holdingAdvice.ts";
+import { adviseHolding, closeLowerThanPrev, closeStandsOnMa4, consecutiveMa4Days, holdingCheckRows, sectorHasOpenRedBox } from "./holdingAdvice.ts";
 import type { KBar } from "./types.ts";
 
 function assert(cond: unknown, message: string) {
@@ -25,6 +25,8 @@ const keep = adviseHolding({
   standDays: 2,
 });
 assert(keep.action === "hold" && keep.label === "继续持仓", "stock and sector both on MA4 is a hold");
+assert(keep.stockOnMa4 && keep.sectorOnMa4 && keep.sectorInRedBox, "hold flags keep the MA4 and box states");
+assert(!keep.conceptInRedBox && !keep.stockCloseDown && !keep.sectorCloseDown, "unset lights stay off");
 assert(!keep.notes.includes("板块红框"), "red-box trend is not part of the hold check");
 assert(!keep.notes.includes("板块仍在红色趋势区间"), "red-box status is not a hold note");
 assert(keep.notes.includes("板块指数站上MA4"), "hold notes keep the sector MA4");
@@ -62,6 +64,7 @@ const bothBreak = adviseHolding({
   sectorCloseDown: true,
 });
 assert(bothBreak.action === "exit" && bothBreak.label === "需要离场", "both off MA4 with lower closes means exit");
+assert(bothBreak.stockCloseDown && bothBreak.sectorCloseDown, "exit keeps the lower-close lights on");
 assert(bothBreak.notes.includes("股价收盘跌破MA4且低于昨日"), "exit names the stock break and lower close");
 assert(bothBreak.notes.includes("板块指数跌破MA4且低于昨日"), "exit names the index break and lower close");
 assert(!bothBreak.notes.includes("板块已离开红色趋势区间"), "red-box trend is not an exit reason");
@@ -170,6 +173,20 @@ assert(
     trends: [{ status: "closed", end: "2026-01-04" }],
   }),
   "a grey closed box is not a hold",
+);
+
+const lights = holdingCheckRows({
+  stockOnMa4: true,
+  sectorOnMa4: false,
+  sectorInRedBox: true,
+  conceptInRedBox: false,
+  stockCloseDown: false,
+  sectorCloseDown: true,
+});
+assert(
+  lights.map((row) => `${row.label}:${Number(row.on)}`).join("|") ===
+    "个股日K站上4日线:1|板块指数站上4日线:0|板块红框:1|概念红框:0|个股日K是否低于昨日:0|板块日K是否低于昨日:1",
+  "holding lights follow the six flags in display order",
 );
 
 console.log("holdingAdvice.check ok");
