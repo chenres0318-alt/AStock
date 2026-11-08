@@ -50,8 +50,8 @@ function boxSpan(trend: { start: string; end: string }): string {
 
 function boxState(trend: { status: string; start: string; end: string }): string {
   if (trend.status === "closed") return "灰框已收口";
-  if (trend.start === trend.end) return "疑似启动";
-  return "红框试运行";
+  if (trend.start === trend.end) return "红框开始";
+  return "红框运行";
 }
 
 export default function SectorTrendView() {
@@ -208,7 +208,7 @@ export default function SectorTrendView() {
           <div>
             <div className="text-sm">近期趋势捕捉</div>
             <div className="mt-1 max-w-3xl text-xs leading-5 text-mute">
-              打出低点的当天，收盘拉到日内高位，当天涨幅或从低点拉起的幅度够，并且多数个股在涨、有领涨龙头，就按疑似启动画出红框。低点守住之后，框延伸到最新一根。跌破这个低点，疑似启动撤回。已经走出的一段如果涨幅回吐，改成灰框，终点留在高点。
+              板块指数日 K 站上 MA4 和 MA7，周 K 站上 MA4 和 MA7，月 K 站上 MA20，趋势开始，画出红框。日 K 同时跌破 MA4 和 MA7，红色趋势结束，改成灰框，停在跌破前最后一根。
             </div>
           </div>
           <BoardPicker
@@ -534,8 +534,10 @@ function TrendChart({
           const x1 = scale.timeToCoordinate(item.start as Time);
           const x2 = scale.timeToCoordinate(item.end as Time);
           if (x1 == null || x2 == null) return null;
-          const left = Math.min(x1, x2);
-          const width = Math.max(8, Math.abs(x2 - x1));
+          const rawLeft = Math.min(x1, x2);
+          const rawRight = Math.max(x1, x2);
+          const left = Math.max(0, rawLeft);
+          const width = Math.max(8, rawRight - left);
           return { start: item.start, left, width, status: item.status };
         })
         .filter((item): item is { start: string; left: number; width: number; status: TrendBox["status"] } => item != null);
@@ -568,8 +570,8 @@ function TrendChart({
     );
     const latest = trendsRef.current.at(-1);
     const trendIndex = latest ? bars.findIndex((bar) => bar.time === latest.start) : -1;
-    const from = Math.max(0, Math.min(bars.length - 90, trendIndex >= 0 ? trendIndex - 8 : bars.length - 90));
-    chart.timeScale().setVisibleLogicalRange({ from, to: bars.length + 1 });
+    const from = Math.max(0, Math.min(bars.length - 160, trendIndex >= 0 ? trendIndex - 8 : bars.length - 160));
+    chart.timeScale().setVisibleLogicalRange({ from: Math.max(from, bars.length - 220), to: bars.length + 1 });
     requestAnimationFrame(() => {
       const scale = chart.timeScale();
       const next = trendsRef.current
@@ -577,10 +579,13 @@ function TrendChart({
           const x1 = scale.timeToCoordinate(item.start as Time);
           const x2 = scale.timeToCoordinate(item.end as Time);
           if (x1 == null || x2 == null) return null;
+          const rawLeft = Math.min(x1, x2);
+          const rawRight = Math.max(x1, x2);
+          const left = Math.max(0, rawLeft);
           return {
             start: item.start,
-            left: Math.min(x1, x2),
-            width: Math.max(8, Math.abs(x2 - x1)),
+            left,
+            width: Math.max(8, rawRight - left),
             status: item.status,
           };
         })
