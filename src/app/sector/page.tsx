@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "板块趋势 · AStock 看盘",
-  description: "板块红色趋势：日K、周K都站上MA4和MA7为开始，日K同时跌破MA4和MA7为结束",
+  description: "板块红色趋势：日K、周K都站上MA4和MA7为开始，日K跌破为结束并改成灰框",
 };
 
 export default function SectorPage() {
