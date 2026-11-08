@@ -102,9 +102,19 @@ function toMemberPaths(series: Array<{ code: string; name: string; bars: KBar[] 
 
 /** 周K MA7 大约要 7 周日线；多留一些以便红框从更早的起点走到现在。 */
 const TREND_BARS = 700;
+/** 红框是否还开着只看最近一段，不必把多年日线都拉一遍。 */
+const LIVE_BARS = 120;
+
+async function boardSeries(code: string, count: number): Promise<{ name: string; bars: KBar[] }> {
+  return cached(`ths-industry-series:${code}:${count}`, 10 * 60_000, () => fetchTonghuashunSeries(code, count));
+}
 
 async function industrySeries(code: string): Promise<{ name: string; bars: KBar[] }> {
-  return cached(`ths-industry-series:${code}:${TREND_BARS}`, 10 * 60_000, () => fetchTonghuashunSeries(code, TREND_BARS));
+  return boardSeries(code, TREND_BARS);
+}
+
+async function liveSeries(code: string): Promise<{ name: string; bars: KBar[] }> {
+  return boardSeries(code, LIVE_BARS);
 }
 
 async function loadMembers(code: string, limit = TREND_BOARD_MEMBER_LIMIT): Promise<BoardMember[]> {
@@ -162,7 +172,7 @@ function emptyBoardScreen(
 export async function loadBoardMa4Roster(code: string): Promise<SectorMa4Screen | null> {
   const boardCode = code.trim();
   if (!isTonghuashunBoard(boardCode)) return null;
-  const series = await industrySeries(boardCode);
+  const series = await liveSeries(boardCode);
   const bars = series.bars;
   if (bars.length < 4) return null;
   const lastTime = bars.at(-1)?.time;
@@ -224,32 +234,28 @@ export async function loadBoardMa4Screen(code: string): Promise<SectorMa4Screen 
 }
 
 async function loadSectorTrend(boardCode: string): Promise<SectorTrendReport> {
-  const [boards, series, seededMembers] = await Promise.all([
-    (isTonghuashunConcept(boardCode) ? listTonghuashunConcepts() : listAllIndustryBoards()).catch(
-      () => [] as SectorItem[],
-    ),
+  const [series, seededMembers] = await Promise.all([
     industrySeries(boardCode),
     loadMembers(boardCode),
   ]);
   let members = seededMembers;
   if (members.length < 5) members = await loadMembers(boardCode);
   const bars = series.bars;
-  const found = boards.find((item) => item.code === boardCode);
   const last = bars.at(-1);
   const prev = bars.at(-2);
   const dayPct = last && prev && prev.close > 0 ? (last.close / prev.close - 1) * 100 : null;
   const board: SectorItem = {
     code: boardCode,
-    name: found?.name || series.name || boardCode,
-    pct: dayPct ?? found?.pct ?? null,
+    name: series.name || boardCode,
+    pct: dayPct,
     price: last?.close ?? null,
-    leader: found?.leader ?? null,
-    leaderCode: found?.leaderCode ?? null,
-    upCount: found?.upCount ?? null,
-    downCount: found?.downCount ?? null,
+    leader: members[0]?.name ?? null,
+    leaderCode: members[0]?.code ?? null,
+    upCount: null,
+    downCount: null,
     source: "ths",
   };
-  const stocks = await memberSeries(members);
+  const stocks = await memberSeries(members, 80, 6);
   const quoted = fillMemberQuotes(members, stocks);
   const paths = toMemberPaths(stocks);
   const roster = quoted.map((item) => ({ ...item, gain: null as number | null }));
@@ -286,7 +292,7 @@ async function scanOpenTrend(
 ): Promise<TrendScan> {
   const klines = await mapPool(boards, concurrency, async (board) => {
     try {
-      const series = await industrySeries(board.code);
+      const series = await liveSeries(board.code);
       const row = { code: board.code, bars: series.bars };
       if (indexCouldBeOpen(row.bars)) onLive?.(board.code);
       return row;
@@ -322,15 +328,15 @@ export async function listBoardsInTrend(
       return mergeTrendScan(industry, concept);
     }
     if (scope === "concept") {
-      return await loadTrendScan("boards-in-open-trend:concept:v8", onLive, async (emit) => {
+      return await loadTrendScan("boards-in-open-trend:concept:v9", onLive, async (emit) => {
         const boards = await listTonghuashunConcepts().catch(() => [] as SectorItem[]);
         if (!boards.length) return { codes: [] as string[], offMa4: [] as string[] };
-        return scanOpenTrend(boards, 8, emit);
+        return scanOpenTrend(boards, 10, emit);
       });
     }
-    return await loadTrendScan("boards-in-open-trend:v12", onLive, async (emit) => {
+    return await loadTrendScan("boards-in-open-trend:v13", onLive, async (emit) => {
       const boards = await listAllIndustryBoards();
-      return scanOpenTrend(boards, 6, emit);
+      return scanOpenTrend(boards, 8, emit);
     });
   } catch {
     return { codes: [], offMa4: [] };

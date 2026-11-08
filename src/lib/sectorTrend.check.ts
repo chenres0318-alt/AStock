@@ -70,6 +70,7 @@ assert(risingTrends[0].start === rising[firstStart].time, "the box starts on the
 assert(risingTrends[0].end === rising.at(-1)?.time, "the open box runs through the latest bar");
 assert(risingTrends[0].leaders[0]?.name === "龙头", "member breadth still names the leader inside the box");
 assert(indexCouldBeOpen(rising), "the rise still looks open on the index alone");
+assert(indexCouldBeOpen(rising.slice(-80)), "a short recent window still sees an open box");
 assert(trendCoversLastBar(risingTrends, rising.at(-1)?.time), "an open box covers the latest bar");
 
 const noMembers = captureSectorTrends(rising, []);
@@ -79,6 +80,7 @@ assert(noMembers[0].memberCount === 0, "no constituents means empty breadth");
 const falling = tradingBars(Array.from({ length: 520 }, (_, i) => Number((2000 - i * 1.2).toFixed(4))));
 assert(captureSectorTrends(falling).length === 0, "a long decline never starts a red box");
 assert(!indexCouldBeOpen(falling), "a decline is not an open trend");
+assert(!indexCouldBeOpen(falling.slice(-80)), "a short recent decline is still not an open box");
 
 const crashedCloses = risingCloses();
 const last = crashedCloses[crashedCloses.length - 1]!;

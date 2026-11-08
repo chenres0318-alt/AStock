@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { screenStocks } from "@/lib/screener";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 30;
+export const maxDuration = 300;
 
 export async function GET() {
   const started = Date.now();

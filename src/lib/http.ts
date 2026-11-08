@@ -10,7 +10,7 @@ export class UpstreamError extends Error {
   }
 }
 
-const MAX_UPSTREAM = 8;
+const MAX_UPSTREAM = 12;
 let activeUpstream = 0;
 const upstreamWaiters: Array<() => void> = [];
 

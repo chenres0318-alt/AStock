@@ -51,7 +51,7 @@ function combineSignals(timeout: AbortSignal, extra?: AbortSignal): AbortSignal 
 }
 
 async function fetchScreen<T>(url: string, signal?: AbortSignal): Promise<T> {
-  const timeout = AbortSignal.timeout(12_000);
+  const timeout = AbortSignal.timeout(25_000);
   const res = await fetch(url, { cache: "no-store", signal: combineSignals(timeout, signal) });
   let data: T & { error?: string };
   try {
@@ -63,15 +63,19 @@ async function fetchScreen<T>(url: string, signal?: AbortSignal): Promise<T> {
   return data;
 }
 
+function isRetryableScanError(error: unknown, userSignal?: AbortSignal): boolean {
+  if (userSignal?.aborted) return false;
+  if (isAbortError(error)) return true;
+  if (error instanceof TypeError) return true;
+  return error instanceof Error && /failed to fetch/i.test(error.message);
+}
+
 async function readJson<T>(url: string, signal?: AbortSignal): Promise<T> {
   try {
     return await fetchScreen<T>(url, signal);
   } catch (error) {
-    if (signal?.aborted) throw error;
-    if (error instanceof TypeError || (error instanceof Error && /failed to fetch/i.test(error.message))) {
-      return await fetchScreen<T>(url, signal);
-    }
-    throw error;
+    if (!isRetryableScanError(error, signal)) throw error;
+    return await fetchScreen<T>(url, signal);
   }
 }
 
@@ -255,29 +259,41 @@ export default function Screener() {
     setLoading(true);
     setError(null);
     const startedAt = Date.now();
+    let misses = 0;
     try {
       for (;;) {
-        const data = await readJson<StockResponse>("/api/screener/stocks", ac.signal);
-        if (ac.signal.aborted) return;
-        setHits(data.items);
-        setMeta({
-          scanned: data.scanned,
-          universe: data.universe,
-          liveBoards: data.liveBoards,
-          elapsedMs: Date.now() - startedAt,
-          source: data.source,
-          discovering: data.discovering,
-          industryLive: data.industryLive,
-          conceptLive: data.conceptLive,
-        });
-        if (data.error) {
-          setError(data.error);
-          break;
-        }
-        if (!data.scanning) {
-          if (data.timedOut) setError("扫描超时，下面是已经扫到的结果，可再点一次继续");
-          else setError(null);
-          break;
+        try {
+          const data = await readJson<StockResponse>("/api/screener/stocks", ac.signal);
+          if (ac.signal.aborted) return;
+          misses = 0;
+          setHits(data.items);
+          setMeta({
+            scanned: data.scanned,
+            universe: data.universe,
+            liveBoards: data.liveBoards,
+            elapsedMs: Date.now() - startedAt,
+            source: data.source,
+            discovering: data.discovering,
+            industryLive: data.industryLive,
+            conceptLive: data.conceptLive,
+          });
+          if (data.error) {
+            setError(data.error);
+            break;
+          }
+          if (!data.scanning) {
+            if (data.timedOut) setError("扫描超时，下面是已经扫到的结果，可再点一次继续");
+            else setError(null);
+            break;
+          }
+          setError(null);
+        } catch (err) {
+          if (ac.signal.aborted) return;
+          misses += 1;
+          if (misses >= 4) {
+            setError(scanErrorMessage(err));
+            break;
+          }
         }
         await sleep(800, ac.signal);
       }
