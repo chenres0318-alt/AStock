@@ -3,6 +3,7 @@ import {
   conditionHoldDays,
   consecutiveMa4AboveMa7,
   consecutiveOnMa4,
+  consecutiveOnMa4AndMa7,
   dailyToMonthly,
   dailyToWeekly,
   decorateMa4Crosses,
@@ -11,6 +12,7 @@ import {
   matchIndustryBoard,
   monthStandsOnMa4,
   weekStandsOnMa4,
+  weekStandsOnMa4AndMa7,
   type SectorMa4Screen,
 } from "./screenerLogic.ts";
 import { raceDeadline } from "./pool.ts";
@@ -63,38 +65,22 @@ function screen(partial: Partial<SectorMa4Screen> & Pick<SectorMa4Screen, "code"
   };
 }
 
-/** 排名用例默认再挂一个过线概念，避免只测行业时被新规则滤掉。 */
-function plusConcept(sectors: SectorMa4Screen[]): SectorMa4Screen[] {
-  const crosses = new Map<string, SectorMa4Screen["crosses"][number]>();
-  const roster = new Map<string, SectorMa4Screen["members"][number]>();
-  for (const sector of sectors) {
-    for (const cross of sector.crosses) crosses.set(cross.code, cross);
-    for (const member of sector.members) roster.set(member.code, member);
-  }
-  return [
-    ...sectors,
-    screen({
-      code: "885001",
-      name: "测试概念",
-      crosses: [...crosses.values()],
-      members: [...roster.values()],
-    }),
-  ];
-}
-
 function hits(sectors: SectorMa4Screen[]) {
-  return collectMa4StandHits(plusConcept(sectors));
+  return collectMa4StandHits(sectors);
 }
 
-const wm = { weekOnMa4: true, monthOnMa4: true };
-const short = { code: "sh600001", name: "短站", days: 1, time: "2026-10-23", ...wm };
-const long = { code: "sh600002", name: "长站", days: 4, time: "2026-10-20", ...wm };
+const dw = { weekOnMa4: true, weekOnMa7: true };
+const short = { code: "sh600001", name: "短站", days: 1, time: "2026-10-23", ...dw };
+const long = { code: "sh600002", name: "长站", days: 4, time: "2026-10-20", ...dw };
 const members = [
   { code: "sh600001", name: "短站", price: 10, pct: 1.2, turnover: 2 },
   { code: "sh600002", name: "长站", price: 20, pct: -0.5, turnover: 3 },
 ];
 
-assert(collectMa4StandHits([screen({ onMa4: false, crosses: [short] })]).length === 0, "index off MA4 is skipped");
+assert(
+  collectMa4StandHits([screen({ onMa4: false, crosses: [short], members })]).length === 1,
+  "an open red box still hits when the index is off MA4",
+);
 assert(
   collectMa4StandHits([screen({ openTrend: { start: "2026-10-01", end: "2026-10-10", status: "closed" }, crosses: [short] })]).length === 0,
   "a closed grey box is skipped",
@@ -105,10 +91,9 @@ assert(
 );
 assert(collectMa4StandHits([screen({ openTrend: null, crosses: [short] })]).length === 0, "no open box means no hits");
 
-assert(
-  collectMa4StandHits([screen({ code: "881121", name: "半导体", crosses: [short], members })]).length === 0,
-  "an industry without a live concept is not a hit",
-);
+const industryOnly = collectMa4StandHits([screen({ code: "881121", name: "半导体", crosses: [short], members })]);
+assert(industryOnly.length === 1, "an industry red box without a concept is still a hit");
+assert(industryOnly[0]?.boards.map((item) => item.name).join(",") === "半导体", "所属板块 can be only the industry");
 
 const ranked = hits([
   screen({
@@ -118,11 +103,11 @@ const ranked = hits([
     members,
   }),
 ]);
-assert(ranked.length === 2, "both names standing on MA4 are kept");
-assert(ranked[0].name === "短站" && ranked[0].days === 1, "the shortest MA4 stand comes first");
+assert(ranked.length === 2, "both names standing on MA4 and MA7 are kept");
+assert(ranked[0].name === "短站" && ranked[0].days === 1, "the shortest stand comes first");
 assert(ranked[1].name === "长站", "the longer stand is still listed after");
 assert(ranked[0].sectorCode === "881121", "the hit keeps the industry board");
-assert(ranked[0].boards.map((item) => item.name).join(",") === "半导体,测试概念", "所属板块 lists the industry then the concept");
+assert(ranked[0].boards.map((item) => item.name).join(",") === "半导体", "所属板块 lists the qualifying industry");
 assert(ranked[0].price === 10, "price comes from the board roster");
 
 const dup = hits([
@@ -131,7 +116,7 @@ const dup = hits([
 ]);
 assert(dup.length === 1, "the same name is not listed twice");
 assert(dup[0].days === 1, "the shorter stand still ranks the row");
-assert(dup[0].boards.map((item) => item.name).join(",") === "白酒,半导体,测试概念", "both qualifying industries stay on 所属板块");
+assert(dup[0].boards.map((item) => item.name).join(",") === "白酒,半导体", "both qualifying industries stay on 所属板块");
 
 const withConcept = collectMa4StandHits([
   screen({ code: "881107", name: "中药", crosses: [short], members }),
@@ -147,20 +132,15 @@ assert(
   collectMa4StandHits([
     screen({ code: "881107", name: "中药", crosses: [short], members }),
     screen({ code: "885799", name: "中药概念", onMa4: false, crosses: [short], members }),
-  ]).length === 0,
-  "industry plus a concept off MA4 is not a hit",
+  ]).length === 1,
+  "an industry hit stays when the concept index is off MA4",
 );
 
 const conceptOnly = collectMa4StandHits([
   screen({ code: "885333", name: "移动支付", crosses: [short], members }),
 ]);
-assert(conceptOnly.length === 0, "a concept without a live industry is not a hit");
-assert(
-  collectMa4StandHits([
-    screen({ code: "885333", name: "移动支付", onMa4: false, crosses: [short], members }),
-  ]).length === 0,
-  "a concept off MA4 is not a hit",
-);
+assert(conceptOnly.length === 1, "a concept red box without an industry is still a hit");
+assert(conceptOnly[0]?.boards.map((item) => item.name).join(",") === "移动支付", "所属板块 can be only the concept");
 assert(
   collectMa4StandHits([
     screen({
@@ -199,17 +179,17 @@ assert(
       name: "半导体",
       crosses: [
         { code: "sh600010", name: "只有日K", days: 1, time: "2026-10-23" },
-        { code: "sh600011", name: "缺月K", days: 1, time: "2026-10-23", weekOnMa4: true },
+        { code: "sh600011", name: "缺周MA7", days: 1, time: "2026-10-23", weekOnMa4: true },
         { code: "sh600012", name: "缺周K", days: 1, time: "2026-10-23", monthOnMa4: true },
       ],
       members: [
         { code: "sh600010", name: "只有日K", price: 10, pct: 1, turnover: 1 },
-        { code: "sh600011", name: "缺月K", price: 11, pct: 1, turnover: 1 },
+        { code: "sh600011", name: "缺周MA7", price: 11, pct: 1, turnover: 1 },
         { code: "sh600012", name: "缺周K", price: 12, pct: 1, turnover: 1 },
       ],
     }),
   ]).length === 0,
-  "daily MA4 without both week and month is not a hit",
+  "daily stand without weekly MA4 and MA7 is not a hit",
 );
 
 const rankedDays = hits([
@@ -217,8 +197,8 @@ const rankedDays = hits([
     code: "881121",
     name: "半导体",
     crosses: [
-      { code: "sh600032", name: "横店样", days: 4, time: "2026-10-26", ...wm },
-      { code: "sh600033", name: "平安样", days: 1, time: "2026-10-29", ...wm },
+      { code: "sh600032", name: "横店样", days: 4, time: "2026-10-26", ...dw },
+      { code: "sh600033", name: "平安样", days: 1, time: "2026-10-29", ...dw },
     ],
     members: [
       { code: "sh600032", name: "横店样", price: 10, pct: 1, turnover: 1 },
@@ -226,16 +206,16 @@ const rankedDays = hits([
     ],
   }),
 ]);
-assert(rankedDays.map((row) => row.name).join(",") === "平安样,横店样", "without a cross, shorter daily MA4 stand ranks first");
-assert(rankedDays[0]?.days === 1 && rankedDays[1]?.days === 4, "持续天数 follows the daily MA4 stand");
+assert(rankedDays.map((row) => row.name).join(",") === "平安样,横店样", "shorter duration ranks first");
+assert(rankedDays[0]?.days === 1 && rankedDays[1]?.days === 4, "持续天数 follows the daily MA4+MA7 stand");
 
-const crossBeatsShort = hits([
+const crossDoesNotBeatShort = hits([
   screen({
     code: "881121",
     name: "半导体",
     crosses: [
-      { code: "sh600050", name: "无上叉短", days: 1, time: "2026-10-29", ...wm },
-      { code: "sh600051", name: "有上叉长", days: 8, time: "2026-10-16", ma4CrossUpMa7: true, ...wm },
+      { code: "sh600050", name: "无上叉短", days: 1, time: "2026-10-29", ...dw },
+      { code: "sh600051", name: "有上叉长", days: 8, time: "2026-10-16", ma4CrossUpMa7: true, ...dw },
     ],
     members: [
       { code: "sh600050", name: "无上叉短", price: 10, pct: 1, turnover: 1 },
@@ -243,15 +223,18 @@ const crossBeatsShort = hits([
     ],
   }),
 ]);
-assert(crossBeatsShort.map((row) => row.name).join(",") === "有上叉长,无上叉短", "MA4 cross above MA7 ranks ahead of a shorter stand without it");
+assert(
+  crossDoesNotBeatShort.map((row) => row.name).join(",") === "无上叉短,有上叉长",
+  "a MA4/MA7 cross does not jump ahead of a shorter stand",
+);
 
-const twoCrosses = hits([
+const twoDurations = hits([
   screen({
     code: "881121",
     name: "半导体",
     crosses: [
-      { code: "sh600052", name: "上叉4日", days: 4, time: "2026-10-26", ma4CrossUpMa7: true, ...wm },
-      { code: "sh600053", name: "上叉1日", days: 1, time: "2026-10-29", ma4CrossUpMa7: true, ...wm },
+      { code: "sh600052", name: "上叉4日", days: 4, time: "2026-10-26", ma4CrossUpMa7: true, ...dw },
+      { code: "sh600053", name: "上叉1日", days: 1, time: "2026-10-29", ma4CrossUpMa7: true, ...dw },
     ],
     members: [
       { code: "sh600052", name: "上叉4日", price: 10, pct: 1, turnover: 1 },
@@ -259,50 +242,50 @@ const twoCrosses = hits([
     ],
   }),
 ]);
-assert(twoCrosses.map((row) => row.name).join(",") === "上叉1日,上叉4日", "among crosses, shorter daily MA4 stand still ranks first");
+assert(twoDurations.map((row) => row.name).join(",") === "上叉1日,上叉4日", "among qualifying names, shorter duration still ranks first");
 
 const weekOnlyLonger = hits([
   screen({
     code: "881121",
     name: "半导体",
     crosses: [
-      { code: "sh600036", name: "无月K短", days: 1, time: "2026-10-29", weekOnMa4: true },
-      { code: "sh600037", name: "日月周都有", days: 9, time: "2026-10-13", ...wm },
+      { code: "sh600036", name: "无周MA7短", days: 1, time: "2026-10-29", weekOnMa4: true },
+      { code: "sh600037", name: "日周都有", days: 9, time: "2026-10-13", ...dw },
     ],
     members: [
-      { code: "sh600036", name: "无月K短", price: 10, pct: 1, turnover: 1 },
-      { code: "sh600037", name: "日月周都有", price: 11, pct: 1, turnover: 1 },
+      { code: "sh600036", name: "无周MA7短", price: 10, pct: 1, turnover: 1 },
+      { code: "sh600037", name: "日周都有", price: 11, pct: 1, turnover: 1 },
     ],
   }),
 ]);
-assert(weekOnlyLonger.map((row) => row.name).join(",") === "日月周都有", "missing month MA4 is dropped even with a shorter daily stand");
+assert(weekOnlyLonger.map((row) => row.name).join(",") === "日周都有", "missing weekly MA7 is dropped even with a shorter daily stand");
 
 const wave1 = collectMa4StandHits([
   screen({
     code: "881121",
     name: "食品加工制造",
-    crosses: [{ code: "sh600040", name: "先扫到", days: 2, time: "2026-10-22" }],
+    crosses: [{ code: "sh600040", name: "先扫到", days: 2, time: "2026-10-22", ...dw }],
     members: [{ code: "sh600040", name: "先扫到", price: 8, pct: 1, turnover: 1 }],
   }),
 ]);
-assert(wave1.length === 0, "an industry scanned before any live concept does not show yet");
+assert(wave1.length === 1 && wave1[0]?.name === "先扫到", "an industry scanned before any concept still shows");
 const wave2 = hits([
   screen({
     code: "881121",
     name: "食品加工制造",
-    crosses: [{ code: "sh600040", name: "先扫到", days: 2, time: "2026-10-22", ...wm }],
+    crosses: [{ code: "sh600040", name: "先扫到", days: 2, time: "2026-10-22", ...dw }],
     members: [{ code: "sh600040", name: "先扫到", price: 8, pct: 1, turnover: 1 }],
   }),
   screen({
     code: "881171",
     name: "医疗器械",
-    crosses: [{ code: "sh600041", name: "后扫上叉", days: 5, time: "2026-10-19", ma4CrossUpMa7: true, ...wm }],
-    members: [{ code: "sh600041", name: "后扫上叉", price: 9, pct: 1, turnover: 1 }],
+    crosses: [{ code: "sh600041", name: "后扫更长", days: 5, time: "2026-10-19", ma4CrossUpMa7: true, ...dw }],
+    members: [{ code: "sh600041", name: "后扫更长", price: 9, pct: 1, turnover: 1 }],
   }),
 ]);
 assert(
-  wave2.map((row) => row.name).join(",") === "后扫上叉,先扫到",
-  "a later board with MA4 cross still jumps ahead of a shorter stand without it",
+  wave2.map((row) => row.name).join(",") === "先扫到,后扫更长",
+  "a later longer stand stays behind a shorter earlier hit",
 );
 
 function bar(time: string, close: number): KBar {
@@ -321,6 +304,7 @@ assert(weeks[0].time === "2026-10-09" && weeks[0].close === 10, "the first week 
 assert(weeks[3].time === "2026-10-27" && weeks[3].close === 13, "the unfinished week still uses the latest close");
 assert(weekStandsOnMa4(weekBars), "a rising weekly tape stands on weekly MA4");
 assert(!weekStandsOnMa4(weekBars.slice(0, 10)), "fewer than four weekly bars cannot stand on weekly MA4");
+assert(!weekStandsOnMa4AndMa7(weekBars), "four weekly bars cannot stand on weekly MA7");
 
 const monthBars = [
   ...["2026-07-15", "2026-07-22", "2026-07-31"].map((time) => bar(time, 10)),
@@ -335,6 +319,9 @@ assert(months[3].time === "2026-10-29" && months[3].close === 13, "the unfinishe
 assert(monthStandsOnMa4(monthBars), "a rising monthly tape stands on monthly MA4");
 assert(!monthStandsOnMa4(monthBars.slice(0, 8)), "fewer than four monthly bars cannot stand on monthly MA4");
 assert(consecutiveOnMa4([10, 11, 12, 13]) === 1, "four rising closes are the first monthly/weekly bar that can stand on MA4");
+assert(consecutiveOnMa4AndMa7([10, 11, 12, 13, 14, 15, 16]) === 1, "seven rising closes are the first bar that can stand on MA4 and MA7");
+assert(consecutiveOnMa4AndMa7(Array.from({ length: 10 }, () => 12)) === 4, "a flat tape stands on both MAs from the seventh bar onward");
+assert(consecutiveOnMa4AndMa7([10, 11, 12, 13, 14, 15, 9]) === 0, "a last close under MA7 is not standing on both");
 
 const crossCloses = [10, 10, 10, 10, 10, 10, 10, 14];
 assert(ma4CrossedUpMa7(crossCloses), "a jump that lifts MA4 through MA7 is a golden cross");
@@ -363,7 +350,37 @@ const decorated = decorateMa4Crosses(
   [{ code: "sh600030", bars: weekBars, price: 13 }],
 );
 assert(decorated[0]?.weekOnMa4 === true, "decorate fills weekly MA4 from the daily tape");
+assert(decorated[0]?.weekOnMa7 === false, "four weekly bars are not enough for weekly MA7");
 assert(decorated[0]?.monthOnMa4 === false, "four weekly bars in October are not four monthly bars");
+
+function tradingBars(closes: number[], start = "2026-08-31"): KBar[] {
+  const origin = Date.parse(`${start}T00:00:00Z`);
+  const bars: KBar[] = [];
+  let offset = 0;
+  for (let i = 0; i < closes.length; i += 1) {
+    let time = "";
+    while (true) {
+      const date = new Date(origin + offset * 86_400_000);
+      offset += 1;
+      const dow = date.getUTCDay();
+      if (dow === 0 || dow === 6) continue;
+      time = date.toISOString().slice(0, 10);
+      break;
+    }
+    bars.push(bar(time, closes[i]));
+  }
+  return bars;
+}
+
+const weekMa7Bars = tradingBars(Array.from({ length: 40 }, (_, i) => 10 + Math.floor(i / 5)));
+assert(dailyToWeekly(weekMa7Bars).length === 8, "eight calendar weeks collapse into eight weekly bars");
+assert(weekStandsOnMa4AndMa7(weekMa7Bars), "eight rising weekly bars stand on weekly MA4 and MA7");
+const weekMa7Decorated = decorateMa4Crosses(
+  [{ code: "sh600034", name: "周MA7", days: 2, time: weekMa7Bars.at(-1)!.time }],
+  [{ code: "sh600034", bars: weekMa7Bars, price: weekMa7Bars.at(-1)!.close }],
+);
+assert(weekMa7Decorated[0]?.weekOnMa4 === true && weekMa7Decorated[0]?.weekOnMa7 === true, "decorate fills weekly MA4 and MA7");
+assert((weekMa7Decorated[0]?.holdDays ?? 0) >= 1, "decorate fills how long daily and weekly stands have held together");
 
 const monthDecorated = decorateMa4Crosses(
   [{ code: "sh600031", name: "月装饰", days: 2, time: "2026-10-29" }],

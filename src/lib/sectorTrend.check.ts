@@ -3,6 +3,7 @@ import {
   captureSectorTrends,
   indexCouldBeOpen,
   listMa4CrossStocks,
+  listMa4Ma7StandStocks,
   maStandFlags,
   standsOnMa4,
   trendCoversLastBar,
@@ -175,6 +176,27 @@ assert(
   "a decline that stays under MA4 is not kept",
 );
 assert(!standsOnMa4(fallingTape), "the falling tape is not standing on MA4");
+
+const shortBoth = datedBars([...Array.from({ length: 14 }, () => 12), 5, 20]);
+const bothWindow = { start: heldLong[6].time, end: heldLong[heldLong.length - 1].time };
+const bothMa = listMa4Ma7StandStocks(bothWindow, [
+  { code: "sh600001", name: "站久", bars: heldLong },
+  { code: "sz000002", name: "刚站上", bars: shortBoth },
+]);
+assert(bothMa.length === 2, "names standing on both MA4 and MA7 stay in the screener pool");
+assert(bothMa[0].name === "刚站上" && bothMa[0].days === 1, "the first day on both MAs sorts first");
+assert(bothMa[1].name === "站久" && bothMa[1].days > 1, "a longer both-MA stand sorts after");
+
+const ma4OnlyCloses = [16, 16, 16, 10, 10, 10, 10.5];
+const ma4Only = datedBars(ma4OnlyCloses);
+assert(
+  listMa4CrossStocks({ start: ma4Only[3].time, end: ma4Only[6].time }, [{ code: "sh600004", name: "只站MA4", bars: ma4Only }]).length === 1,
+  "a last close under MA7 can still stand on MA4",
+);
+assert(
+  listMa4Ma7StandStocks({ start: ma4Only[3].time, end: ma4Only[6].time }, [{ code: "sh600004", name: "只站MA4", bars: ma4Only }]).length === 0,
+  "a last close under MA7 is not a daily MA4+MA7 stand",
+);
 
 console.log("sectorTrend.check ok", {
   start: risingTrends[0].start,

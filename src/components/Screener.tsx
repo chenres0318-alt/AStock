@@ -104,7 +104,7 @@ function HitTable({
   onToggleHold: (item: ScreenerHit) => void;
 }) {
   if (!items.length) {
-    return <EmptyHint text={scanning ? "正在扫描，扫到的股票会马上出现，上叉优先、再按个股站上MA4天数从短到长排" : "没有符合条件的结果"} />;
+    return <EmptyHint text={scanning ? "正在扫描，扫到的股票会马上出现，按条件同时成立天数从短到长排" : "没有符合条件的结果"} />;
   }
   return (
     <div className="overflow-auto scroll-thin">
@@ -286,10 +286,10 @@ export default function Screener() {
 
       <section className="panel px-4 py-3">
         <div className="text-sm">
-          选股：必须个股日 K 站上 MA4，周 K 站上 MA4，月 K 站上 MA4，并且所属行业和至少一个概念都在红框、板块指数日 K 都站上 MA4。只过行业或只过概念的不要。
+          选股：必须属于行业或概念红框，日 K 站上 MA4 和 MA7，周 K 站上 MA4 和 MA7。只过行业或只过概念都可以。
         </div>
         <div className="mt-2 max-w-4xl text-xs leading-5 text-mute">
-          红框不限几天内。MA4 上叉 MA7 不是必须，有则更好、排在前面。持续天数是个股站上 MA4 的持续时间，同样是否上叉时天数越短越靠前。扫到就显示。不含科创板、创业板、北交所、ST。同一只股票只出现一次。所属板块同时列出过线的行业和概念，可点进板块页核对红框。
+          红框不限几天内。持续天数是这些条件同时成立的交易日数，越短越靠前。扫到就显示。不含科创板、创业板、北交所、ST。同一只股票只出现一次。所属板块列出过线的行业和概念，可点进板块页核对红框。
         </div>
       </section>
 
@@ -304,7 +304,7 @@ export default function Screener() {
             <div className="flex flex-wrap items-center justify-end gap-2">
               {meta ? (
                 <span className="text-[10px] text-mute">
-                  红框板块 {meta.liveBoards ?? "--"} · 站上MA4 {meta.universe ?? meta.scanned} · 扫描 {meta.scanned} · 命中 {hits.length}
+                  红框板块 {meta.liveBoards ?? "--"} · 扫描 {meta.scanned}{meta?.universe ? `/${meta.universe}` : ""} · 命中 {hits.length}
                   {meta.source === "ths-board" || meta.source === "ths-industry" ? " · 同花顺行业+概念" : ""}
                   {meta.elapsedMs ? ` · ${Math.round(meta.elapsedMs / 1000)}s` : ""}
                 </span>
@@ -322,7 +322,7 @@ export default function Screener() {
         />
         {loading ? (
           <div className="border-b border-line px-4 py-2 text-xs text-mute">
-            边扫边显示，扫到就先排 MA4 上叉 MA7，再按个股站上 MA4 的天数从短到长。已扫 {meta?.scanned ?? 0}
+            边扫边显示，按条件同时成立天数从短到长。已扫 {meta?.scanned ?? 0}
             {meta?.universe ? `/${meta.universe}` : ""} · 命中 {hits.length}
           </div>
         ) : null}

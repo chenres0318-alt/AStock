@@ -121,14 +121,12 @@ export function standsOnMa4(bars: KBar[], price?: number | null): boolean {
   return closeOnMa4(closes, last, spot);
 }
 
-/**
- * 这段趋势最新一根上：现价站上 MA4 即可，按连续站上天数从少到多。
- * 不含科创板、创业板。没有站上的不进名单。
- */
-export function listMa4CrossStocks(
+function listStandStocks(
   segment: { start: string; end: string },
   stocks: Array<{ code: string; name: string; bars: KBar[]; price?: number | null }>,
+  periods: number[],
 ): MaCrossStock[] {
+  const minIndex = Math.max(...periods) - 1;
   const rows: MaCrossStock[] = [];
   for (const stock of stocks) {
     if (isGrowthBoardShare(stock.code)) continue;
@@ -138,12 +136,14 @@ export function listMa4CrossStocks(
       const time = stock.bars[i].time;
       if (time >= segment.start && time <= segment.end) last = i;
     }
-    if (last < 0) continue;
+    if (last < minIndex) continue;
     const spot = stock.price != null && stock.price > 0 ? stock.price : closes[last];
-    if (!closeOnMa4(closes, last, spot)) continue;
+    const onAll = (index: number, price = closes[index]) =>
+      periods.every((period) => closeOnMa(closes, period, index, price));
+    if (!onAll(last, spot)) continue;
     let from = last;
-    for (let i = last - 1; i >= 3; i -= 1) {
-      if (!closeOnMa4(closes, i)) break;
+    for (let i = last - 1; i >= minIndex; i -= 1) {
+      if (!onAll(i)) break;
       from = i;
     }
     rows.push({
@@ -158,6 +158,25 @@ export function listMa4CrossStocks(
     return a.name.localeCompare(b.name, "zh-CN");
   });
   return rows;
+}
+
+/**
+ * 这段趋势最新一根上：现价站上 MA4 即可，按连续站上天数从少到多。
+ * 不含科创板、创业板。没有站上的不进名单。
+ */
+export function listMa4CrossStocks(
+  segment: { start: string; end: string },
+  stocks: Array<{ code: string; name: string; bars: KBar[]; price?: number | null }>,
+): MaCrossStock[] {
+  return listStandStocks(segment, stocks, [4]);
+}
+
+/** 选股用：日 K 同时站上 MA4 和 MA7，按连续站上天数从少到多。不含科创、创业。 */
+export function listMa4Ma7StandStocks(
+  segment: { start: string; end: string },
+  stocks: Array<{ code: string; name: string; bars: KBar[]; price?: number | null }>,
+): MaCrossStock[] {
+  return listStandStocks(segment, stocks, [4, 7]);
 }
 
 function weekStart(time: string): string {
