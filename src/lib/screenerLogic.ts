@@ -360,9 +360,6 @@ export function decorateMa4Crosses(
       holdDays: conditionHoldDays({
         dailyDays,
         dailySince,
-        weekOn: week.on,
-        weekDays: week.days,
-        weekSince,
         bars: stock.bars,
       }),
     };
@@ -408,8 +405,15 @@ function withBoards(hit: Ma4StandHit, boards: ScreenerBoardRef[]): Ma4StandHit {
   return { ...hit, boards: ordered, sector: primary.name, sectorCode: primary.code };
 }
 
+/** 选股：日 K 同时站上 MA4 和 MA7 的持续天数上限（含当天）。 */
+export const SCREENER_MAX_STAND_DAYS = 4;
+
+function standDuration(hit: { holdDays?: number; days: number }): number {
+  return hit.holdDays || hit.days;
+}
+
 function hitRank(hit: Ma4StandHit): number[] {
-  return [hit.holdDays || hit.days, hit.days];
+  return [standDuration(hit), hit.days];
 }
 
 function betterHit(next: Ma4StandHit, prev: Ma4StandHit | undefined): boolean {
@@ -423,8 +427,8 @@ function betterHit(next: Ma4StandHit, prev: Ma4StandHit | undefined): boolean {
 }
 
 /**
- * 必须：个股日 K、周 K 站上 MA4 和 MA7；所属行业和至少一个概念都要红框覆盖最新一根。
- * 只过行业或只过概念的不要。按这些条件同时成立的交易日数从短到长排。同一只股票只留一条。不含科创、创业、北交所、ST。
+ * 必须：个股日 K 站上 MA4 和 MA7，持续不超过 4 日；所属行业和至少一个概念都要红框覆盖最新一根。
+ * 只过行业或只过概念的不要。不看周 K。按持续天数从短到长排。同一只股票只留一条。不含科创、创业、北交所、ST。
  */
 export function collectMa4StandHits(sectors: SectorMa4Screen[]): Ma4StandHit[] {
   const best = new Map<string, Ma4StandHit>();
@@ -436,7 +440,6 @@ export function collectMa4StandHits(sectors: SectorMa4Screen[]): Ma4StandHit[] {
       const member = members.get(cross.code);
       const name = cross.name || member?.name || cross.code;
       if (!isScreenerShare(cross.code, name)) continue;
-      if (!cross.weekOnMa4 || !cross.weekOnMa7) continue;
       const ma4CrossUpMa7 = Boolean(cross.ma4CrossUpMa7);
       const weekOnMa4 = Boolean(cross.weekOnMa4);
       const weekOnMa7 = Boolean(cross.weekOnMa7);
@@ -468,8 +471,6 @@ export function collectMa4StandHits(sectors: SectorMa4Screen[]): Ma4StandHit[] {
             conditionHoldDays({
               dailyDays: cross.days,
               dailySince: cross.time,
-              weekOn: weekOnMa4 && weekOnMa7,
-              weekDays,
             }),
         },
         [{ code: sector.code, name: sector.name }],
@@ -483,12 +484,18 @@ export function collectMa4StandHits(sectors: SectorMa4Screen[]): Ma4StandHit[] {
       best.set(hit.code, merged);
     }
   }
-  return [...best.values()].filter(hasIndustryAndConcept).sort((a, b) => {
-    const left = hitRank(a);
-    const right = hitRank(b);
-    for (let i = 0; i < left.length; i += 1) {
-      if (left[i] !== right[i]) return left[i] - right[i];
-    }
-    return a.name.localeCompare(b.name, "zh-CN");
-  });
+  return [...best.values()]
+    .filter(hasIndustryAndConcept)
+    .filter((hit) => {
+      const days = standDuration(hit);
+      return days >= 1 && days <= SCREENER_MAX_STAND_DAYS;
+    })
+    .sort((a, b) => {
+      const left = hitRank(a);
+      const right = hitRank(b);
+      for (let i = 0; i < left.length; i += 1) {
+        if (left[i] !== right[i]) return left[i] - right[i];
+      }
+      return a.name.localeCompare(b.name, "zh-CN");
+    });
 }

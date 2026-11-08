@@ -193,25 +193,23 @@ const stHit = collectMa4StandHits([
 ]);
 assert(stHit.length === 0, "ST names do not appear in the stand list");
 
-assert(
-  hits([
-    screen({
-      code: "881121",
-      name: "半导体",
-      crosses: [
-        { code: "sh600010", name: "只有日K", days: 1, time: "2026-10-23" },
-        { code: "sh600011", name: "缺周MA7", days: 1, time: "2026-10-23", weekOnMa4: true },
-        { code: "sh600012", name: "缺周K", days: 1, time: "2026-10-23", monthOnMa4: true },
-      ],
-      members: [
-        { code: "sh600010", name: "只有日K", price: 10, pct: 1, turnover: 1 },
-        { code: "sh600011", name: "缺周MA7", price: 11, pct: 1, turnover: 1 },
-        { code: "sh600012", name: "缺周K", price: 12, pct: 1, turnover: 1 },
-      ],
-    }),
-  ]).length === 0,
-  "daily stand without weekly MA4 and MA7 is not a hit",
-);
+const noWeekNeeded = hits([
+  screen({
+    code: "881121",
+    name: "半导体",
+    crosses: [
+      { code: "sh600010", name: "只有日K", days: 1, time: "2026-10-23" },
+      { code: "sh600011", name: "缺周MA7", days: 1, time: "2026-10-23", weekOnMa4: true },
+      { code: "sh600012", name: "缺周K", days: 1, time: "2026-10-23", monthOnMa4: true },
+    ],
+    members: [
+      { code: "sh600010", name: "只有日K", price: 10, pct: 1, turnover: 1 },
+      { code: "sh600011", name: "缺周MA7", price: 11, pct: 1, turnover: 1 },
+      { code: "sh600012", name: "缺周K", price: 12, pct: 1, turnover: 1 },
+    ],
+  }),
+]);
+assert(noWeekNeeded.length === 3, "daily MA4+MA7 hits do not need weekly stands");
 
 const rankedDays = hits([
   screen({
@@ -245,8 +243,8 @@ const crossDoesNotBeatShort = hits([
   }),
 ]);
 assert(
-  crossDoesNotBeatShort.map((row) => row.name).join(",") === "无上叉短,有上叉长",
-  "a MA4/MA7 cross does not jump ahead of a shorter stand",
+  crossDoesNotBeatShort.map((row) => row.name).join(",") === "无上叉短",
+  "a stand longer than 4 days is dropped even with a MA4/MA7 cross",
 );
 
 const twoDurations = hits([
@@ -279,7 +277,7 @@ const weekOnlyLonger = hits([
     ],
   }),
 ]);
-assert(weekOnlyLonger.map((row) => row.name).join(",") === "日周都有", "missing weekly MA7 is dropped even with a shorter daily stand");
+assert(weekOnlyLonger.map((row) => row.name).join(",") === "无周MA7短", "weekly MA7 is not required; stands longer than 4 days are dropped");
 
 const wave1 = collectMa4StandHits([
   screen({
@@ -304,17 +302,14 @@ const wave2 = hits([
     members: [{ code: "sh600041", name: "后扫更长", price: 9, pct: 1, turnover: 1 }],
   }),
 ]);
-assert(
-  wave2.map((row) => row.name).join(",") === "先扫到,后扫更长",
-  "a later longer stand stays behind a shorter earlier hit",
-);
+assert(wave2.map((row) => row.name).join(",") === "先扫到", "a later 5-day stand is dropped by the 4-day cap");
 
 const bothBeatsOne = collectMa4StandHits([
   screen({
     code: "881121",
     name: "半导体",
     crosses: [
-      { code: "sh600060", name: "双过长", days: 8, time: "2026-10-16", ...dw },
+      { code: "sh600060", name: "双过长", days: 3, time: "2026-10-21", ...dw },
       { code: "sh600061", name: "只过短", days: 1, time: "2026-10-29", ...dw },
     ],
     members: [
@@ -325,7 +320,7 @@ const bothBeatsOne = collectMa4StandHits([
   screen({
     code: "885001",
     name: "测试概念",
-    crosses: [{ code: "sh600060", name: "双过长", days: 8, time: "2026-10-16", ...dw }],
+    crosses: [{ code: "sh600060", name: "双过长", days: 3, time: "2026-10-21", ...dw }],
     members: [{ code: "sh600060", name: "双过长", price: 10, pct: 1, turnover: 1 }],
   }),
 ]);
@@ -333,6 +328,22 @@ assert(
   bothBeatsOne.map((row) => row.name).join(",") === "双过长",
   "a name that only has one red box is dropped even with a shorter stand",
 );
+
+const overFour = hits([
+  screen({
+    code: "881121",
+    name: "半导体",
+    crosses: [
+      { code: "sh600070", name: "刚好4日", days: 4, time: "2026-10-26", ...dw },
+      { code: "sh600071", name: "第5日", days: 5, time: "2026-10-23", ...dw },
+    ],
+    members: [
+      { code: "sh600070", name: "刚好4日", price: 10, pct: 1, turnover: 1 },
+      { code: "sh600071", name: "第5日", price: 11, pct: 1, turnover: 1 },
+    ],
+  }),
+]);
+assert(overFour.map((row) => row.name).join(",") === "刚好4日", "day 4 is kept and day 5 is dropped");
 
 const bothByDays = collectMa4StandHits([
   screen({
