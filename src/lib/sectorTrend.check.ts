@@ -87,13 +87,13 @@ const last = crashedCloses[crashedCloses.length - 1]!;
 for (let i = 0; i < 8; i += 1) crashedCloses.push(Number((last * 0.7).toFixed(4)));
 const crashed = tradingBars(crashedCloses);
 const crashedTrends = captureSectorTrends(crashed);
-assert(crashedTrends.length === 1 && crashedTrends[0].status === "closed", "breaking both daily MA4 and MA7 closes the box");
+assert(crashedTrends.length === 1 && crashedTrends[0].status === "closed", "a daily MA break closes the box as grey");
 assert(crashedTrends[0].end !== crashed.at(-1)?.time, "the gray box stops before the break day");
 const oneAndDone = rising.slice(0, firstStart + 1);
 const started = oneAndDone.at(-1)!;
 oneAndDone.push({ ...started, time: "2099-01-06", open: 1, high: 1, low: 1, close: 1 });
-assert(captureSectorTrends(oneAndDone).length === 0, "a start that both-breaks the next day leaves no gray stub");
-assert(!indexCouldBeOpen(crashed), "both daily averages broken is no longer an open trend");
+assert(captureSectorTrends(oneAndDone).length === 0, "a start that breaks the next day leaves no gray stub");
+assert(!indexCouldBeOpen(crashed), "a daily MA break is no longer an open trend");
 assert(!trendCoversLastBar(crashedTrends, crashed.at(-1)?.time), "a closed box does not cover the latest bar");
 
 const dipCloses = risingCloses();
@@ -105,7 +105,9 @@ const dipped = tradingBars(dipCloses);
 const dipFlags = maStandFlags(dipped).at(-1);
 assert(dipFlags && !dipFlags.dayOnMa4 && dipFlags.dayOnMa7, "a dip through MA4 can still stand on MA7");
 const stillOpen = captureSectorTrends(dipped);
-assert(stillOpen.length === 1 && stillOpen[0].status === "open", "leaving only one of MA4/MA7 does not end the red box");
+assert(stillOpen.length === 1 && stillOpen[0].status === "closed", "breaking daily MA4 turns the red box grey");
+assert(stillOpen[0].end !== dipped.at(-1)?.time, "the gray box stops before the break day");
+assert(!indexCouldBeOpen(dipped), "a daily MA4 break is not an open red box");
 
 const short = tradingBars(Array.from({ length: 25 }, (_, i) => 100 + i));
 assert(captureSectorTrends(short).length === 0, "fewer than 7 weekly bars cannot start");
