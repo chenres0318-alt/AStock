@@ -327,6 +327,7 @@ async function loadConceptCatalog(): Promise<ConceptCatalog> {
   try {
     html = await firstOk([
       () => readHtml("https://q.10jqka.com.cn/gn/", CONCEPT_REFERER),
+      () => readHtml("http://q.10jqka.com.cn/gn/", CONCEPT_REFERER),
       () => readHtml("https://data.10jqka.com.cn/funds/gnzjl/", "https://data.10jqka.com.cn/funds/gnzjl/"),
     ]);
   } catch {
@@ -385,7 +386,12 @@ export function conceptCatalogNeedsDetailCrawl(quotedCount: number): boolean {
 }
 
 export async function fetchTonghuashunConcepts(): Promise<SectorItem[]> {
-  const catalog = await cached("ths-concept-boards", 10 * 60_000, loadConceptCatalog);
+  const catalog = await cached(
+    "ths-concept-boards",
+    10 * 60_000,
+    loadConceptCatalog,
+    (value) => value.items.length >= 50,
+  );
   conceptDetailCodes.clear();
   for (const [plate, cid] of Object.entries(catalog.detailCodes)) conceptDetailCodes.set(plate, cid);
   return catalog.items;

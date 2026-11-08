@@ -17,4 +17,15 @@ const stale = await cached("stale-industry-test", 1, async () => {
 });
 assert(stale === "live", "an expired industry list is reused when Tonghuashun fails");
 
+let loads = 0;
+await cached("empty-live-scan", 60_000, async () => {
+  loads += 1;
+  return { codes: [] as string[] };
+}, (value) => value.codes.length > 0);
+await cached("empty-live-scan", 60_000, async () => {
+  loads += 1;
+  return { codes: [] as string[] };
+}, (value) => value.codes.length > 0);
+assert(loads === 2, "an empty live-board scan is not cached");
+
 console.log("cache.check ok", seeded.length);

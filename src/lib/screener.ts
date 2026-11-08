@@ -46,6 +46,8 @@ export type StockScreenResult = {
   scanning: boolean;
   /** 还在确认哪些板块处于红框，名单会边找边变长。 */
   discovering?: boolean;
+  industryLive?: number;
+  conceptLive?: number;
   timedOut?: boolean;
 };
 
@@ -77,6 +79,8 @@ function startJob(): ScanJob {
     scanned: 0,
     universe: 0,
     liveBoards: 0,
+    industryLive: 0,
+    conceptLive: 0,
     sectors: [] as SectorMa4Screen[],
     done: false,
     discovering: true,
@@ -91,6 +95,8 @@ function startJob(): ScanJob {
     source: "ths-board",
     scanning: !state.done,
     discovering: state.discovering,
+    industryLive: state.industryLive,
+    conceptLive: state.conceptLive,
     timedOut: state.done && (state.discovering || (state.universe > 0 && state.scanned < state.universe)),
   });
   const deadline = startedAt + SCAN_MAX_MS;
@@ -104,9 +110,11 @@ function startJob(): ScanJob {
       waiters = [];
       for (const resolve of list) resolve();
     };
-    const enqueue = (code: string) => {
+    const enqueue = (code: string, kind: "industry" | "concept") => {
       if (seen.has(code)) return;
       seen.add(code);
+      if (kind === "concept") state.conceptLive += 1;
+      else state.industryLive += 1;
       state.liveBoards = seen.size;
       state.universe = seen.size;
       if (Date.now() <= deadline) pending.push(code);
@@ -124,8 +132,8 @@ function startJob(): ScanJob {
       }
     };
     const listing = Promise.all([
-      listBoardsInTrend("industry", enqueue),
-      listBoardsInTrend("concept", enqueue),
+      listBoardsInTrend("industry", (code) => enqueue(code, "industry")),
+      listBoardsInTrend("concept", (code) => enqueue(code, "concept")),
     ]).finally(() => {
       listingDone = true;
       state.discovering = false;
@@ -148,10 +156,13 @@ function startJob(): ScanJob {
     return snapshot();
   })()
     .then((value) => {
-      cachedResult = {
-        value: { ...value, scanning: false },
-        expireAt: Date.now() + (value.timedOut ? 20_000 : RESULT_TTL_MS),
-      };
+      const emptyDualBox = value.items.length === 0 && (value.conceptLive ?? 0) === 0;
+      if (!emptyDualBox) {
+        cachedResult = {
+          value: { ...value, scanning: false },
+          expireAt: Date.now() + (value.timedOut || !value.items.length ? 20_000 : RESULT_TTL_MS),
+        };
+      }
       return value;
     })
     .finally(() => {

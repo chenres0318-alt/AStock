@@ -279,13 +279,13 @@ export async function listBoardsInTrend(
       return mergeTrendScan(industry, concept);
     }
     if (scope === "concept") {
-      return await loadTrendScan("boards-in-open-trend:concept:v7", onLive, async (emit) => {
+      return await loadTrendScan("boards-in-open-trend:concept:v8", onLive, async (emit) => {
         const boards = await listTonghuashunConcepts().catch(() => [] as SectorItem[]);
         if (!boards.length) return { codes: [] as string[], offMa4: [] as string[] };
         return scanOpenTrend(boards, 8, emit);
       });
     }
-    return await loadTrendScan("boards-in-open-trend:v11", onLive, async (emit) => {
+    return await loadTrendScan("boards-in-open-trend:v12", onLive, async (emit) => {
       const boards = await listAllIndustryBoards();
       return scanOpenTrend(boards, 6, emit);
     });
@@ -301,10 +301,15 @@ async function loadTrendScan(
   loader: (emit?: (code: string) => void) => Promise<TrendScan>,
 ): Promise<TrendScan> {
   let streamed = false;
-  const scan = await cached(key, 10 * 60_000, async () => {
-    streamed = true;
-    return loader(onLive);
-  });
+  const scan = await cached(
+    key,
+    10 * 60_000,
+    async () => {
+      streamed = true;
+      return loader(onLive);
+    },
+    (value) => value.codes.length > 0,
+  );
   if (!streamed) scan.codes.forEach((code) => onLive?.(code));
   return scan;
 }
