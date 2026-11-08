@@ -65,8 +65,27 @@ function screen(partial: Partial<SectorMa4Screen> & Pick<SectorMa4Screen, "code"
   };
 }
 
+/** 排名用例默认再挂一个过线概念，避免只测行业时被双红框规则滤掉。 */
+function plusConcept(sectors: SectorMa4Screen[]): SectorMa4Screen[] {
+  const crosses = new Map<string, SectorMa4Screen["crosses"][number]>();
+  const roster = new Map<string, SectorMa4Screen["members"][number]>();
+  for (const sector of sectors) {
+    for (const cross of sector.crosses) crosses.set(cross.code, cross);
+    for (const member of sector.members) roster.set(member.code, member);
+  }
+  return [
+    ...sectors,
+    screen({
+      code: "885001",
+      name: "测试概念",
+      crosses: [...crosses.values()],
+      members: [...roster.values()],
+    }),
+  ];
+}
+
 function hits(sectors: SectorMa4Screen[]) {
-  return collectMa4StandHits(sectors);
+  return collectMa4StandHits(plusConcept(sectors));
 }
 
 const dw = { weekOnMa4: true, weekOnMa7: true };
@@ -78,7 +97,9 @@ const members = [
 ];
 
 assert(
-  collectMa4StandHits([screen({ onMa4: false, crosses: [short], members })]).length === 1,
+  collectMa4StandHits(
+    plusConcept([screen({ code: "881121", name: "半导体", onMa4: false, crosses: [short], members })]),
+  ).length === 1,
   "an open red box still hits when the index is off MA4",
 );
 assert(
@@ -91,9 +112,10 @@ assert(
 );
 assert(collectMa4StandHits([screen({ openTrend: null, crosses: [short] })]).length === 0, "no open box means no hits");
 
-const industryOnly = collectMa4StandHits([screen({ code: "881121", name: "半导体", crosses: [short], members })]);
-assert(industryOnly.length === 1, "an industry red box without a concept is still a hit");
-assert(industryOnly[0]?.boards.map((item) => item.name).join(",") === "半导体", "所属板块 can be only the industry");
+assert(
+  collectMa4StandHits([screen({ code: "881121", name: "半导体", crosses: [short], members })]).length === 0,
+  "an industry without a live concept is not a hit",
+);
 
 const ranked = hits([
   screen({
@@ -107,7 +129,7 @@ assert(ranked.length === 2, "both names standing on MA4 and MA7 are kept");
 assert(ranked[0].name === "短站" && ranked[0].days === 1, "the shortest stand comes first");
 assert(ranked[1].name === "长站", "the longer stand is still listed after");
 assert(ranked[0].sectorCode === "881121", "the hit keeps the industry board");
-assert(ranked[0].boards.map((item) => item.name).join(",") === "半导体", "所属板块 lists the qualifying industry");
+assert(ranked[0].boards.map((item) => item.name).join(",") === "半导体,测试概念", "所属板块 lists the industry then the concept");
 assert(ranked[0].price === 10, "price comes from the board roster");
 
 const dup = hits([
@@ -116,7 +138,7 @@ const dup = hits([
 ]);
 assert(dup.length === 1, "the same name is not listed twice");
 assert(dup[0].days === 1, "the shorter stand still ranks the row");
-assert(dup[0].boards.map((item) => item.name).join(",") === "白酒,半导体", "both qualifying industries stay on 所属板块");
+assert(dup[0].boards.map((item) => item.name).join(",") === "白酒,半导体,测试概念", "both qualifying industries stay on 所属板块");
 
 const withConcept = collectMa4StandHits([
   screen({ code: "881107", name: "中药", crosses: [short], members }),
@@ -133,14 +155,13 @@ assert(
     screen({ code: "881107", name: "中药", crosses: [short], members }),
     screen({ code: "885799", name: "中药概念", onMa4: false, crosses: [short], members }),
   ]).length === 1,
-  "an industry hit stays when the concept index is off MA4",
+  "industry plus a concept whose index is off MA4 still hits while the concept box is open",
 );
 
 const conceptOnly = collectMa4StandHits([
   screen({ code: "885333", name: "移动支付", crosses: [short], members }),
 ]);
-assert(conceptOnly.length === 1, "a concept red box without an industry is still a hit");
-assert(conceptOnly[0]?.boards.map((item) => item.name).join(",") === "移动支付", "所属板块 can be only the concept");
+assert(conceptOnly.length === 0, "a concept without a live industry is not a hit");
 assert(
   collectMa4StandHits([
     screen({
@@ -268,7 +289,7 @@ const wave1 = collectMa4StandHits([
     members: [{ code: "sh600040", name: "先扫到", price: 8, pct: 1, turnover: 1 }],
   }),
 ]);
-assert(wave1.length === 1 && wave1[0]?.name === "先扫到", "an industry scanned before any concept still shows");
+assert(wave1.length === 0, "an industry scanned before any live concept does not show yet");
 const wave2 = hits([
   screen({
     code: "881121",
@@ -309,8 +330,8 @@ const bothBeatsOne = collectMa4StandHits([
   }),
 ]);
 assert(
-  bothBeatsOne.map((row) => row.name).join(",") === "双过长,只过短",
-  "industry plus concept ranks ahead of a shorter stand that only has one red box",
+  bothBeatsOne.map((row) => row.name).join(",") === "双过长",
+  "a name that only has one red box is dropped even with a shorter stand",
 );
 
 const bothByDays = collectMa4StandHits([

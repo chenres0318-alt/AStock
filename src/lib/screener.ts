@@ -10,12 +10,7 @@ const SCAN_MAX_MS = 300_000;
 const FIRST_WAIT_MS = 2_000;
 
 function hitReasons(row: ReturnType<typeof collectMa4StandHits>[number]): string[] {
-  const reasons: string[] = ["日K站上MA4和MA7", "周K站上MA4和MA7"];
-  const industry = row.boards.some((board) => /^881\d{3}$/.test(board.code));
-  const concept = row.boards.some((board) => /^88[5-9]\d{3}$/.test(board.code));
-  if (industry && concept) reasons.push("行业和概念红框");
-  if (industry) reasons.push("行业红框");
-  if (concept) reasons.push("概念红框");
+  const reasons: string[] = ["日K站上MA4和MA7", "周K站上MA4和MA7", "行业红框", "概念红框"];
   return reasons;
 }
 
