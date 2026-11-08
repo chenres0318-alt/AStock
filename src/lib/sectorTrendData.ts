@@ -236,11 +236,17 @@ async function loadSectorTrend(boardCode: string): Promise<SectorTrendReport> {
   };
 }
 
-async function scanOpenTrend(boards: SectorItem[], concurrency: number): Promise<TrendScan> {
+async function scanOpenTrend(
+  boards: SectorItem[],
+  concurrency: number,
+  onLive?: (code: string) => void,
+): Promise<TrendScan> {
   const klines = await mapPool(boards, concurrency, async (board) => {
     try {
       const series = await industrySeries(board.code);
-      return { code: board.code, bars: series.bars };
+      const row = { code: board.code, bars: series.bars };
+      if (indexCouldBeOpen(row.bars)) onLive?.(board.code);
+      return row;
     } catch {
       return { code: board.code, bars: [] as KBar[] };
     }
@@ -260,24 +266,45 @@ async function scanOpenTrend(boards: SectorItem[], concurrency: number): Promise
  * 下拉标红只看指数日/周均线能不能把红框留到最后一根，避免对全市场成分股再扫一遍把当前板块拖死。
  * 选股扫行业和概念。板块页一进就扫指数红框给下拉标红，不等点进某个板块；点进去后仍用成分股补龙头名单。
  */
-export async function listBoardsInTrend(scope: "industry" | "concept" | "all" = "industry"): Promise<TrendScan> {
+export async function listBoardsInTrend(
+  scope: "industry" | "concept" | "all" = "industry",
+  onLive?: (code: string) => void,
+): Promise<TrendScan> {
   try {
     if (scope === "all") {
-      const [industry, concept] = await Promise.all([listBoardsInTrend("industry"), listBoardsInTrend("concept")]);
+      const [industry, concept] = await Promise.all([
+        listBoardsInTrend("industry", onLive),
+        listBoardsInTrend("concept", onLive),
+      ]);
       return mergeTrendScan(industry, concept);
     }
     if (scope === "concept") {
-      return await cached("boards-in-open-trend:concept:v7", 10 * 60_000, async () => {
+      return await loadTrendScan("boards-in-open-trend:concept:v7", onLive, async (emit) => {
         const boards = await listTonghuashunConcepts().catch(() => [] as SectorItem[]);
         if (!boards.length) return { codes: [] as string[], offMa4: [] as string[] };
-        return scanOpenTrend(boards, 8);
+        return scanOpenTrend(boards, 8, emit);
       });
     }
-    return await cached("boards-in-open-trend:v11", 10 * 60_000, async () => {
+    return await loadTrendScan("boards-in-open-trend:v11", onLive, async (emit) => {
       const boards = await listAllIndustryBoards();
-      return scanOpenTrend(boards, 6);
+      return scanOpenTrend(boards, 6, emit);
     });
   } catch {
     return { codes: [], offMa4: [] };
   }
+}
+
+/** 缓存未命中时边判红框边回调；命中时把已有名单一次交给回调。 */
+async function loadTrendScan(
+  key: string,
+  onLive: ((code: string) => void) | undefined,
+  loader: (emit?: (code: string) => void) => Promise<TrendScan>,
+): Promise<TrendScan> {
+  let streamed = false;
+  const scan = await cached(key, 10 * 60_000, async () => {
+    streamed = true;
+    return loader(onLive);
+  });
+  if (!streamed) scan.codes.forEach((code) => onLive?.(code));
+  return scan;
 }

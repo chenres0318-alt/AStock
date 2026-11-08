@@ -15,7 +15,7 @@ import {
   weekStandsOnMa4AndMa7,
   type SectorMa4Screen,
 } from "./screenerLogic.ts";
-import { raceDeadline } from "./pool.ts";
+import { raceDeadline, runDynamicPool } from "./pool.ts";
 import type { KBar, SectorItem } from "./types.ts";
 
 function assert(cond: unknown, message: string) {
@@ -485,6 +485,44 @@ assert((monthDecorated[0]?.holdDays ?? 0) >= 1, "decorate fills how long the cur
   assert(hit === "now", "finished work wins the race");
   const skipped = await raceDeadline(Promise.resolve("now"), 0);
   assert(skipped === undefined, "a zero wait does not block on work");
+}
+
+{
+  const pending: number[] = [];
+  const seen: number[] = [];
+  let closed = false;
+  let waiters: Array<() => void> = [];
+  const wake = () => {
+    const list = waiters;
+    waiters = [];
+    for (const resolve of list) resolve();
+  };
+  const producer = (async () => {
+    for (const value of [1, 2, 3, 4]) {
+      pending.push(value);
+      wake();
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+    closed = true;
+    wake();
+  })();
+  await Promise.all([
+    producer,
+    runDynamicPool(2, {
+      pull: () => pending.shift(),
+      closed: () => closed && pending.length === 0,
+      wait: () => {
+        if (closed || pending.length) return Promise.resolve();
+        return new Promise<void>((resolve) => waiters.push(resolve));
+      },
+      work: async (value) => {
+        seen.push(value);
+        await new Promise((resolve) => setTimeout(resolve, 8));
+      },
+    }),
+  ]);
+  assert(seen.slice().sort().join(",") === "1,2,3,4", "dynamic pool works items as they arrive");
+  assert(seen[0] === 1, "the first queued item starts before the producer finishes");
 }
 
 console.log("screener.check ok");
