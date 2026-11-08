@@ -14,10 +14,15 @@ import {
   type SectorMemberPath,
   type SectorTrendSegment,
 } from "./sectorTrend";
-import { decorateMa4Crosses, type SectorMa4Screen } from "./screenerLogic";
+import { decorateMa4Crosses, type SectorMa4Member, type SectorMa4Screen } from "./screenerLogic";
 import { fetchTonghuashunSeries } from "./sources/tonghuashun";
 import { fetchTencentKline } from "./sources/tencent";
+import { SCREENER_BOARD_MEMBER_LIMIT, TREND_BOARD_MEMBER_LIMIT } from "./thsMemberPages";
 import type { BoardMember, KBar, SectorItem } from "./types";
+
+export { SCREENER_BOARD_MEMBER_LIMIT, TREND_BOARD_MEMBER_LIMIT };
+
+type MemberKline = { code: string; name: string; bars: KBar[]; price: number | null };
 
 export type SectorTrendMember = BoardMember & {
   gain: number | null;
@@ -102,11 +107,11 @@ async function industrySeries(code: string): Promise<{ name: string; bars: KBar[
   return cached(`ths-industry-series:${code}:${TREND_BARS}`, 10 * 60_000, () => fetchTonghuashunSeries(code, TREND_BARS));
 }
 
-async function loadMembers(code: string): Promise<BoardMember[]> {
+async function loadMembers(code: string, limit = TREND_BOARD_MEMBER_LIMIT): Promise<BoardMember[]> {
   let last: BoardMember[] = [];
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
-      last = await listBoardMembers(code, 40, "amount");
+      last = await listBoardMembers(code, limit, "amount");
       if (last.length) return last;
     } catch {
       last = [];
@@ -126,8 +131,35 @@ export async function getSectorTrend(code: string): Promise<SectorTrendReport> {
   );
 }
 
-/** 选股用：只要红框还开着，就扫成分股日/周 MA4+MA7，不要求指数当天还站上 MA4。 */
-export async function loadBoardMa4Screen(code: string): Promise<SectorMa4Screen | null> {
+function toScreenMembers(rows: BoardMember[]): SectorMa4Member[] {
+  return rows.map((item) => ({
+    code: item.code,
+    name: item.name,
+    price: item.price,
+    pct: item.pct,
+    turnover: item.turnover,
+  }));
+}
+
+function emptyBoardScreen(
+  code: string,
+  name: string,
+  onMa4: boolean,
+  lastTime: string | undefined,
+): SectorMa4Screen {
+  return {
+    code,
+    name,
+    onMa4,
+    lastTime,
+    openTrend: null,
+    crosses: [],
+    members: [],
+  };
+}
+
+/** 选股用：红框还开着时先给出完整成分股名单，日/周均线稍后再补。 */
+export async function loadBoardMa4Roster(code: string): Promise<SectorMa4Screen | null> {
   const boardCode = code.trim();
   if (!isTonghuashunBoard(boardCode)) return null;
   const series = await industrySeries(boardCode);
@@ -135,49 +167,60 @@ export async function loadBoardMa4Screen(code: string): Promise<SectorMa4Screen 
   if (bars.length < 4) return null;
   const lastTime = bars.at(-1)?.time;
   const onMa4 = standsOnMa4(bars);
+  const name = series.name || boardCode;
   if (!lastTime || !indexCouldBeOpen(bars)) {
-    return {
-      code: boardCode,
-      name: series.name || boardCode,
-      onMa4,
-      lastTime,
-      openTrend: null,
-      crosses: [],
-      members: [],
-    };
+    return emptyBoardScreen(boardCode, name, onMa4, lastTime);
   }
-  const members = await loadMembers(boardCode);
-  if (members.length < 5) return null;
-  const stocks = await memberSeries(members, 120, 3);
-  if (stocks.length < 5) return null;
-  const quoted = fillMemberQuotes(members, stocks);
-  const paths = toMemberPaths(stocks);
-  const trends = captureSectorTrends(bars, paths);
+  const trends = captureSectorTrends(bars, []);
   const open = trends.find((trend) => trend.status === "open" && trend.end === lastTime) ?? null;
-  const crosses = open
-    ? decorateMa4Crosses(
-        listMa4Ma7StandStocks(
-          open,
-          stocks.filter((stock) => !isGrowthBoardShare(stock.code) && !isStName(stock.name)),
-        ),
-        stocks,
-      )
-    : [];
+  if (!open) {
+    return emptyBoardScreen(boardCode, name, onMa4, lastTime);
+  }
+  const members = await loadMembers(boardCode, SCREENER_BOARD_MEMBER_LIMIT);
+  if (members.length < 5) return null;
   return {
     code: boardCode,
-    name: series.name || boardCode,
+    name,
     onMa4,
     lastTime,
-    openTrend: open ? { start: open.start, end: open.end, status: open.status } : null,
-    crosses,
-    members: quoted.map((item) => ({
-      code: item.code,
-      name: item.name,
-      price: item.price,
-      pct: item.pct,
-      turnover: item.turnover,
-    })),
+    openTrend: { start: open.start, end: open.end, status: open.status },
+    crosses: [],
+    members: toScreenMembers(members),
   };
+}
+
+export function applyMa4Crosses(screen: SectorMa4Screen, stocks: MemberKline[]): SectorMa4Screen {
+  const memberIds = new Set(screen.members.map((item) => bareCode(item.code)));
+  const inBoard = stocks.filter((stock) => memberIds.has(bareCode(stock.code)));
+  if (!screen.openTrend || !inBoard.length) return { ...screen, crosses: [] };
+  const eligible = inBoard.filter((stock) => !isGrowthBoardShare(stock.code) && !isStName(stock.name));
+  const crosses = decorateMa4Crosses(listMa4Ma7StandStocks(screen.openTrend, eligible), inBoard);
+  const quoted = fillMemberQuotes(
+    screen.members.map((item) => ({ ...item, amount: null })),
+    inBoard,
+  );
+  return {
+    ...screen,
+    crosses,
+    members: toScreenMembers(quoted),
+  };
+}
+
+export async function loadScreenerMemberKlines(members: BoardMember[]): Promise<MemberKline[]> {
+  return memberSeries(members, 80, 8);
+}
+
+/** 选股用：只要红框还开着，就扫成分股日/周 MA4+MA7，不要求指数当天还站上 MA4。 */
+export async function loadBoardMa4Screen(code: string): Promise<SectorMa4Screen | null> {
+  const roster = await loadBoardMa4Roster(code);
+  if (!roster?.openTrend || roster.members.length < 5) return roster;
+  const stocks = await memberSeries(
+    roster.members.map((item) => ({ ...item, amount: null })),
+    80,
+    6,
+  );
+  if (stocks.length < 5) return roster;
+  return applyMa4Crosses(roster, stocks);
 }
 
 async function loadSectorTrend(boardCode: string): Promise<SectorTrendReport> {
@@ -279,13 +322,13 @@ export async function listBoardsInTrend(
       return mergeTrendScan(industry, concept);
     }
     if (scope === "concept") {
-      return await loadTrendScan("boards-in-open-trend:concept:v7", onLive, async (emit) => {
+      return await loadTrendScan("boards-in-open-trend:concept:v8", onLive, async (emit) => {
         const boards = await listTonghuashunConcepts().catch(() => [] as SectorItem[]);
         if (!boards.length) return { codes: [] as string[], offMa4: [] as string[] };
         return scanOpenTrend(boards, 8, emit);
       });
     }
-    return await loadTrendScan("boards-in-open-trend:v11", onLive, async (emit) => {
+    return await loadTrendScan("boards-in-open-trend:v12", onLive, async (emit) => {
       const boards = await listAllIndustryBoards();
       return scanOpenTrend(boards, 6, emit);
     });
@@ -301,10 +344,15 @@ async function loadTrendScan(
   loader: (emit?: (code: string) => void) => Promise<TrendScan>,
 ): Promise<TrendScan> {
   let streamed = false;
-  const scan = await cached(key, 10 * 60_000, async () => {
-    streamed = true;
-    return loader(onLive);
-  });
+  const scan = await cached(
+    key,
+    10 * 60_000,
+    async () => {
+      streamed = true;
+      return loader(onLive);
+    },
+    (value) => value.codes.length > 0,
+  );
   if (!streamed) scan.codes.forEach((code) => onLive?.(code));
   return scan;
 }

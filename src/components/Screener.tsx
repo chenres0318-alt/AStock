@@ -23,6 +23,8 @@ type StockResponse = {
   timedOut?: boolean;
   scanning?: boolean;
   discovering?: boolean;
+  industryLive?: number;
+  conceptLive?: number;
 };
 
 function scanErrorMessage(error: unknown): string {
@@ -95,6 +97,7 @@ function HitTable({
   items,
   scanning,
   discovering,
+  missingConcept,
   onOpen,
   holdingCodes,
   onToggleHold,
@@ -102,6 +105,7 @@ function HitTable({
   items: ScreenerHit[];
   scanning: boolean;
   discovering?: boolean;
+  missingConcept?: boolean;
   onOpen: (item: ScreenerHit) => void;
   holdingCodes: Set<string>;
   onToggleHold: (item: ScreenerHit) => void;
@@ -110,7 +114,10 @@ function HitTable({
     const scanningText = discovering
       ? "正在确认红框板块，找到就马上扫成分股，不必等全部扫完"
       : "正在扫描，扫到的股票会马上出现，按日K站上MA4和MA7的天数从短到长排，最多2日";
-    return <EmptyHint text={scanning ? scanningText : "没有符合条件的结果"} />;
+    const idleText = missingConcept
+      ? "没有扫到概念红框，行业和概念都要红框才能入选。请再点一次开始选股。"
+      : "没有符合条件的结果";
+    return <EmptyHint text={scanning ? scanningText : idleText} />;
   }
   return (
     <div className="overflow-auto scroll-thin">
@@ -232,6 +239,8 @@ export default function Screener() {
     elapsedMs?: number;
     source?: string;
     discovering?: boolean;
+    industryLive?: number;
+    conceptLive?: number;
   } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -258,6 +267,8 @@ export default function Screener() {
           elapsedMs: Date.now() - startedAt,
           source: data.source,
           discovering: data.discovering,
+          industryLive: data.industryLive,
+          conceptLive: data.conceptLive,
         });
         if (data.error) {
           setError(data.error);
@@ -297,7 +308,7 @@ export default function Screener() {
           选股：必须行业和概念都在红框（板块与概念共振），日 K 站上 MA4 和 MA7、周 K 站上 MA4，持续不超过 2 日。只过行业或只过概念的不要。
         </div>
         <div className="mt-2 max-w-4xl text-xs leading-5 text-mute">
-          不看周 K 的 MA7、月 K。红框不限几天内。持续天数是个股日 K 同时站上 MA4 和 MA7 的交易日数，1～2 日，越短越靠前。扫到就显示。不含科创板、创业板、北交所、ST。同一只股票只出现一次。所属板块同时列出过线的行业和概念，可点进板块页核对红框。
+          不看周 K 的 MA7、月 K。红框不限几天内。持续天数是个股日 K 同时站上 MA4 和 MA7 的交易日数，1～2 日，越短越靠前。扫红框行业和概念里的主板成分股，不只成交额前几名。不含科创板、创业板、北交所、ST。同一只股票只出现一次。所属板块同时列出过线的行业和概念，可点进板块页核对红框。
         </div>
       </section>
 
@@ -312,7 +323,11 @@ export default function Screener() {
             <div className="flex flex-wrap items-center justify-end gap-2">
               {meta ? (
                 <span className="text-[10px] text-mute">
-                  红框板块 {meta.liveBoards ?? "--"} · 扫描 {meta.scanned}{meta?.universe ? `/${meta.universe}` : ""} · 命中 {hits.length}
+                  红框板块 {meta.liveBoards ?? "--"}
+                  {meta.industryLive != null || meta.conceptLive != null
+                    ? `（行业${meta.industryLive ?? 0}·概念${meta.conceptLive ?? 0}）`
+                    : ""}{" "}
+                  · 扫描 {meta.scanned}{meta?.universe ? `/${meta.universe}` : ""} · 命中 {hits.length}
                   {meta.source === "ths-board" || meta.source === "ths-industry" ? " · 同花顺行业+概念" : ""}
                   {meta.elapsedMs ? ` · ${Math.round(meta.elapsedMs / 1000)}s` : ""}
                 </span>
@@ -341,6 +356,7 @@ export default function Screener() {
           items={hits}
           scanning={loading}
           discovering={meta?.discovering}
+          missingConcept={!loading && (meta?.conceptLive ?? -1) === 0}
           onOpen={openStock}
           holdingCodes={holdingCodes}
           onToggleHold={(item) =>

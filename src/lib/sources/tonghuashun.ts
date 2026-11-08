@@ -5,6 +5,7 @@ import { fetchGbk, fetchUtf, firstOk, retryOk, UpstreamError } from "../http";
 import { parseTonghuashunFieldIndustry, parseTonghuashunSwIndustry } from "../thsSwIndustry";
 import { mapPool } from "../pool";
 import { isShanghaiWeekend, thsRealtimeTradeDate, withToday } from "../thsRealtime";
+import { tonghuashunMemberPageCount } from "../thsMemberPages";
 import type { BoardMember, KBar, SectorItem } from "../types";
 
 const LIST_REFERER = "https://q.10jqka.com.cn/thshy/";
@@ -246,28 +247,55 @@ export async function fetchTonghuashunIndustries(): Promise<SectorItem[]> {
   return quoted;
 }
 
+function collectMembers(rows: BoardMember[], seen: Set<string>, members: BoardMember[], limit: number): number {
+  let added = 0;
+  for (const item of rows) {
+    if (seen.has(item.code)) continue;
+    seen.add(item.code);
+    members.push(item);
+    added += 1;
+    if (members.length >= limit) break;
+  }
+  return added;
+}
+
 async function fetchMemberPages(base: string, limit: number, emptyMessage: string): Promise<BoardMember[]> {
-  const pages = Math.min(4, Math.max(1, Math.ceil(limit / 10)));
+  const pages = tonghuashunMemberPageCount(limit);
   const members: BoardMember[] = [];
   const seen = new Set<string>();
-  for (let page = 1; page <= pages && members.length < limit; page += 1) {
-    const url = page === 1 ? base : `${base}page/${page}/`;
-    let html = "";
-    try {
-      html = await readHtml(url, base);
-    } catch {
-      if (members.length) break;
-      throw new UpstreamError(emptyMessage);
+  let html = "";
+  try {
+    html = await readHtml(base, base);
+  } catch {
+    throw new UpstreamError(emptyMessage);
+  }
+  const first = parseMemberRows(html);
+  if (!collectMembers(first, seen, members, limit)) {
+    throw new UpstreamError(emptyMessage);
+  }
+  if (members.length >= limit || pages <= 1 || first.length < 10) return members.slice(0, limit);
+  const extraConcurrency = 4;
+  for (let page = 2; page <= pages && members.length < limit; ) {
+    const batch: number[] = [];
+    while (batch.length < extraConcurrency && page <= pages) {
+      batch.push(page);
+      page += 1;
     }
-    let added = 0;
-    for (const item of parseMemberRows(html)) {
-      if (seen.has(item.code)) continue;
-      seen.add(item.code);
-      members.push(item);
-      added += 1;
+    const rest = await mapPool(batch, extraConcurrency, async (n) => {
+      try {
+        const pageHtml = await readHtml(`${base}page/${n}/`, base);
+        return parseMemberRows(pageHtml);
+      } catch {
+        return [] as BoardMember[];
+      }
+    });
+    let short = false;
+    for (const rows of rest) {
+      collectMembers(rows, seen, members, limit);
+      if (rows.length < 10) short = true;
       if (members.length >= limit) break;
     }
-    if (!added) break;
+    if (short) break;
   }
   return members.slice(0, limit);
 }
@@ -327,6 +355,7 @@ async function loadConceptCatalog(): Promise<ConceptCatalog> {
   try {
     html = await firstOk([
       () => readHtml("https://q.10jqka.com.cn/gn/", CONCEPT_REFERER),
+      () => readHtml("http://q.10jqka.com.cn/gn/", CONCEPT_REFERER),
       () => readHtml("https://data.10jqka.com.cn/funds/gnzjl/", "https://data.10jqka.com.cn/funds/gnzjl/"),
     ]);
   } catch {
@@ -385,7 +414,12 @@ export function conceptCatalogNeedsDetailCrawl(quotedCount: number): boolean {
 }
 
 export async function fetchTonghuashunConcepts(): Promise<SectorItem[]> {
-  const catalog = await cached("ths-concept-boards", 10 * 60_000, loadConceptCatalog);
+  const catalog = await cached(
+    "ths-concept-boards",
+    10 * 60_000,
+    loadConceptCatalog,
+    (value) => value.items.length >= 50,
+  );
   conceptDetailCodes.clear();
   for (const [plate, cid] of Object.entries(catalog.detailCodes)) conceptDetailCodes.set(plate, cid);
   return catalog.items;
