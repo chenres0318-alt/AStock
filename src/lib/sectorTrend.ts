@@ -29,7 +29,8 @@ export type MaStandFlags = {
   dayOnMa7: boolean;
   weekOnMa4: boolean;
   weekOnMa7: boolean;
-  monthOnMa20: boolean;
+  monthOnMa4: boolean;
+  monthOnMa7: boolean;
 };
 
 function closeOn(closes: Map<string, number>, times: string[], index: number): number | null {
@@ -200,13 +201,21 @@ export function maStandFlags(bars: KBar[]): MaStandFlags[] {
       dayOnMa7: closeOnMa(dayCloses, 7, index),
       weekOnMa4: closeOnMa(weekCloses, 4, w),
       weekOnMa7: closeOnMa(weekCloses, 7, w),
-      monthOnMa20: closeOnMa(monthCloses, 20, m),
+      monthOnMa4: closeOnMa(monthCloses, 4, m),
+      monthOnMa7: closeOnMa(monthCloses, 7, m),
     };
   });
 }
 
 function canStart(flags: MaStandFlags): boolean {
-  return flags.dayOnMa4 && flags.dayOnMa7 && flags.weekOnMa4 && flags.weekOnMa7 && flags.monthOnMa20;
+  return (
+    flags.dayOnMa4 &&
+    flags.dayOnMa7 &&
+    flags.weekOnMa4 &&
+    flags.weekOnMa7 &&
+    flags.monthOnMa4 &&
+    flags.monthOnMa7
+  );
 }
 
 function bothDailyBroken(flags: MaStandFlags): boolean {
@@ -220,11 +229,11 @@ export function trendCoversLastBar(segments: SectorTrendSegment[], lastTime: str
 }
 
 /**
- * 指数日 K 站上 MA4 和 MA7、周 K 站上 MA4 和 MA7、月 K 站上 MA20，趋势开始。
+ * 指数日 K、周 K、月 K 都站上 MA4 和 MA7，趋势开始。
  * 日 K 同时跌破 MA4 和 MA7，红框结束，灰框停在跌破前最后一根。
  */
 export function captureSectorTrends(bars: KBar[], members: SectorMemberPath[] = []): SectorTrendSegment[] {
-  if (bars.length < 20) return [];
+  if (bars.length < 7) return [];
   const flags = maStandFlags(bars);
   const segments: SectorTrendSegment[] = [];
   let start = -1;
