@@ -469,18 +469,8 @@ async function fetchTonghuashunToday(code: string): Promise<KBar | null> {
   }
 }
 
-async function fetchTonghuashunHistory(code: string, count: number): Promise<Series> {
-  const referer = boardReferer(code);
-  let text = "";
-  try {
-    text = await fetchUtf(`https://d.10jqka.com.cn/v6/line/48_${code}/01/last.js`, {
-      referer,
-      timeoutMs: 12_000,
-    });
-  } catch {
-    throw new UpstreamError("同花顺板块指数日线暂时取不到");
-  }
-  const payload = parseJsonp<{ name?: string; data?: string }>(text);
+function parseThsLinePayload(text: string): { name: string; bars: KBar[]; years: number[] } {
+  const payload = parseJsonp<{ name?: string; data?: string; year?: Record<string, number> }>(text);
   const bars: KBar[] = [];
   for (const row of String(payload.data ?? "").split(";")) {
     if (!row) continue;
@@ -506,17 +496,71 @@ async function fetchTonghuashunHistory(code: string, count: number): Promise<Ser
       turnover: Number.isFinite(turnover) ? turnover : null,
     });
   }
-  const sliced = bars.slice(-Math.max(1, count));
-  if (sliced.length < 2) throw new UpstreamError("同花顺板块指数日线暂时取不到");
-  return { name: payload.name?.trim() || code, bars: sliced };
+  const years = Object.keys(payload.year ?? {})
+    .map(Number)
+    .filter((year) => Number.isFinite(year) && year >= 1990)
+    .sort((a, b) => b - a);
+  return { name: payload.name?.trim() || "", bars, years };
+}
+
+async function fetchTonghuashunYear(code: string, year: number, referer: string): Promise<KBar[]> {
+  try {
+    const text = await fetchUtf(`https://d.10jqka.com.cn/v6/line/48_${code}/01/${year}.js`, {
+      referer,
+      timeoutMs: 16_000,
+    });
+    return parseThsLinePayload(text).bars;
+  } catch {
+    return [];
+  }
+}
+
+async function fetchTonghuashunHistory(code: string, count: number): Promise<Series> {
+  const referer = boardReferer(code);
+  let text = "";
+  try {
+    text = await fetchUtf(`https://d.10jqka.com.cn/v6/line/48_${code}/01/last.js`, {
+      referer,
+      timeoutMs: 12_000,
+    });
+  } catch {
+    throw new UpstreamError("同花顺板块指数日线暂时取不到");
+  }
+  const last = parseThsLinePayload(text);
+  const byTime = new Map(last.bars.map((bar) => [bar.time, bar]));
+  const need = Math.max(1, count);
+  if (byTime.size < need) {
+    const years = last.years.length ? last.years : [new Date().getUTCFullYear(), new Date().getUTCFullYear() - 1, new Date().getUTCFullYear() - 2];
+    const missing = years.filter(
+      (year) => ![...byTime.keys()].some((time) => time.startsWith(`${year}-01`) || time.startsWith(`${year}-02`)),
+    );
+    for (const year of missing.slice(0, 4)) {
+      if (byTime.size >= need) break;
+      const extra = await cached(
+        `ths-kline-year:v2:${code}:${year}`,
+        12 * 60 * 60_000,
+        () => fetchTonghuashunYear(code, year, referer),
+        (bars) => bars.length > 50,
+      );
+      for (const bar of extra) {
+        if (!byTime.has(bar.time)) byTime.set(bar.time, bar);
+      }
+    }
+  }
+  const bars = [...byTime.values()].sort((a, b) => a.time.localeCompare(b.time)).slice(-need);
+  if (bars.length < 2) throw new UpstreamError("同花顺板块指数日线暂时取不到");
+  return { name: last.name || code, bars };
 }
 
 export async function fetchTonghuashunSeries(code: string, count = 160): Promise<Series> {
   if (!isTonghuashunBoard(code)) {
     throw new UpstreamError("请从同花顺行业或概念里选择一个板块", 400);
   }
-  const history = await cached(`ths-kline-hist:v2:${code}:${count}`, 10 * 60_000, () =>
-    fetchTonghuashunHistory(code, count),
+  const history = await cached(
+    `ths-kline-hist:v4:${code}:${count}`,
+    10 * 60_000,
+    () => fetchTonghuashunHistory(code, count),
+    (series) => series.bars.length >= 2 && (count <= 200 || series.bars.length >= Math.min(count, 400)),
   );
   const today = await cached(`ths-kline-today:v3:${code}`, 20_000, () => fetchTonghuashunToday(code));
   const room = Math.max(1, count);

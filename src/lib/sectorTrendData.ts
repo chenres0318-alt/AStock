@@ -94,8 +94,11 @@ function toMemberPaths(series: Array<{ code: string; name: string; bars: KBar[] 
   });
 }
 
+/** 月K MA20 大约要 20 个月日线，红框要从更早的起点走到现在。 */
+const TREND_BARS = 700;
+
 async function industrySeries(code: string): Promise<{ name: string; bars: KBar[] }> {
-  return cached(`ths-industry-series:${code}:160`, 10 * 60_000, () => fetchTonghuashunSeries(code, 160));
+  return cached(`ths-industry-series:${code}:${TREND_BARS}`, 10 * 60_000, () => fetchTonghuashunSeries(code, TREND_BARS));
 }
 
 async function loadMembers(code: string): Promise<BoardMember[]> {
@@ -115,7 +118,7 @@ export async function getSectorTrend(code: string): Promise<SectorTrendReport> {
   const boardCode = code.trim();
   if (!isTonghuashunBoard(boardCode)) throw new UpstreamError("请从同花顺行业或概念里选择一个板块", 400);
   return cached(
-    `sector-trend-report:v3:${boardCode}`,
+    `sector-trend-report:v6:${boardCode}`,
     10 * 60_000,
     () => loadSectorTrend(boardCode),
     (report) => report.memberCount >= 5 || report.trends.length > 0,
@@ -253,8 +256,8 @@ async function scanOpenTrend(boards: SectorItem[], concurrency: number): Promise
 
 /**
  * 最新一根还落在趋势区间里的板块代码。
- * 下拉标红只看指数价格是否还能把红框留到最后一根，避免对全市场成分股再扫一遍把当前板块拖死。
- * 选股扫行业和概念。板块页一进就扫指数红框给下拉标红，不等点进某个板块；点进去后仍用成分股做完整捕捉。
+ * 下拉标红只看指数日/周/月均线能不能把红框留到最后一根，避免对全市场成分股再扫一遍把当前板块拖死。
+ * 选股扫行业和概念。板块页一进就扫指数红框给下拉标红，不等点进某个板块；点进去后仍用成分股补龙头名单。
  */
 export async function listBoardsInTrend(scope: "industry" | "concept" | "all" = "industry"): Promise<TrendScan> {
   try {
@@ -263,13 +266,13 @@ export async function listBoardsInTrend(scope: "industry" | "concept" | "all" = 
       return mergeTrendScan(industry, concept);
     }
     if (scope === "concept") {
-      return await cached("boards-in-open-trend:concept:v1", 10 * 60_000, async () => {
+      return await cached("boards-in-open-trend:concept:v2", 10 * 60_000, async () => {
         const boards = await listTonghuashunConcepts().catch(() => [] as SectorItem[]);
         if (!boards.length) return { codes: [] as string[], offMa4: [] as string[] };
         return scanOpenTrend(boards, 8);
       });
     }
-    return await cached("boards-in-open-trend:v5", 10 * 60_000, async () => {
+    return await cached("boards-in-open-trend:v6", 10 * 60_000, async () => {
       const boards = await listAllIndustryBoards();
       return scanOpenTrend(boards, 6);
     });

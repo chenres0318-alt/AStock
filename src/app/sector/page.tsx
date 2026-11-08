@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "板块趋势 · AStock 看盘",
-  description: "板块近期趋势捕捉：局部低点出发、不破位、个股同步、有龙头才画框",
+  description: "板块红色趋势：日K站上MA4和MA7、周K站上MA4和MA7、月K站上MA20为开始，日K同时跌破MA4和MA7为结束",
 };
 
 export default function SectorPage() {
