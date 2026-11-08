@@ -90,7 +90,7 @@ function hits(sectors: SectorMa4Screen[]) {
 
 const dw = { weekOnMa4: true, weekOnMa7: true };
 const short = { code: "sh600001", name: "短站", days: 1, time: "2026-10-23", ...dw };
-const long = { code: "sh600002", name: "长站", days: 4, time: "2026-10-20", ...dw };
+const long = { code: "sh600002", name: "长站", days: 2, time: "2026-10-22", ...dw };
 const members = [
   { code: "sh600001", name: "短站", price: 10, pct: 1.2, turnover: 2 },
   { code: "sh600002", name: "长站", price: 20, pct: -0.5, turnover: 3 },
@@ -216,7 +216,7 @@ const rankedDays = hits([
     code: "881121",
     name: "半导体",
     crosses: [
-      { code: "sh600032", name: "横店样", days: 4, time: "2026-10-26", ...dw },
+      { code: "sh600032", name: "横店样", days: 2, time: "2026-10-28", ...dw },
       { code: "sh600033", name: "平安样", days: 1, time: "2026-10-29", ...dw },
     ],
     members: [
@@ -226,7 +226,7 @@ const rankedDays = hits([
   }),
 ]);
 assert(rankedDays.map((row) => row.name).join(",") === "平安样,横店样", "shorter duration ranks first");
-assert(rankedDays[0]?.days === 1 && rankedDays[1]?.days === 4, "持续天数 follows the daily MA4+MA7 stand");
+assert(rankedDays[0]?.days === 1 && rankedDays[1]?.days === 2, "持续天数 follows the daily MA4+MA7 stand");
 
 const crossDoesNotBeatShort = hits([
   screen({
@@ -244,7 +244,7 @@ const crossDoesNotBeatShort = hits([
 ]);
 assert(
   crossDoesNotBeatShort.map((row) => row.name).join(",") === "无上叉短",
-  "a stand longer than 4 days is dropped even with a MA4/MA7 cross",
+  "a stand longer than 2 days is dropped even with a MA4/MA7 cross",
 );
 
 const twoDurations = hits([
@@ -252,16 +252,16 @@ const twoDurations = hits([
     code: "881121",
     name: "半导体",
     crosses: [
-      { code: "sh600052", name: "上叉4日", days: 4, time: "2026-10-26", ma4CrossUpMa7: true, ...dw },
+      { code: "sh600052", name: "上叉2日", days: 2, time: "2026-10-28", ma4CrossUpMa7: true, ...dw },
       { code: "sh600053", name: "上叉1日", days: 1, time: "2026-10-29", ma4CrossUpMa7: true, ...dw },
     ],
     members: [
-      { code: "sh600052", name: "上叉4日", price: 10, pct: 1, turnover: 1 },
+      { code: "sh600052", name: "上叉2日", price: 10, pct: 1, turnover: 1 },
       { code: "sh600053", name: "上叉1日", price: 11, pct: 1, turnover: 1 },
     ],
   }),
 ]);
-assert(twoDurations.map((row) => row.name).join(",") === "上叉1日,上叉4日", "among qualifying names, shorter duration still ranks first");
+assert(twoDurations.map((row) => row.name).join(",") === "上叉1日,上叉2日", "among qualifying names, shorter duration still ranks first");
 
 const weekOnlyLonger = hits([
   screen({
@@ -277,7 +277,7 @@ const weekOnlyLonger = hits([
     ],
   }),
 ]);
-assert(weekOnlyLonger.map((row) => row.name).join(",") === "无周MA7短", "weekly MA7 is not required; stands longer than 4 days are dropped");
+assert(weekOnlyLonger.map((row) => row.name).join(",") === "无周MA7短", "weekly MA7 is not required; stands longer than 2 days are dropped");
 
 const wave1 = collectMa4StandHits([
   screen({
@@ -302,14 +302,14 @@ const wave2 = hits([
     members: [{ code: "sh600041", name: "后扫更长", price: 9, pct: 1, turnover: 1 }],
   }),
 ]);
-assert(wave2.map((row) => row.name).join(",") === "先扫到", "a later 5-day stand is dropped by the 4-day cap");
+assert(wave2.map((row) => row.name).join(",") === "先扫到", "a later 5-day stand is dropped by the 2-day cap");
 
 const bothBeatsOne = collectMa4StandHits([
   screen({
     code: "881121",
     name: "半导体",
     crosses: [
-      { code: "sh600060", name: "双过长", days: 3, time: "2026-10-21", ...dw },
+      { code: "sh600060", name: "双过长", days: 2, time: "2026-10-22", ...dw },
       { code: "sh600061", name: "只过短", days: 1, time: "2026-10-29", ...dw },
     ],
     members: [
@@ -320,7 +320,7 @@ const bothBeatsOne = collectMa4StandHits([
   screen({
     code: "885001",
     name: "测试概念",
-    crosses: [{ code: "sh600060", name: "双过长", days: 3, time: "2026-10-21", ...dw }],
+    crosses: [{ code: "sh600060", name: "双过长", days: 2, time: "2026-10-22", ...dw }],
     members: [{ code: "sh600060", name: "双过长", price: 10, pct: 1, turnover: 1 }],
   }),
 ]);
@@ -329,32 +329,32 @@ assert(
   "a name that only has one red box is dropped even with a shorter stand",
 );
 
-const overFour = hits([
+const overTwo = hits([
   screen({
     code: "881121",
     name: "半导体",
     crosses: [
-      { code: "sh600070", name: "刚好4日", days: 4, time: "2026-10-26", ...dw },
-      { code: "sh600071", name: "第5日", days: 5, time: "2026-10-23", ...dw },
+      { code: "sh600070", name: "刚好2日", days: 2, time: "2026-10-28", ...dw },
+      { code: "sh600071", name: "第3日", days: 3, time: "2026-10-27", ...dw },
     ],
     members: [
-      { code: "sh600070", name: "刚好4日", price: 10, pct: 1, turnover: 1 },
-      { code: "sh600071", name: "第5日", price: 11, pct: 1, turnover: 1 },
+      { code: "sh600070", name: "刚好2日", price: 10, pct: 1, turnover: 1 },
+      { code: "sh600071", name: "第3日", price: 11, pct: 1, turnover: 1 },
     ],
   }),
 ]);
-assert(overFour.map((row) => row.name).join(",") === "刚好4日", "day 4 is kept and day 5 is dropped");
+assert(overTwo.map((row) => row.name).join(",") === "刚好2日", "day 2 is kept and day 3 is dropped");
 
 const bothByDays = collectMa4StandHits([
   screen({
     code: "881121",
     name: "半导体",
     crosses: [
-      { code: "sh600062", name: "双过4日", days: 4, time: "2026-10-26", ...dw },
+      { code: "sh600062", name: "双过2日", days: 2, time: "2026-10-28", ...dw },
       { code: "sh600063", name: "双过1日", days: 1, time: "2026-10-29", ...dw },
     ],
     members: [
-      { code: "sh600062", name: "双过4日", price: 10, pct: 1, turnover: 1 },
+      { code: "sh600062", name: "双过2日", price: 10, pct: 1, turnover: 1 },
       { code: "sh600063", name: "双过1日", price: 11, pct: 1, turnover: 1 },
     ],
   }),
@@ -362,17 +362,17 @@ const bothByDays = collectMa4StandHits([
     code: "885001",
     name: "测试概念",
     crosses: [
-      { code: "sh600062", name: "双过4日", days: 4, time: "2026-10-26", ...dw },
+      { code: "sh600062", name: "双过2日", days: 2, time: "2026-10-28", ...dw },
       { code: "sh600063", name: "双过1日", days: 1, time: "2026-10-29", ...dw },
     ],
     members: [
-      { code: "sh600062", name: "双过4日", price: 10, pct: 1, turnover: 1 },
+      { code: "sh600062", name: "双过2日", price: 10, pct: 1, turnover: 1 },
       { code: "sh600063", name: "双过1日", price: 11, pct: 1, turnover: 1 },
     ],
   }),
 ]);
 assert(
-  bothByDays.map((row) => row.name).join(",") === "双过1日,双过4日",
+  bothByDays.map((row) => row.name).join(",") === "双过1日,双过2日",
   "among names in both red boxes, shorter duration still ranks first",
 );
 
