@@ -80,7 +80,7 @@ export type Ma4StandHit = {
   since: string;
   sector: string;
   sectorCode: string;
-  /** 同时在红框里的行业和概念，行业在前。行业或概念有一个即可。 */
+  /** 同时在红框里的行业和概念，行业在前。命中必须两种都有。 */
   boards: ScreenerBoardRef[];
   price: number | null;
   pct: number | null;
@@ -409,7 +409,7 @@ function withBoards(hit: Ma4StandHit, boards: ScreenerBoardRef[]): Ma4StandHit {
 }
 
 function hitRank(hit: Ma4StandHit): number[] {
-  return [hasIndustryAndConcept(hit) ? 0 : 1, hit.holdDays || hit.days, hit.days];
+  return [hit.holdDays || hit.days, hit.days];
 }
 
 function betterHit(next: Ma4StandHit, prev: Ma4StandHit | undefined): boolean {
@@ -423,9 +423,8 @@ function betterHit(next: Ma4StandHit, prev: Ma4StandHit | undefined): boolean {
 }
 
 /**
- * 必须：个股属于行业或概念红框（开着且盖住最新一根），日 K 站上 MA4 和 MA7，周 K 站上 MA4 和 MA7。
- * 只过行业或只过概念都可以；两种都过更好、排在前面。同样是否双过时，按这些条件同时成立的交易日数从短到长排。
- * 同一只股票只留一条。不含科创、创业、北交所、ST。
+ * 必须：个股日 K、周 K 站上 MA4 和 MA7；所属行业和至少一个概念都要红框覆盖最新一根。
+ * 只过行业或只过概念的不要。按这些条件同时成立的交易日数从短到长排。同一只股票只留一条。不含科创、创业、北交所、ST。
  */
 export function collectMa4StandHits(sectors: SectorMa4Screen[]): Ma4StandHit[] {
   const best = new Map<string, Ma4StandHit>();
@@ -484,7 +483,7 @@ export function collectMa4StandHits(sectors: SectorMa4Screen[]): Ma4StandHit[] {
       best.set(hit.code, merged);
     }
   }
-  return [...best.values()].sort((a, b) => {
+  return [...best.values()].filter(hasIndustryAndConcept).sort((a, b) => {
     const left = hitRank(a);
     const right = hitRank(b);
     for (let i = 0; i < left.length; i += 1) {
