@@ -83,20 +83,26 @@ export default function SectorTrendView() {
         return extra.length ? [...prev, ...extra] : prev.length ? prev : incoming;
       });
     };
-    readJson<{ items: SectorItem[] }>("/api/market/sectors?scope=industry")
-      .then((data) => {
-        if (cancelled) return;
-        const items = data.items ?? [];
-        mergeBoards(items);
-        const current = codeRef.current;
-        if (isTonghuashunConcept(current)) return;
-        if (isTonghuashunBoard(current) && items.some((item) => item.code === current)) return;
-        const preferred = items.find((item) => item.code === "881121" || item.name === "半导体") ?? items[0];
-        if (preferred && preferred.code !== current) router.replace(`/sector?code=${preferred.code}`);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : "板块列表失败");
-      });
+    const loadIndustry = (attempt: number) => {
+      readJson<{ items: SectorItem[] }>("/api/market/sectors?scope=industry")
+        .then((data) => {
+          if (cancelled) return;
+          const items = data.items ?? [];
+          mergeBoards(items);
+          setError(null);
+          const current = codeRef.current;
+          if (isTonghuashunConcept(current)) return;
+          if (isTonghuashunBoard(current) && items.some((item) => item.code === current)) return;
+          const preferred = items.find((item) => item.code === "881121" || item.name === "半导体") ?? items[0];
+          if (preferred && preferred.code !== current) router.replace(`/sector?code=${preferred.code}`);
+        })
+        .catch((err) => {
+          if (cancelled) return;
+          if (attempt < 2) window.setTimeout(() => loadIndustry(attempt + 1), 1500);
+          else setError(err instanceof Error ? err.message : "板块列表失败");
+        });
+    };
+    loadIndustry(0);
     const loadConcepts = (attempt: number) => {
       readJson<{ items: SectorItem[] }>("/api/market/sectors?scope=concept")
         .then((data) => {

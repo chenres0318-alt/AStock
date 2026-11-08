@@ -207,6 +207,7 @@ export async function fetchTonghuashunIndustries(): Promise<SectorItem[]> {
   try {
     pageOne = await firstOk([
       () => readHtml("https://q.10jqka.com.cn/thshy/", LIST_REFERER),
+      () => readHtml("http://q.10jqka.com.cn/thshy/", LIST_REFERER),
       () => readHtml("https://data.10jqka.com.cn/funds/hyzjl/", "https://data.10jqka.com.cn/funds/hyzjl/"),
     ]);
   } catch {

@@ -1,9 +1,10 @@
 import { mergeBoardMembers } from "./boardExtras";
-import { cached } from "./cache";
+import { cached, peekCached } from "./cache";
 import { isTonghuashunBoard, isTonghuashunIndustry } from "./codes";
 import { fetchBoardMembers } from "./sources/eastmoney";
 import { fetchSinaBoardMembers, type SinaNodeSort } from "./sources/sina";
 import { fetchTonghuashunConcepts, fetchTonghuashunIndustries, fetchTonghuashunMembers } from "./sources/tonghuashun";
+import { fallbackIndustryBoards } from "./thsIndustryCatalog";
 import type { BoardMember, SectorItem } from "./types";
 
 export async function listIndustryBoards(): Promise<SectorItem[]> {
@@ -11,7 +12,18 @@ export async function listIndustryBoards(): Promise<SectorItem[]> {
 }
 
 export async function listAllIndustryBoards(): Promise<SectorItem[]> {
-  return cached("ths-industry-boards", 3 * 60_000, () => fetchTonghuashunIndustries());
+  try {
+    return await cached(
+      "ths-industry-boards",
+      3 * 60_000,
+      () => fetchTonghuashunIndustries(),
+      (rows) => rows.length >= 10,
+    );
+  } catch {
+    const stale = peekCached<SectorItem[]>("ths-industry-boards");
+    if (stale && stale.length >= 10) return stale;
+    return fallbackIndustryBoards();
+  }
 }
 
 export async function listTonghuashunConcepts(): Promise<SectorItem[]> {
