@@ -104,7 +104,7 @@ function HitTable({
   onToggleHold: (item: ScreenerHit) => void;
 }) {
   if (!items.length) {
-    return <EmptyHint text={scanning ? "正在扫描，扫到的股票会马上出现，按条件同时成立天数从短到长排" : "没有符合条件的结果"} />;
+    return <EmptyHint text={scanning ? "正在扫描，扫到的股票会马上出现，行业和概念都过优先、再按条件同时成立天数从短到长排" : "没有符合条件的结果"} />;
   }
   return (
     <div className="overflow-auto scroll-thin">
@@ -286,10 +286,10 @@ export default function Screener() {
 
       <section className="panel px-4 py-3">
         <div className="text-sm">
-          选股：必须属于行业或概念红框，日 K 站上 MA4 和 MA7，周 K 站上 MA4 和 MA7。只过行业或只过概念都可以。
+          选股：必须属于行业或概念红框，日 K 站上 MA4 和 MA7，周 K 站上 MA4 和 MA7。只过行业或只过概念都可以，两种都过更好、排在前面。
         </div>
         <div className="mt-2 max-w-4xl text-xs leading-5 text-mute">
-          红框不限几天内。持续天数是这些条件同时成立的交易日数，越短越靠前。扫到就显示。不含科创板、创业板、北交所、ST。同一只股票只出现一次。所属板块列出过线的行业和概念，可点进板块页核对红框。
+          红框不限几天内。行业和概念都过红框的排在只过一个的前面，同样是否双过时持续天数越短越靠前。扫到就显示。不含科创板、创业板、北交所、ST。同一只股票只出现一次。所属板块列出过线的行业和概念，可点进板块页核对红框。
         </div>
       </section>
 
@@ -322,7 +322,7 @@ export default function Screener() {
         />
         {loading ? (
           <div className="border-b border-line px-4 py-2 text-xs text-mute">
-            边扫边显示，按条件同时成立天数从短到长。已扫 {meta?.scanned ?? 0}
+            边扫边显示，行业和概念都过优先，再按条件同时成立天数从短到长。已扫 {meta?.scanned ?? 0}
             {meta?.universe ? `/${meta.universe}` : ""} · 命中 {hits.length}
           </div>
         ) : null}

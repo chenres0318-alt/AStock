@@ -373,6 +373,20 @@ function isIndustryBoard(code: string): boolean {
   return /^881\d{3}$/.test(code.trim());
 }
 
+function isConceptBoard(code: string): boolean {
+  return /^88[5-9]\d{3}$/.test(code.trim());
+}
+
+function hasIndustryAndConcept(hit: Ma4StandHit): boolean {
+  let industry = false;
+  let concept = false;
+  for (const board of hit.boards) {
+    if (isIndustryBoard(board.code)) industry = true;
+    else if (isConceptBoard(board.code)) concept = true;
+  }
+  return industry && concept;
+}
+
 function sortScreenerBoards(boards: ScreenerBoardRef[]): ScreenerBoardRef[] {
   const seen = new Set<string>();
   const unique: ScreenerBoardRef[] = [];
@@ -395,7 +409,7 @@ function withBoards(hit: Ma4StandHit, boards: ScreenerBoardRef[]): Ma4StandHit {
 }
 
 function hitRank(hit: Ma4StandHit): number[] {
-  return [hit.holdDays || hit.days, hit.days];
+  return [hasIndustryAndConcept(hit) ? 0 : 1, hit.holdDays || hit.days, hit.days];
 }
 
 function betterHit(next: Ma4StandHit, prev: Ma4StandHit | undefined): boolean {
@@ -410,7 +424,8 @@ function betterHit(next: Ma4StandHit, prev: Ma4StandHit | undefined): boolean {
 
 /**
  * 必须：个股属于行业或概念红框（开着且盖住最新一根），日 K 站上 MA4 和 MA7，周 K 站上 MA4 和 MA7。
- * 只过行业或只过概念都可以。按这些条件同时成立的交易日数从短到长排。同一只股票只留一条。不含科创、创业、北交所、ST。
+ * 只过行业或只过概念都可以；两种都过更好、排在前面。同样是否双过时，按这些条件同时成立的交易日数从短到长排。
+ * 同一只股票只留一条。不含科创、创业、北交所、ST。
  */
 export function collectMa4StandHits(sectors: SectorMa4Screen[]): Ma4StandHit[] {
   const best = new Map<string, Ma4StandHit>();

@@ -288,6 +288,62 @@ assert(
   "a later longer stand stays behind a shorter earlier hit",
 );
 
+const bothBeatsOne = collectMa4StandHits([
+  screen({
+    code: "881121",
+    name: "半导体",
+    crosses: [
+      { code: "sh600060", name: "双过长", days: 8, time: "2026-10-16", ...dw },
+      { code: "sh600061", name: "只过短", days: 1, time: "2026-10-29", ...dw },
+    ],
+    members: [
+      { code: "sh600060", name: "双过长", price: 10, pct: 1, turnover: 1 },
+      { code: "sh600061", name: "只过短", price: 11, pct: 1, turnover: 1 },
+    ],
+  }),
+  screen({
+    code: "885001",
+    name: "测试概念",
+    crosses: [{ code: "sh600060", name: "双过长", days: 8, time: "2026-10-16", ...dw }],
+    members: [{ code: "sh600060", name: "双过长", price: 10, pct: 1, turnover: 1 }],
+  }),
+]);
+assert(
+  bothBeatsOne.map((row) => row.name).join(",") === "双过长,只过短",
+  "industry plus concept ranks ahead of a shorter stand that only has one red box",
+);
+
+const bothByDays = collectMa4StandHits([
+  screen({
+    code: "881121",
+    name: "半导体",
+    crosses: [
+      { code: "sh600062", name: "双过4日", days: 4, time: "2026-10-26", ...dw },
+      { code: "sh600063", name: "双过1日", days: 1, time: "2026-10-29", ...dw },
+    ],
+    members: [
+      { code: "sh600062", name: "双过4日", price: 10, pct: 1, turnover: 1 },
+      { code: "sh600063", name: "双过1日", price: 11, pct: 1, turnover: 1 },
+    ],
+  }),
+  screen({
+    code: "885001",
+    name: "测试概念",
+    crosses: [
+      { code: "sh600062", name: "双过4日", days: 4, time: "2026-10-26", ...dw },
+      { code: "sh600063", name: "双过1日", days: 1, time: "2026-10-29", ...dw },
+    ],
+    members: [
+      { code: "sh600062", name: "双过4日", price: 10, pct: 1, turnover: 1 },
+      { code: "sh600063", name: "双过1日", price: 11, pct: 1, turnover: 1 },
+    ],
+  }),
+]);
+assert(
+  bothByDays.map((row) => row.name).join(",") === "双过1日,双过4日",
+  "among names in both red boxes, shorter duration still ranks first",
+);
+
 function bar(time: string, close: number): KBar {
   return { time, open: close, high: close, low: close, close, volume: 1 };
 }
