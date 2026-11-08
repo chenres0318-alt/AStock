@@ -10,6 +10,28 @@ export function mergeLiveCodes(base: readonly string[], extra: readonly string[]
   return [...new Set([...base, ...extra])];
 }
 
+/**
+ * 全量扫描结果覆盖未点开过的同范围代码，丢掉缓存里过期的红名。
+ * 已经点开核对过的板块仍以报告为准，行业扫描不会把概念抹掉。
+ */
+export function ingestLiveScan(
+  prev: readonly string[],
+  incoming: readonly string[],
+  settled: ReadonlySet<string>,
+  scope: "industry" | "concept",
+): string[] {
+  const inScope =
+    scope === "concept" ? (code: string) => /^88[5-9]\d{3}$/.test(code) : (code: string) => /^881\d{3}$/.test(code);
+  const next = new Set<string>();
+  for (const code of prev) {
+    if (settled.has(code) || !inScope(code)) next.add(code);
+  }
+  for (const code of incoming) {
+    if (!settled.has(code)) next.add(code);
+  }
+  return [...next];
+}
+
 export type TrendScan = { codes: string[]; offMa4: string[] };
 
 export function mergeTrendScan(base: TrendScan, extra: TrendScan): TrendScan {
@@ -24,7 +46,7 @@ export function parseActiveListScope(raw: string | null | undefined): "industry"
   return "industry";
 }
 
-const STORAGE_KEY = "astock.boards-in-trend";
+const STORAGE_KEY = "astock.boards-in-trend.v2";
 
 export function readStoredLiveCodes(): string[] {
   if (typeof sessionStorage === "undefined") return [];

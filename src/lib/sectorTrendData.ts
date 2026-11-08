@@ -256,7 +256,7 @@ async function scanOpenTrend(boards: SectorItem[], concurrency: number): Promise
 
 /**
  * 最新一根还落在趋势区间里的板块代码。
- * 下拉标红只看指数日/周/月均线能不能把红框留到最后一根，避免对全市场成分股再扫一遍把当前板块拖死。
+ * 下拉标红只看指数日/周均线能不能把红框留到最后一根，避免对全市场成分股再扫一遍把当前板块拖死。
  * 选股扫行业和概念。板块页一进就扫指数红框给下拉标红，不等点进某个板块；点进去后仍用成分股补龙头名单。
  */
 export async function listBoardsInTrend(scope: "industry" | "concept" | "all" = "industry"): Promise<TrendScan> {

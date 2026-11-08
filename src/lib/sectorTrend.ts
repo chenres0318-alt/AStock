@@ -251,7 +251,7 @@ export function captureSectorTrends(bars: KBar[], members: SectorMemberPath[] = 
 }
 
 /**
- * 指数自己能不能把红框留到最后一根。只看日/周/月均线，不扫成分股。
+ * 指数自己能不能把红框留到最后一根。只看日/周均线，不扫成分股。
  */
 export function indexCouldBeOpen(bars: KBar[]): boolean {
   const last = bars.at(-1)?.time;

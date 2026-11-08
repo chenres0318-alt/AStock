@@ -11,7 +11,8 @@ import {
   type ISeriesApi,
   type Time,
 } from "lightweight-charts";
-import { applyBoardLive, mergeLiveCodes, readStoredLiveCodes, writeStoredLiveCodes } from "@/lib/boardLive";
+import { applyBoardLive, ingestLiveScan, mergeLiveCodes, readStoredLiveCodes, writeStoredLiveCodes } from "@/lib/boardLive";
+import { indexCouldBeOpen } from "@/lib/sectorTrend";
 import { displaySymbol, isTonghuashunBoard, isTonghuashunConcept, priceDigits, toTencentCode } from "@/lib/codes";
 import { formatPct, formatPrice, toneClass } from "@/lib/format";
 import type { KBar, SectorItem } from "@/lib/types";
@@ -126,8 +127,7 @@ export default function SectorTrendView() {
 
   useEffect(() => {
     if (!report) return;
-    const last = report.bars.at(-1)?.time;
-    const live = report.trends.some((item) => item.status === "open" && item.end === last);
+    const live = indexCouldBeOpen(report.bars);
     settledBoards.current.add(report.board.code);
     setLiveCodes((prev) => applyBoardLive(prev, report.board.code, live));
     setOffMa4Codes((prev) => applyBoardLive(prev, report.board.code, live && report.onMa4 === false));
@@ -159,34 +159,29 @@ export default function SectorTrendView() {
 
   useEffect(() => {
     let cancelled = false;
-    const ingest = (data: { codes?: string[]; offMa4?: string[] }) => {
+    const ingest = (data: { codes?: string[]; offMa4?: string[] }, scope: "industry" | "concept") => {
       if (cancelled) return;
-      const incoming = (data.codes ?? []).filter((item) => !settledBoards.current.has(item));
-      const incomingOff = new Set((data.offMa4 ?? []).filter((item) => !settledBoards.current.has(item)));
-      setLiveCodes((prev) => mergeLiveCodes(prev, incoming));
-      setOffMa4Codes((prev) => {
-        const next = new Set(prev);
-        for (const item of incoming) {
-          if (incomingOff.has(item)) next.add(item);
-          else next.delete(item);
-        }
-        return [...next];
-      });
+      const incoming = data.codes ?? [];
+      if (!incoming.length) return;
+      const incomingOff = data.offMa4 ?? [];
+      const settled = settledBoards.current;
+      setLiveCodes((prev) => ingestLiveScan(prev, incoming, settled, scope));
+      setOffMa4Codes((prev) => ingestLiveScan(prev, incomingOff, settled, scope));
     };
-    const load = (url: string, attempt: number, onDone?: () => void) => {
+    const load = (url: string, scope: "industry" | "concept", attempt: number, onDone?: () => void) => {
       readJson<{ codes: string[]; offMa4?: string[] }>(url, 120_000)
         .then((data) => {
-          ingest(data);
+          ingest(data, scope);
           if (!cancelled) onDone?.();
         })
         .catch(() => {
           if (cancelled) return;
-          if (attempt < 2) window.setTimeout(() => load(url, attempt + 1, onDone), 2000);
+          if (attempt < 2) window.setTimeout(() => load(url, scope, attempt + 1, onDone), 2000);
           else onDone?.();
         });
     };
-    load("/api/market/sector-trend?list=active", 0, () => setIndustryLiveReady(true));
-    load("/api/market/sector-trend?list=active&scope=concept", 0, () => setConceptLiveReady(true));
+    load("/api/market/sector-trend?list=active", "industry", 0, () => setIndustryLiveReady(true));
+    load("/api/market/sector-trend?list=active&scope=concept", "concept", 0, () => setConceptLiveReady(true));
     return () => {
       cancelled = true;
     };

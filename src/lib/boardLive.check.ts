@@ -1,4 +1,4 @@
-import { applyBoardLive, mergeLiveCodes, mergeTrendScan, parseActiveListScope } from "./boardLive.ts";
+import { applyBoardLive, ingestLiveScan, mergeLiveCodes, mergeTrendScan, parseActiveListScope } from "./boardLive.ts";
 
 function assert(cond: unknown, message: string) {
   if (!cond) throw new Error(message);
@@ -24,6 +24,27 @@ assert(
 assert(
   applyBoardLive([], "885799", true).join(",") === "885799",
   "a live concept is marked without waiting to open it",
+);
+
+assert(
+  ingestLiveScan(["881121", "885799"], ["881174"], new Set(), "industry").sort().join(",") === "881174,885799",
+  "a fresh industry scan drops stale red industry names and keeps concepts",
+);
+assert(
+  ingestLiveScan(["881121"], ["881174"], new Set(["881121"]), "industry").sort().join(",") === "881121,881174",
+  "an opened live board stays red even if this scan has not listed it yet",
+);
+assert(
+  ingestLiveScan([], ["881121"], new Set(["881121"]), "industry").join(",") === "",
+  "an opened board that is no longer live is not painted red by the scan",
+);
+assert(
+  ingestLiveScan(["885001"], ["885799"], new Set(), "concept").sort().join(",") === "885799",
+  "a fresh concept scan drops stale red concept names",
+);
+assert(
+  ingestLiveScan(["881121", "885799"], [], new Set(), "industry").join(",") === "885799",
+  "an empty industry result clears unsettled industry names and keeps concepts",
 );
 
 const merged = mergeTrendScan(
