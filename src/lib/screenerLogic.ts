@@ -406,7 +406,7 @@ function withBoards(hit: Ma4StandHit, boards: ScreenerBoardRef[]): Ma4StandHit {
 }
 
 /** 选股：日 K 同时站上 MA4 和 MA7 的持续天数上限（含当天）。 */
-export const SCREENER_MAX_STAND_DAYS = 4;
+export const SCREENER_MAX_STAND_DAYS = 2;
 
 function standDuration(hit: { holdDays?: number; days: number }): number {
   return hit.holdDays || hit.days;
@@ -427,7 +427,7 @@ function betterHit(next: Ma4StandHit, prev: Ma4StandHit | undefined): boolean {
 }
 
 /**
- * 必须：个股日 K 站上 MA4 和 MA7，持续不超过 4 日；所属行业和至少一个概念都要红框覆盖最新一根。
+ * 必须：个股日 K 站上 MA4 和 MA7，持续不超过 2 日；所属行业和至少一个概念都要红框覆盖最新一根。
  * 只过行业或只过概念的不要。不看周 K。按持续天数从短到长排。同一只股票只留一条。不含科创、创业、北交所、ST。
  */
 export function collectMa4StandHits(sectors: SectorMa4Screen[]): Ma4StandHit[] {
