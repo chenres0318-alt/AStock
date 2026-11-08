@@ -1,8 +1,8 @@
-import { toTencentCode } from "./codes";
-import { listBoardsInTrend, loadBoardMa4Screen } from "./sectorTrendData";
-import { collectMa4StandHits, isScreenerShare, type SectorMa4Screen } from "./screenerLogic";
+import { bareCode, toTencentCode } from "./codes";
+import { applyMa4Crosses, listBoardsInTrend, loadBoardMa4Roster, loadScreenerMemberKlines } from "./sectorTrendData";
+import { collectMa4StandHits, dualBoxMemberIds, isScreenerShare, type SectorMa4Screen } from "./screenerLogic";
 import { raceDeadline, runDynamicPool } from "./pool";
-import type { ScreenerHit } from "./types";
+import type { BoardMember, KBar, ScreenerHit } from "./types";
 
 const BOARD_CONCURRENCY = 4;
 const RESULT_TTL_MS = 2 * 60_000;
@@ -120,15 +120,59 @@ function startJob(): ScanJob {
       if (Date.now() <= deadline) pending.push(code);
       wake();
     };
+    const klines = new Map<string, { code: string; name: string; bars: KBar[]; price: number | null }>();
+    const rosterById = () => {
+      const map = new Map<string, BoardMember>();
+      for (const sector of state.sectors) {
+        for (const member of sector.members) {
+          const id = bareCode(member.code);
+          if (!map.has(id)) {
+            map.set(id, {
+              code: member.code,
+              name: member.name,
+              price: member.price,
+              pct: member.pct,
+              amount: null,
+              turnover: member.turnover,
+            });
+          }
+        }
+      }
+      return map;
+    };
+    const hydrateDualBox = async () => {
+      const ids = dualBoxMemberIds(state.sectors);
+      const roster = rosterById();
+      const missing: BoardMember[] = [];
+      for (const id of ids) {
+        if (klines.has(id)) continue;
+        const row = roster.get(id);
+        if (row) missing.push(row);
+      }
+      if (missing.length) {
+        const rows = await loadScreenerMemberKlines(missing);
+        for (const row of rows) klines.set(bareCode(row.code), row);
+      }
+      const stocks = [...klines.values()];
+      for (let i = 0; i < state.sectors.length; i += 1) {
+        state.sectors[i] = applyMa4Crosses(state.sectors[i], stocks);
+      }
+    };
+    let hydrateTail = Promise.resolve();
+    const requestHydrate = () => {
+      hydrateTail = hydrateTail.then(hydrateDualBox, hydrateDualBox);
+      return hydrateTail;
+    };
     const scanBoard = async (code: string) => {
       if (Date.now() > deadline) return;
       try {
-        const screen = await loadBoardMa4Screen(code);
+        const screen = await loadBoardMa4Roster(code);
         if (screen) state.sectors.push(screen);
       } catch {
         // skip board
       } finally {
         state.scanned += 1;
+        void requestHydrate();
       }
     };
     const listing = Promise.all([
@@ -151,6 +195,7 @@ function startJob(): ScanJob {
         work: scanBoard,
       }),
     ]);
+    await requestHydrate();
     state.done = true;
     state.discovering = false;
     return snapshot();

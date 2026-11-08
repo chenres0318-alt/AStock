@@ -1,5 +1,6 @@
 import {
   collectMa4StandHits,
+  dualBoxMemberIds,
   conditionHoldDays,
   consecutiveMa4AboveMa7,
   consecutiveOnMa4,
@@ -162,6 +163,46 @@ const conceptOnly = collectMa4StandHits([
   screen({ code: "885333", name: "移动支付", crosses: [short], members }),
 ]);
 assert(conceptOnly.length === 0, "a concept without a live industry is not a hit");
+
+const tail = { code: "sh600199", name: "名单尾部", price: 8, pct: 1, turnover: 1 };
+const headMembers = Array.from({ length: 40 }, (_, i) => ({
+  code: `sh601${String(i).padStart(3, "0")}`,
+  name: `头${i}`,
+  price: 1,
+  pct: 1,
+  turnover: 1,
+}));
+assert(
+  dualBoxMemberIds([
+    screen({ code: "881121", name: "半导体", members: [...headMembers, tail] }),
+    screen({ code: "885001", name: "测试概念", members: [...headMembers.slice(0, 10), tail] }),
+  ]).includes("600199"),
+  "a name past the old top-40 still counts for dual-box",
+);
+assert(
+  dualBoxMemberIds([
+    screen({ code: "881121", name: "半导体", members: headMembers }),
+    screen({ code: "885001", name: "测试概念", members: [tail] }),
+  ]).length === 0,
+  "top-40 industry and a tail-only concept do not intersect",
+);
+assert(
+  collectMa4StandHits([
+    screen({
+      code: "881121",
+      name: "半导体",
+      crosses: [{ ...short, code: tail.code, name: tail.name }],
+      members: [...headMembers, tail],
+    }),
+    screen({
+      code: "885001",
+      name: "测试概念",
+      crosses: [{ ...short, code: tail.code, name: tail.name }],
+      members: [...headMembers.slice(0, 10), tail],
+    }),
+  ]).map((row) => row.name).join(",") === "名单尾部",
+  "a dual-box name outside the old top 40 still hits",
+);
 assert(
   collectMa4StandHits([
     screen({

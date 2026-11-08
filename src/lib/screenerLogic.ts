@@ -384,6 +384,23 @@ function hasIndustryAndConcept(hit: Ma4StandHit): boolean {
   return industry && concept;
 }
 
+/** 同时出现在红框行业和红框概念成分股里的主板代码。 */
+export function dualBoxMemberIds(sectors: SectorMa4Screen[]): string[] {
+  const industry = new Set<string>();
+  const concept = new Set<string>();
+  for (const sector of sectors) {
+    const open = sector.openTrend;
+    if (!open || open.status !== "open" || !sector.lastTime || open.end !== sector.lastTime) continue;
+    const bucket = isIndustryBoard(sector.code) ? industry : isConceptBoard(sector.code) ? concept : null;
+    if (!bucket) continue;
+    for (const member of sector.members) {
+      if (!isScreenerShare(member.code, member.name)) continue;
+      bucket.add(stockId(member.code));
+    }
+  }
+  return [...industry].filter((id) => concept.has(id));
+}
+
 function sortScreenerBoards(boards: ScreenerBoardRef[]): ScreenerBoardRef[] {
   const seen = new Set<string>();
   const unique: ScreenerBoardRef[] = [];

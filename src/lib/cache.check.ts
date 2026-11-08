@@ -1,4 +1,5 @@
 import { cached } from "./cache.ts";
+import { SCREENER_BOARD_MEMBER_LIMIT, tonghuashunMemberPageCount } from "./thsMemberPages.ts";
 import { fallbackIndustryBoards, THS_INDUSTRY_CATALOG } from "./thsIndustryCatalog.ts";
 
 function assert(cond: unknown, message: string) {
@@ -27,5 +28,12 @@ await cached("empty-live-scan", 60_000, async () => {
   return { codes: [] as string[] };
 }, (value) => value.codes.length > 0);
 assert(loads === 2, "an empty live-board scan is not cached");
+
+assert(SCREENER_BOARD_MEMBER_LIMIT >= 200, "screener member lists cover more than the old top 40");
+assert(tonghuashunMemberPageCount(40) === 4, "the sector page still uses four member pages");
+assert(
+  tonghuashunMemberPageCount(SCREENER_BOARD_MEMBER_LIMIT) >= 20,
+  "screener member lists fetch at least 20 pages",
+);
 
 console.log("cache.check ok", seeded.length);
