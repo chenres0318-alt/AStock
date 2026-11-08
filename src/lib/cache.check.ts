@@ -1,4 +1,6 @@
 import { cached } from "./cache.ts";
+import { parseTonghuashunBlockrank } from "./thsBlockrank.ts";
+import { fallbackConceptBoards, THS_CONCEPT_CATALOG } from "./thsConceptCatalog.ts";
 import { SCREENER_BOARD_MEMBER_LIMIT, tonghuashunMemberPageCount } from "./thsMemberPages.ts";
 import { fallbackIndustryBoards, THS_INDUSTRY_CATALOG } from "./thsIndustryCatalog.ts";
 
@@ -36,4 +38,15 @@ assert(
   "screener member lists fetch at least 20 pages",
 );
 
-console.log("cache.check ok", seeded.length);
+const concepts = fallbackConceptBoards();
+assert(THS_CONCEPT_CATALOG.length >= 200, "the built-in concept roster covers the Tonghuashun set");
+assert(concepts.some((item) => item.code === "885525" && item.name === "白酒概念"), "the fallback still has 白酒概念");
+assert(new Set(concepts.map((item) => item.code)).size === concepts.length, "fallback concept codes are unique");
+
+const ranked = parseTonghuashunBlockrank(
+  `quotebridge_v6_blockrank_881121_199112_d10({"block":{"name":"半导体","subcodeCount":190},"items":{"0":{"5":"600001","10":"10.5","19":"100","55":"测试股","199112":"1.2","1968584":"2.3"}}})`,
+);
+assert(ranked.total === 190 && ranked.members[0]?.code === "600001" && ranked.members[0]?.name === "测试股", "blockrank JSONP still names constituents");
+assert(ranked.members[0]?.price === 10.5 && ranked.members[0]?.pct === 1.2, "blockrank JSONP keeps price and percent");
+
+console.log("cache.check ok", seeded.length, concepts.length);

@@ -5,6 +5,7 @@ import { fetchGbk, fetchUtf, firstOk, retryOk, UpstreamError } from "../http";
 import { parseTonghuashunFieldIndustry, parseTonghuashunSwIndustry } from "../thsSwIndustry";
 import { mapPool } from "../pool";
 import { isShanghaiWeekend, thsRealtimeTradeDate, withToday } from "../thsRealtime";
+import { parseTonghuashunBlockrank, tonghuashunBlockrankUrl } from "../thsBlockrank";
 import { tonghuashunMemberPageCount } from "../thsMemberPages";
 import type { BoardMember, KBar, SectorItem } from "../types";
 
@@ -432,22 +433,56 @@ async function conceptDetailCode(plate: string): Promise<string | null> {
   return conceptDetailCodes.get(plate) ?? null;
 }
 
-export async function fetchTonghuashunMembers(code: string, limit = 40): Promise<BoardMember[]> {
-  if (isTonghuashunIndustry(code)) {
-    return fetchMemberPages(
-      `https://q.10jqka.com.cn/thshy/detail/code/${code}/`,
-      limit,
-      "同花顺行业成分股暂时读不到",
-    );
+async function fetchBlockrankMembers(code: string, limit: number): Promise<BoardMember[]> {
+  const referer = boardReferer(code);
+  const read = async (size: number) => {
+    try {
+      const text = await fetchUtf(tonghuashunBlockrankUrl(code, size), { referer, timeoutMs: 12_000 });
+      return parseTonghuashunBlockrank(text);
+    } catch {
+      return { members: [] as BoardMember[], total: 0 };
+    }
+  };
+  const want = Math.min(Math.max(limit, 10), 200);
+  let parsed = await read(Math.min(want, 10));
+  if (!parsed.members.length) parsed = await read(50);
+  const need = Math.min(want, parsed.total || want);
+  if (parsed.members.length < need) {
+    const full = await read(need);
+    if (full.members.length) parsed = full;
   }
-  if (!isTonghuashunConcept(code)) return [];
-  const cid = await conceptDetailCode(code);
-  if (!cid) return [];
-  return fetchMemberPages(
-    `https://q.10jqka.com.cn/gn/detail/code/${cid}/`,
-    limit,
-    "同花顺概念成分股暂时读不到",
-  );
+  return parsed.members.slice(0, limit);
+}
+
+export async function fetchTonghuashunMembers(code: string, limit = 40): Promise<BoardMember[]> {
+  if (!isTonghuashunIndustry(code) && !isTonghuashunConcept(code)) return [];
+  const ranked = await fetchBlockrankMembers(code, limit).catch(() => [] as BoardMember[]);
+  if (ranked.length >= Math.min(limit, 20)) return ranked;
+  try {
+    if (isTonghuashunIndustry(code)) {
+      const fetched = await fetchMemberPages(
+        `https://q.10jqka.com.cn/thshy/detail/code/${code}/`,
+        limit,
+        "同花顺行业成分股暂时读不到",
+      );
+      if (fetched.length) return fetched;
+    } else {
+      const cid = await conceptDetailCode(code).catch(() => null);
+      if (cid) {
+        const fetched = await fetchMemberPages(
+          `https://q.10jqka.com.cn/gn/detail/code/${cid}/`,
+          limit,
+          "同花顺概念成分股暂时读不到",
+        );
+        if (fetched.length) return fetched;
+      }
+    }
+  } catch {
+    // quote JSONP is enough when the HTML constituent pages are blocked
+  }
+  if (ranked.length) return ranked;
+  if (isTonghuashunIndustry(code)) throw new UpstreamError("同花顺行业成分股暂时读不到");
+  return [];
 }
 
 function parseJsonp<T>(text: string): T {

@@ -5,6 +5,7 @@ import { fetchBoardMembers } from "./sources/eastmoney";
 import { fetchSinaBoardMembers, type SinaNodeSort } from "./sources/sina";
 import { fetchTonghuashunConcepts, fetchTonghuashunIndustries, fetchTonghuashunMembers } from "./sources/tonghuashun";
 import { fallbackIndustryBoards } from "./thsIndustryCatalog";
+import { fallbackConceptBoards } from "./thsConceptCatalog";
 import type { BoardMember, SectorItem } from "./types";
 
 export async function listIndustryBoards(): Promise<SectorItem[]> {
@@ -27,7 +28,15 @@ export async function listAllIndustryBoards(): Promise<SectorItem[]> {
 }
 
 export async function listTonghuashunConcepts(): Promise<SectorItem[]> {
-  return fetchTonghuashunConcepts();
+  try {
+    const items = await fetchTonghuashunConcepts();
+    if (items.length >= 50) return items;
+  } catch {
+    // q.10jqka.com.cn/gn/ is often blocked; keep a stale hit or the built-in roster.
+  }
+  const stale = peekCached<{ items?: SectorItem[] }>("ths-concept-boards");
+  if ((stale?.items?.length ?? 0) >= 50) return stale!.items!;
+  return fallbackConceptBoards();
 }
 
 /** 板块页下拉：同花顺行业，再加上同花顺概念。 */
