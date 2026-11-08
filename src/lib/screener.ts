@@ -1,7 +1,7 @@
 import { toTencentCode } from "./codes";
 import { listBoardsInTrend, loadBoardMa4Screen } from "./sectorTrendData";
 import { collectMa4StandHits, isScreenerShare, type SectorMa4Screen } from "./screenerLogic";
-import { mapPool, raceDeadline } from "./pool";
+import { raceDeadline, runDynamicPool } from "./pool";
 import type { ScreenerHit } from "./types";
 
 const BOARD_CONCURRENCY = 4;
@@ -44,6 +44,8 @@ export type StockScreenResult = {
   items: ScreenerHit[];
   source: string;
   scanning: boolean;
+  /** 还在确认哪些板块处于红框，名单会边找边变长。 */
+  discovering?: boolean;
   timedOut?: boolean;
 };
 
@@ -77,6 +79,7 @@ function startJob(): ScanJob {
     liveBoards: 0,
     sectors: [] as SectorMa4Screen[],
     done: false,
+    discovering: true,
   };
   const snapshot = (): StockScreenResult => ({
     scanned: state.scanned,
@@ -87,16 +90,28 @@ function startJob(): ScanJob {
       .map(toHit),
     source: "ths-board",
     scanning: !state.done,
-    timedOut: state.done && state.universe > 0 && state.scanned < state.universe,
+    discovering: state.discovering,
+    timedOut: state.done && (state.discovering || (state.universe > 0 && state.scanned < state.universe)),
   });
   const deadline = startedAt + SCAN_MAX_MS;
   const promise = (async () => {
-    const industry = await listBoardsInTrend("industry");
-    const concept = await listBoardsInTrend("concept");
-    const industryLive = industry.codes;
-    const conceptLive = concept.codes;
-    state.universe = industryLive.length + conceptLive.length;
-    state.liveBoards = industry.codes.length + concept.codes.length;
+    const pending: string[] = [];
+    const seen = new Set<string>();
+    let listingDone = false;
+    let waiters: Array<() => void> = [];
+    const wake = () => {
+      const list = waiters;
+      waiters = [];
+      for (const resolve of list) resolve();
+    };
+    const enqueue = (code: string) => {
+      if (seen.has(code)) return;
+      seen.add(code);
+      state.liveBoards = seen.size;
+      state.universe = seen.size;
+      if (Date.now() <= deadline) pending.push(code);
+      wake();
+    };
     const scanBoard = async (code: string) => {
       if (Date.now() > deadline) return;
       try {
@@ -108,14 +123,28 @@ function startJob(): ScanJob {
         state.scanned += 1;
       }
     };
-    const queued: string[] = [];
-    const rounds = Math.max(industryLive.length, conceptLive.length);
-    for (let i = 0; i < rounds; i += 1) {
-      if (i < industryLive.length) queued.push(industryLive[i]);
-      if (i < conceptLive.length) queued.push(conceptLive[i]);
-    }
-    await mapPool(queued, BOARD_CONCURRENCY, scanBoard);
+    const listing = Promise.all([
+      listBoardsInTrend("industry", enqueue),
+      listBoardsInTrend("concept", enqueue),
+    ]).finally(() => {
+      listingDone = true;
+      state.discovering = false;
+      wake();
+    });
+    await Promise.all([
+      listing,
+      runDynamicPool(BOARD_CONCURRENCY, {
+        pull: () => pending.shift(),
+        closed: () => listingDone && pending.length === 0,
+        wait: () => {
+          if (listingDone || pending.length) return Promise.resolve();
+          return new Promise<void>((resolve) => waiters.push(resolve));
+        },
+        work: scanBoard,
+      }),
+    ]);
     state.done = true;
+    state.discovering = false;
     return snapshot();
   })()
     .then((value) => {

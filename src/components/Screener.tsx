@@ -22,6 +22,7 @@ type StockResponse = {
   error?: string;
   timedOut?: boolean;
   scanning?: boolean;
+  discovering?: boolean;
 };
 
 function scanErrorMessage(error: unknown): string {
@@ -93,18 +94,23 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
 function HitTable({
   items,
   scanning,
+  discovering,
   onOpen,
   holdingCodes,
   onToggleHold,
 }: {
   items: ScreenerHit[];
   scanning: boolean;
+  discovering?: boolean;
   onOpen: (item: ScreenerHit) => void;
   holdingCodes: Set<string>;
   onToggleHold: (item: ScreenerHit) => void;
 }) {
   if (!items.length) {
-    return <EmptyHint text={scanning ? "正在扫描，扫到的股票会马上出现，按日K站上MA4和MA7的天数从短到长排，最多2日" : "没有符合条件的结果"} />;
+    const scanningText = discovering
+      ? "正在确认红框板块，找到就马上扫成分股，不必等全部扫完"
+      : "正在扫描，扫到的股票会马上出现，按日K站上MA4和MA7的天数从短到长排，最多2日";
+    return <EmptyHint text={scanning ? scanningText : "没有符合条件的结果"} />;
   }
   return (
     <div className="overflow-auto scroll-thin">
@@ -225,6 +231,7 @@ export default function Screener() {
     liveBoards?: number;
     elapsedMs?: number;
     source?: string;
+    discovering?: boolean;
   } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -250,6 +257,7 @@ export default function Screener() {
           liveBoards: data.liveBoards,
           elapsedMs: Date.now() - startedAt,
           source: data.source,
+          discovering: data.discovering,
         });
         if (data.error) {
           setError(data.error);
@@ -322,13 +330,17 @@ export default function Screener() {
         />
         {loading ? (
           <div className="border-b border-line px-4 py-2 text-xs text-mute">
-            边扫边显示，按日 K 站上 MA4 和 MA7 的天数从短到长，最多 2 日。已扫 {meta?.scanned ?? 0}
+            {meta?.discovering
+              ? "正在确认红框板块，边找边扫成分股，不必等全部 300 个板块。"
+              : "边扫边显示，按日 K 站上 MA4 和 MA7 的天数从短到长，最多 2 日。"}{" "}
+            已扫 {meta?.scanned ?? 0}
             {meta?.universe ? `/${meta.universe}` : ""} · 命中 {hits.length}
           </div>
         ) : null}
         <HitTable
           items={hits}
           scanning={loading}
+          discovering={meta?.discovering}
           onOpen={openStock}
           holdingCodes={holdingCodes}
           onToggleHold={(item) =>
