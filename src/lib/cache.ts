@@ -6,10 +6,11 @@ const store = new Map<string, Entry<unknown>>();
 const inflight = new Map<string, Promise<unknown>>();
 
 function prune(now = Date.now()) {
+  if (store.size <= MAX_ENTRIES) return;
   for (const [key, entry] of store) {
     if (entry.expireAt <= now) store.delete(key);
+    if (store.size <= MAX_ENTRIES) return;
   }
-  if (store.size <= MAX_ENTRIES) return;
   const extra = store.size - MAX_ENTRIES;
   let dropped = 0;
   for (const key of store.keys()) {
@@ -17,6 +18,10 @@ function prune(now = Date.now()) {
     dropped += 1;
     if (dropped >= extra) break;
   }
+}
+
+export function peekCached<T>(key: string): T | undefined {
+  return store.get(key)?.value as T | undefined;
 }
 
 export function cached<T>(
@@ -43,6 +48,7 @@ export function cached<T>(
     })
     .catch((error) => {
       inflight.delete(key);
+      if (hit) return hit.value as T;
       throw error;
     });
   inflight.set(key, promise);
