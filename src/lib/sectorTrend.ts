@@ -29,8 +29,6 @@ export type MaStandFlags = {
   dayOnMa7: boolean;
   weekOnMa4: boolean;
   weekOnMa7: boolean;
-  monthOnMa4: boolean;
-  monthOnMa7: boolean;
 };
 
 function closeOn(closes: Map<string, number>, times: string[], index: number): number | null {
@@ -172,50 +170,31 @@ function weekStart(time: string): string {
   return date.toISOString().slice(0, 10);
 }
 
-/** 每个交易日：日/周/月均线是否站上。周、月用截至当天的未完成 K 线。 */
+/** 每个交易日：日/周均线是否站上。周线用截至当天的未完成 K 线。 */
 export function maStandFlags(bars: KBar[]): MaStandFlags[] {
   const dayCloses = bars.map((bar) => bar.close);
   const weekCloses: number[] = [];
-  const monthCloses: number[] = [];
   let weekKey = "";
-  let monthKey = "";
   return bars.map((bar, index) => {
     const week = weekStart(bar.time);
-    const month = bar.time.slice(0, 7);
     if (week !== weekKey) {
       weekCloses.push(bar.close);
       weekKey = week;
     } else {
       weekCloses[weekCloses.length - 1] = bar.close;
     }
-    if (month !== monthKey) {
-      monthCloses.push(bar.close);
-      monthKey = month;
-    } else {
-      monthCloses[monthCloses.length - 1] = bar.close;
-    }
     const w = weekCloses.length - 1;
-    const m = monthCloses.length - 1;
     return {
       dayOnMa4: closeOnMa(dayCloses, 4, index),
       dayOnMa7: closeOnMa(dayCloses, 7, index),
       weekOnMa4: closeOnMa(weekCloses, 4, w),
       weekOnMa7: closeOnMa(weekCloses, 7, w),
-      monthOnMa4: closeOnMa(monthCloses, 4, m),
-      monthOnMa7: closeOnMa(monthCloses, 7, m),
     };
   });
 }
 
 function canStart(flags: MaStandFlags): boolean {
-  return (
-    flags.dayOnMa4 &&
-    flags.dayOnMa7 &&
-    flags.weekOnMa4 &&
-    flags.weekOnMa7 &&
-    flags.monthOnMa4 &&
-    flags.monthOnMa7
-  );
+  return flags.dayOnMa4 && flags.dayOnMa7 && flags.weekOnMa4 && flags.weekOnMa7;
 }
 
 function bothDailyBroken(flags: MaStandFlags): boolean {
@@ -229,7 +208,7 @@ export function trendCoversLastBar(segments: SectorTrendSegment[], lastTime: str
 }
 
 /**
- * 指数日 K、周 K、月 K 都站上 MA4 和 MA7，趋势开始。
+ * 指数日 K、周 K 都站上 MA4 和 MA7，趋势开始。
  * 日 K 同时跌破 MA4 和 MA7，红框结束，灰框停在跌破前最后一根。
  */
 export function captureSectorTrends(bars: KBar[], members: SectorMemberPath[] = []): SectorTrendSegment[] {

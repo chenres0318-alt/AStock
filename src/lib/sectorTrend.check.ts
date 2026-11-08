@@ -44,7 +44,7 @@ function tradingBars(closes: number[], start = "2024-01-02"): KBar[] {
   return bars;
 }
 
-/** 约 24 个月交易日，前段抬升让日/周/月都能站上 MA4 和 MA7。 */
+/** 足够长的抬升，让日 K、周 K 都能站上 MA4 和 MA7。 */
 function risingCloses(days = 520): number[] {
   return Array.from({ length: days }, (_, i) => Number((1000 + i * 1.2).toFixed(4)));
 }
@@ -62,9 +62,9 @@ function membersFollowing(bars: KBar[]): SectorMemberPath[] {
 const rising = tradingBars(risingCloses());
 const risingFlags = maStandFlags(rising);
 const firstStart = risingFlags.findIndex(
-  (row) => row.dayOnMa4 && row.dayOnMa7 && row.weekOnMa4 && row.weekOnMa7 && row.monthOnMa4 && row.monthOnMa7,
+  (row) => row.dayOnMa4 && row.dayOnMa7 && row.weekOnMa4 && row.weekOnMa7,
 );
-assert(firstStart >= 0, "a long rise eventually stands on daily, weekly and monthly MA4/MA7");
+assert(firstStart >= 0, "a long rise eventually stands on daily and weekly MA4/MA7");
 const risingTrends = captureSectorTrends(rising, membersFollowing(rising));
 assert(risingTrends.length === 1 && risingTrends[0].status === "open", "the MA alignment opens one red box");
 assert(risingTrends[0].start === rising[firstStart].time, "the box starts on the first day all MAs stand");
@@ -106,9 +106,16 @@ assert(dipFlags && !dipFlags.dayOnMa4 && dipFlags.dayOnMa7, "a dip through MA4 c
 const stillOpen = captureSectorTrends(dipped);
 assert(stillOpen.length === 1 && stillOpen[0].status === "open", "leaving only one of MA4/MA7 does not end the red box");
 
-const short = tradingBars(Array.from({ length: 30 }, (_, i) => 100 + i));
-assert(captureSectorTrends(short).length === 0, "fewer than 7 monthly bars cannot start");
+const short = tradingBars(Array.from({ length: 25 }, (_, i) => 100 + i));
+assert(captureSectorTrends(short).length === 0, "fewer than 7 weekly bars cannot start");
 assert(!indexCouldBeOpen(short), "a short tape cannot be an open red box");
+
+const weeksOnly = tradingBars(Array.from({ length: 50 }, (_, i) => 100 + i));
+const weeksOnlyTrends = captureSectorTrends(weeksOnly);
+assert(
+  weeksOnlyTrends.length === 1 && weeksOnlyTrends[0].status === "open",
+  "seven weekly bars are enough to start without monthly MAs",
+);
 
 assert(isTonghuashunIndustry("881121") && !isTonghuashunConcept("881121"), "an industry code stays an industry");
 assert(isTonghuashunConcept("885457") && isTonghuashunConcept("886056"), "concept indexes use 885 and 886");
