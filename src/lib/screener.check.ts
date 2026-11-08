@@ -193,7 +193,7 @@ const stHit = collectMa4StandHits([
 ]);
 assert(stHit.length === 0, "ST names do not appear in the stand list");
 
-const noWeekNeeded = hits([
+const weekMa4Needed = hits([
   screen({
     code: "881121",
     name: "半导体",
@@ -209,7 +209,7 @@ const noWeekNeeded = hits([
     ],
   }),
 ]);
-assert(noWeekNeeded.length === 3, "daily MA4+MA7 hits do not need weekly stands");
+assert(weekMa4Needed.map((row) => row.name).join(",") === "缺周MA7", "weekly MA4 is required; weekly MA7 and monthly stands are not");
 
 const rankedDays = hits([
   screen({
@@ -277,7 +277,7 @@ const weekOnlyLonger = hits([
     ],
   }),
 ]);
-assert(weekOnlyLonger.map((row) => row.name).join(",") === "无周MA7短", "weekly MA7 is not required; stands longer than 2 days are dropped");
+assert(weekOnlyLonger.map((row) => row.name).join(",") === "无周MA7短", "weekly MA7 is still not required; stands longer than 2 days are dropped");
 
 const wave1 = collectMa4StandHits([
   screen({
