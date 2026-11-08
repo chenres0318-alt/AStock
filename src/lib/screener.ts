@@ -10,9 +10,12 @@ const SCAN_MAX_MS = 300_000;
 const FIRST_WAIT_MS = 2_000;
 
 function hitReasons(row: ReturnType<typeof collectMa4StandHits>[number]): string[] {
-  const reasons: string[] = ["日K站上MA4", "周K站上MA4", "月K站上MA4"];
-  if (row.ma4CrossUpMa7) reasons.push("MA4上叉MA7");
-  reasons.push("行业红框", "概念红框", "板块指数站上MA4");
+  const reasons: string[] = ["日K站上MA4和MA7", "周K站上MA4和MA7"];
+  const industry = row.boards.some((board) => /^881\d{3}$/.test(board.code));
+  const concept = row.boards.some((board) => /^88[5-9]\d{3}$/.test(board.code));
+  if (industry && concept) reasons.push("行业和概念红框");
+  if (industry) reasons.push("行业红框");
+  if (concept) reasons.push("概念红框");
   return reasons;
 }
 
@@ -31,7 +34,7 @@ function toHit(row: ReturnType<typeof collectMa4StandHits>[number]): ScreenerHit
     dif: 0,
     dea: 0,
     hist: 0,
-    standDays: row.days,
+    standDays: row.holdDays || row.days,
     reasons: hitReasons(row),
     sector: row.sector,
     sectorCode: row.sectorCode,
@@ -93,14 +96,10 @@ function startJob(): ScanJob {
   });
   const deadline = startedAt + SCAN_MAX_MS;
   const promise = (async () => {
-    const liveOnMa4 = (scan: { codes: string[]; offMa4: string[] }) => {
-      const off = new Set(scan.offMa4);
-      return scan.codes.filter((code) => !off.has(code));
-    };
     const industry = await listBoardsInTrend("industry");
     const concept = await listBoardsInTrend("concept");
-    const industryLive = liveOnMa4(industry);
-    const conceptLive = liveOnMa4(concept);
+    const industryLive = industry.codes;
+    const conceptLive = concept.codes;
     state.universe = industryLive.length + conceptLive.length;
     state.liveBoards = industry.codes.length + concept.codes.length;
     const scanBoard = async (code: string) => {

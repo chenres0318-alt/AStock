@@ -8,6 +8,7 @@ import {
   captureSectorTrends,
   indexCouldBeOpen,
   listMa4CrossStocks,
+  listMa4Ma7StandStocks,
   memberGainsInWindow,
   standsOnMa4,
   type SectorMemberPath,
@@ -125,7 +126,7 @@ export async function getSectorTrend(code: string): Promise<SectorTrendReport> {
   );
 }
 
-/** 选股用：只要红框、MA4 和成分股站上天数，不缓存整份板块报告。 */
+/** 选股用：只要红框还开着，就扫成分股日/周 MA4+MA7，不要求指数当天还站上 MA4。 */
 export async function loadBoardMa4Screen(code: string): Promise<SectorMa4Screen | null> {
   const boardCode = code.trim();
   if (!isTonghuashunBoard(boardCode)) return null;
@@ -134,7 +135,7 @@ export async function loadBoardMa4Screen(code: string): Promise<SectorMa4Screen 
   if (bars.length < 4) return null;
   const lastTime = bars.at(-1)?.time;
   const onMa4 = standsOnMa4(bars);
-  if (!lastTime || !onMa4 || !indexCouldBeOpen(bars)) {
+  if (!lastTime || !indexCouldBeOpen(bars)) {
     return {
       code: boardCode,
       name: series.name || boardCode,
@@ -155,7 +156,7 @@ export async function loadBoardMa4Screen(code: string): Promise<SectorMa4Screen 
   const open = trends.find((trend) => trend.status === "open" && trend.end === lastTime) ?? null;
   const crosses = open
     ? decorateMa4Crosses(
-        listMa4CrossStocks(
+        listMa4Ma7StandStocks(
           open,
           stocks.filter((stock) => !isGrowthBoardShare(stock.code) && !isStName(stock.name)),
         ),
