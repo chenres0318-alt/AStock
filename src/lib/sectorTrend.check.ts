@@ -106,8 +106,10 @@ const dipped = tradingBars(dipCloses);
 const dipFlags = maStandFlags(dipped).at(-1);
 assert(dipFlags && !dipFlags.dayOnMa4 && dipFlags.dayOnMa7, "a dip through MA4 can still stand on MA7");
 const stillOpen = captureSectorTrends(dipped);
-assert(stillOpen.length === 1 && stillOpen[0].status === "open", "leaving only one of MA4/MA7 does not end the red box");
-assert(indexCouldBeOpen(dipped), "a dip through only MA4 keeps the red box open");
+assert(stillOpen.some((row) => row.status === "closed"), "breaking daily MA4 ends the red box even if MA7 still stands");
+assert(!indexCouldBeOpen(dipped), "a dip through MA4 is no longer an open trend");
+const closedDip = stillOpen.filter((row) => row.status === "closed").at(-1);
+assert(closedDip && closedDip.end !== dipped.at(-1)?.time, "the gray box stops before the MA4 break day");
 
 const tooShort = tradingBars(Array.from({ length: 6 }, (_, i) => 100 + i));
 assert(captureSectorTrends(tooShort).length === 0, "fewer than 7 daily bars cannot stand on MA7");

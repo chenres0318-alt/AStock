@@ -328,13 +328,13 @@ export async function listBoardsInTrend(
       return mergeTrendScan(industry, concept);
     }
     if (scope === "concept") {
-      return await loadTrendScan("boards-in-open-trend:concept:v9", onLive, async (emit) => {
+      return await loadTrendScan("boards-in-open-trend:concept:v10", onLive, async (emit) => {
         const boards = await listTonghuashunConcepts().catch(() => [] as SectorItem[]);
         if (!boards.length) return { codes: [] as string[], offMa4: [] as string[] };
         return scanOpenTrend(boards, 10, emit);
       });
     }
-    return await loadTrendScan("boards-in-open-trend:v13", onLive, async (emit) => {
+    return await loadTrendScan("boards-in-open-trend:v14", onLive, async (emit) => {
       const boards = await listAllIndustryBoards();
       return scanOpenTrend(boards, 8, emit);
     });

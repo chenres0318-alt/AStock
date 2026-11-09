@@ -216,8 +216,8 @@ function canStart(flags: MaStandFlags): boolean {
   return flags.dayOnMa4 && flags.dayOnMa7 && flags.weekOnMa4;
 }
 
-function bothDailyBroken(flags: MaStandFlags): boolean {
-  return !flags.dayOnMa4 && !flags.dayOnMa7;
+function dailyBrokenMa4(flags: MaStandFlags): boolean {
+  return !flags.dayOnMa4;
 }
 
 /** 最后一根是否还落在某段趋势区间里。收口的灰框不含跌破当天。 */
@@ -228,7 +228,7 @@ export function trendCoversLastBar(segments: SectorTrendSegment[], lastTime: str
 
 /**
  * 指数日 K 站上 MA4 和 MA7、周 K 站上 MA4，趋势开始。
- * 日 K 同时跌破 MA4 和 MA7，红色趋势结束，改成灰框，停在跌破前最后一根。不看周 K 的 MA7、月 K。
+ * 日 K 跌破 MA4，红色趋势结束，改成灰框，停在跌破前最后一根。不看周 K 的 MA7、月 K。
  */
 export function captureSectorTrends(bars: KBar[], members: SectorMemberPath[] = []): SectorTrendSegment[] {
   if (bars.length < 7) return [];
@@ -260,7 +260,7 @@ export function captureSectorTrends(bars: KBar[], members: SectorMemberPath[] = 
       if (canStart(flags[i])) start = i;
       continue;
     }
-    if (bothDailyBroken(flags[i])) {
+    if (dailyBrokenMa4(flags[i])) {
       push(start, i - 1, "closed");
       start = -1;
     }
