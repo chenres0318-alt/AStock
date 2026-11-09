@@ -4,7 +4,7 @@ import { collectMa4StandHits, dualBoxMemberIds, isScreenerShare, type SectorMa4S
 import { raceDeadline, runDynamicPool } from "./pool";
 import type { BoardMember, KBar, ScreenerHit } from "./types";
 
-const BOARD_CONCURRENCY = 4;
+const BOARD_CONCURRENCY = 6;
 const RESULT_TTL_MS = 2 * 60_000;
 const SCAN_MAX_MS = 300_000;
 const FIRST_WAIT_MS = 2_000;
@@ -141,6 +141,7 @@ function startJob(): ScanJob {
       return map;
     };
     const hydrateDualBox = async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
       const ids = dualBoxMemberIds(state.sectors);
       const roster = rosterById();
       const missing: BoardMember[] = [];
@@ -159,8 +160,22 @@ function startJob(): ScanJob {
       }
     };
     let hydrateTail = Promise.resolve();
-    const requestHydrate = () => {
-      hydrateTail = hydrateTail.then(hydrateDualBox, hydrateDualBox);
+    let hydrateTimer: ReturnType<typeof setTimeout> | null = null;
+    const requestHydrate = (immediate = false) => {
+      const run = () => {
+        hydrateTimer = null;
+        hydrateTail = hydrateTail.then(hydrateDualBox, hydrateDualBox);
+        return hydrateTail;
+      };
+      if (immediate) {
+        if (hydrateTimer) {
+          clearTimeout(hydrateTimer);
+          hydrateTimer = null;
+        }
+        return run();
+      }
+      if (hydrateTimer) return hydrateTail;
+      hydrateTimer = setTimeout(run, 750);
       return hydrateTail;
     };
     const scanBoard = async (code: string) => {
@@ -195,7 +210,7 @@ function startJob(): ScanJob {
         work: scanBoard,
       }),
     ]);
-    await requestHydrate();
+    await requestHydrate(true);
     state.done = true;
     state.discovering = false;
     return snapshot();

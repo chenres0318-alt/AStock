@@ -144,20 +144,27 @@ export default function SectorTrendView() {
     let cancelled = false;
     setLoading(true);
     setReport(null);
-    readJson<Report>(`/api/market/sector-trend?code=${code}`)
-      .then((data) => {
-        if (cancelled) return;
-        setReport(data);
-        const open = data.trends.find((item) => item.status === "open");
-        setPicked((open ?? data.trends.at(-1))?.start ?? null);
-        setError(null);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : "趋势计算失败");
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+    const load = (attempt: number) => {
+      readJson<Report>(`/api/market/sector-trend?code=${code}`)
+        .then((data) => {
+          if (cancelled) return;
+          setReport(data);
+          const open = data.trends.find((item) => item.status === "open");
+          setPicked((open ?? data.trends.at(-1))?.start ?? null);
+          setError(null);
+          setLoading(false);
+        })
+        .catch((err) => {
+          if (cancelled) return;
+          if (attempt < 1) {
+            window.setTimeout(() => load(attempt + 1), 1200);
+            return;
+          }
+          setError(err instanceof Error ? err.message : "趋势计算失败");
+          setLoading(false);
+        });
+    };
+    load(0);
     return () => {
       cancelled = true;
     };
