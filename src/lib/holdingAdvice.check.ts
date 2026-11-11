@@ -1,4 +1,12 @@
-import { adviseHolding, closeLowerThanPrev, closeStandsOnMa4, consecutiveMa4Days, holdingCheckRows, sectorHasOpenRedBox } from "./holdingAdvice.ts";
+import {
+  adviseHolding,
+  closeHigherThanPrev,
+  closeLowerThanPrev,
+  closeStandsOnMa4,
+  consecutiveMa4Days,
+  holdingCheckRows,
+  sectorHasOpenRedBox,
+} from "./holdingAdvice.ts";
 import type { KBar } from "./types.ts";
 
 function assert(cond: unknown, message: string) {
@@ -16,110 +24,104 @@ function bars(closes: number[]): KBar[] {
   }));
 }
 
-const keep = adviseHolding({
+const allOn = adviseHolding({
   stockOnMa4: true,
   sectorOnMa4: true,
   sectorInRedBox: true,
   hasSector: true,
   sectorResolved: true,
   standDays: 2,
+  conceptInRedBox: true,
+  stockAbovePrev: true,
 });
-assert(keep.action === "hold" && keep.label === "继续持仓", "stock and sector both on MA4 is a hold");
-assert(keep.stockOnMa4 && keep.sectorOnMa4 && keep.sectorInRedBox, "hold flags keep the MA4 and box states");
-assert(!keep.conceptInRedBox && !keep.stockCloseDown && !keep.sectorCloseDown, "unset lights stay off");
-assert(!keep.notes.includes("板块红框"), "red-box trend is not part of the hold check");
-assert(!keep.notes.includes("板块仍在红色趋势区间"), "red-box status is not a hold note");
-assert(keep.notes.includes("板块指数站上MA4"), "hold notes keep the sector MA4");
-assert(keep.notes.some((note) => note.includes("2日")), "hold notes keep the MA4 stand days");
+assert(allOn.action === "hold" && allOn.label === "继续持有", "three red lights keep holding");
+assert(allOn.stockOnMa4 && allOn.sectorInRedBox && allOn.conceptInRedBox && allOn.stockAbovePrev, "hold keeps the three flags");
+assert(allOn.notes.includes("股价日K高于MA4"), "hold names the MA4 light");
+assert(allOn.notes.includes("板块概念红框"), "hold names the dual red-box light");
+assert(allOn.notes.includes("股价高于昨日"), "hold names the higher-close light");
 
-const stockBreak = adviseHolding({
+const oneGray = adviseHolding({
   stockOnMa4: false,
   sectorOnMa4: true,
   sectorInRedBox: true,
   hasSector: true,
   sectorResolved: true,
+  conceptInRedBox: true,
+  stockAbovePrev: true,
 });
-assert(stockBreak.action === "hold", "stock off MA4 alone is not an exit");
-assert(stockBreak.notes.includes("股价收盘跌破MA4"), "stock break is still named");
-assert(stockBreak.notes.includes("板块指数站上MA4"), "sector still on MA4 is named");
+assert(oneGray.action === "hold" && oneGray.label === "继续持有", "one gray light still holds");
+assert(oneGray.notes.includes("未满足股价日K高于MA4"), "the gray MA4 light is named");
 
-const indexBreak = adviseHolding({
-  stockOnMa4: true,
-  sectorOnMa4: false,
-  sectorInRedBox: true,
+const twoGray = adviseHolding({
+  stockOnMa4: false,
+  sectorOnMa4: true,
+  sectorInRedBox: false,
   hasSector: true,
   sectorResolved: true,
+  conceptInRedBox: true,
+  stockAbovePrev: true,
 });
-assert(indexBreak.action === "hold", "sector off MA4 alone is not an exit");
-assert(indexBreak.notes.includes("板块指数跌破MA4"), "index break is named");
-assert(indexBreak.notes.some((note) => note.includes("个股站上MA4")), "stock still on MA4 is named");
+assert(twoGray.action === "exit" && twoGray.label === "离场清仓", "two gray lights mean exit");
+assert(twoGray.notes.includes("未满足股价日K高于MA4"), "exit names the gray MA4");
+assert(twoGray.notes.includes("未满足板块概念红框"), "a missing industry box grays the dual-box light");
 
-const bothBreak = adviseHolding({
+const threeGray = adviseHolding({
   stockOnMa4: false,
   sectorOnMa4: false,
-  sectorInRedBox: true,
+  sectorInRedBox: false,
   hasSector: true,
   sectorResolved: true,
-  stockCloseDown: true,
-  sectorCloseDown: true,
+  conceptInRedBox: false,
+  stockAbovePrev: false,
 });
-assert(bothBreak.action === "exit" && bothBreak.label === "需要离场", "both off MA4 with lower closes means exit");
-assert(bothBreak.stockCloseDown && bothBreak.sectorCloseDown, "exit keeps the lower-close lights on");
-assert(bothBreak.notes.includes("股价收盘跌破MA4且低于昨日"), "exit names the stock break and lower close");
-assert(bothBreak.notes.includes("板块指数跌破MA4且低于昨日"), "exit names the index break and lower close");
-assert(!bothBreak.notes.includes("板块已离开红色趋势区间"), "red-box trend is not an exit reason");
+assert(threeGray.action === "exit" && threeGray.label === "离场清仓", "three gray lights mean exit");
 
-const bothBreakStockUp = adviseHolding({
-  stockOnMa4: false,
-  sectorOnMa4: false,
-  sectorInRedBox: true,
-  hasSector: true,
-  sectorResolved: true,
-  stockCloseDown: false,
-  sectorCloseDown: true,
-});
-assert(bothBreakStockUp.action === "hold", "both off MA4 but stock close not lower is a hold");
-assert(bothBreakStockUp.notes.includes("股价收盘未低于昨日"), "a rebound stock close is named");
-
-const bothBreakIndexUp = adviseHolding({
-  stockOnMa4: false,
-  sectorOnMa4: false,
-  sectorInRedBox: true,
-  hasSector: true,
-  sectorResolved: true,
-  stockCloseDown: true,
-  sectorCloseDown: false,
-});
-assert(bothBreakIndexUp.action === "hold", "both off MA4 but index close not lower is a hold");
-assert(bothBreakIndexUp.notes.includes("板块指数收盘未低于昨日"), "a rebound index close is named");
-
-const bothBreakNoDown = adviseHolding({
-  stockOnMa4: false,
-  sectorOnMa4: false,
-  sectorInRedBox: true,
-  hasSector: true,
-  sectorResolved: true,
-});
-assert(bothBreakNoDown.action === "hold", "both off MA4 without lower-close confirmation is a hold");
-
-const boxEnd = adviseHolding({
+const conceptOnly = adviseHolding({
   stockOnMa4: true,
   sectorOnMa4: true,
   sectorInRedBox: false,
   hasSector: true,
   sectorResolved: true,
+  conceptInRedBox: true,
+  stockAbovePrev: true,
 });
-assert(boxEnd.action === "hold", "leaving the red box does not force an exit");
-assert(!boxEnd.notes.includes("板块已离开红色趋势区间"), "red-box status is ignored");
+assert(conceptOnly.action === "hold", "industry box off but the other two red is still a hold");
+assert(conceptOnly.notes.includes("未满足板块概念红框"), "industry without concept or concept without industry is one gray");
 
-const boxEndStockOn = adviseHolding({
+const industryOnly = adviseHolding({
   stockOnMa4: true,
-  sectorOnMa4: false,
-  sectorInRedBox: false,
+  sectorOnMa4: true,
+  sectorInRedBox: true,
   hasSector: true,
   sectorResolved: true,
+  conceptInRedBox: false,
+  stockAbovePrev: true,
 });
-assert(boxEndStockOn.action === "hold", "a dead red box with stock still on MA4 is not an exit");
+assert(industryOnly.action === "hold", "concept box off but the other two red is still a hold");
+
+const belowPrev = adviseHolding({
+  stockOnMa4: true,
+  sectorOnMa4: true,
+  sectorInRedBox: true,
+  hasSector: true,
+  sectorResolved: true,
+  conceptInRedBox: true,
+  stockAbovePrev: false,
+  stockCloseDown: true,
+});
+assert(belowPrev.action === "hold", "only the higher-close light gray is still a hold");
+assert(belowPrev.notes.includes("未满足股价高于昨日"), "a close not above yesterday is named");
+
+const ma4AndPrevGray = adviseHolding({
+  stockOnMa4: false,
+  sectorOnMa4: true,
+  sectorInRedBox: true,
+  hasSector: true,
+  sectorResolved: true,
+  conceptInRedBox: true,
+  stockAbovePrev: false,
+});
+assert(ma4AndPrevGray.action === "exit" && ma4AndPrevGray.label === "离场清仓", "off MA4 and not above yesterday is an exit");
 
 const missing = adviseHolding({
   stockOnMa4: true,
@@ -127,24 +129,32 @@ const missing = adviseHolding({
   sectorInRedBox: false,
   hasSector: false,
   sectorResolved: false,
+  conceptInRedBox: true,
+  stockAbovePrev: true,
 });
-assert(missing.action === "hold", "a missing sector is not treated as both broken");
+assert(missing.action === "hold", "a missing sector is one gray dual-box light, not an exit");
 assert(missing.notes.some((note) => note.includes("缺少所属板块")), "missing sector is explained");
 
 const unresolved = adviseHolding({
-  stockOnMa4: false,
+  stockOnMa4: true,
   sectorOnMa4: false,
   sectorInRedBox: false,
   hasSector: true,
   sectorResolved: false,
+  conceptInRedBox: true,
+  stockAbovePrev: true,
 });
-assert(unresolved.action === "hold", "an unresolved sector is not treated as both broken");
+assert(unresolved.action === "hold", "an unresolved sector is one gray dual-box light, not an exit");
 assert(unresolved.notes.some((note) => note.includes("暂无法核对")), "a failed sector fetch is explained");
 
 assert(!closeLowerThanPrev(bars([10])), "one bar cannot be lower than yesterday");
 assert(!closeLowerThanPrev(bars([10, 10])), "a flat close is not lower");
 assert(!closeLowerThanPrev(bars([10, 11])), "a higher close is not lower");
 assert(closeLowerThanPrev(bars([11, 10])), "a lower close is lower than yesterday");
+assert(!closeHigherThanPrev(bars([10])), "one bar cannot be higher than yesterday");
+assert(!closeHigherThanPrev(bars([10, 10])), "a flat close is not higher");
+assert(closeHigherThanPrev(bars([10, 11])), "a higher close is above yesterday");
+assert(!closeHigherThanPrev(bars([11, 10])), "a lower close is not above yesterday");
 
 assert(!closeStandsOnMa4(bars([10, 11, 12])), "fewer than 4 bars cannot stand on MA4");
 assert(closeStandsOnMa4(bars([8, 9, 10, 11, 12])), "a rising close stands on MA4");
@@ -177,16 +187,25 @@ assert(
 
 const lights = holdingCheckRows({
   stockOnMa4: true,
-  sectorOnMa4: false,
   sectorInRedBox: true,
   conceptInRedBox: false,
-  stockCloseDown: false,
-  sectorCloseDown: true,
+  stockAbovePrev: true,
 });
 assert(
   lights.map((row) => `${row.label}:${Number(row.on)}`).join("|") ===
-    "个股日K站上4日线:1|板块指数站上4日线:0|板块红框:1|概念红框:0|个股日K是否低于昨日:0|板块日K是否低于昨日:1",
-  "holding lights follow the six flags in display order",
+    "股价日K高于MA4:1|板块概念红框:0|股价高于昨日:1",
+  "holding lights are the three positive checks; dual-box needs both boards",
+);
+assert(
+  holdingCheckRows({
+    stockOnMa4: true,
+    sectorInRedBox: true,
+    conceptInRedBox: true,
+    stockAbovePrev: false,
+  })
+    .map((row) => `${row.label}:${Number(row.on)}`)
+    .join("|") === "股价日K高于MA4:1|板块概念红框:1|股价高于昨日:0",
+  "a close not above yesterday turns that light gray",
 );
 
 console.log("holdingAdvice.check ok");

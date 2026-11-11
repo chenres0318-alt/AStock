@@ -146,13 +146,14 @@ export type HoldingItem = {
 
 export type HoldingAdvice = {
   action: "hold" | "exit";
-  label: "继续持仓" | "需要离场";
+  label: "继续持有" | "离场清仓";
   stockOnMa4: boolean;
   sectorOnMa4: boolean;
   sectorInRedBox: boolean;
   conceptInRedBox: boolean;
   stockCloseDown: boolean;
   sectorCloseDown: boolean;
+  stockAbovePrev: boolean;
   notes: string[];
 };
 

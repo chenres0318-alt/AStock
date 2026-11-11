@@ -27,7 +27,7 @@ export default function QuotePanel({
   hint,
 }: {
   quote: Quote | undefined;
-  hint?: { label: string; hold: boolean; detail?: string } | null;
+  hint?: { label: string; hold: boolean; rows?: Array<{ label: string; on: boolean }>; detail?: string } | null;
 }) {
   if (!quote) {
     return <div className="panel px-4 py-6 text-sm text-mute">选择一只股票查看行情</div>;
@@ -68,9 +68,13 @@ export default function QuotePanel({
           </div>
           <div className="mt-0.5 text-xs text-mute">{displaySymbol(quote.code)}</div>
           {hint ? (
-            <div className={`mt-1 text-xs ${hint.hold ? "text-down" : "text-up"}`}>
-              {hint.label}
-              {hint.detail ? <span className="ml-2 text-mute">{hint.detail}</span> : null}
+            <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-xs">
+              <span className={hint.hold ? "text-down" : "text-up"}>{hint.label}</span>
+              {(hint.rows ?? []).map((row) => (
+                <span key={row.label} className={row.on ? "text-up" : "text-mute"}>
+                  {row.label}
+                </span>
+              ))}
             </div>
           ) : null}
         </div>

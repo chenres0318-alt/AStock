@@ -19,7 +19,7 @@ type StatusResponse = {
 function HoldingFlagRows({ status }: { status: HoldingStatus }) {
   const rows = holdingCheckRows(status);
   return (
-    <div className="mt-0.5 grid grid-cols-2 gap-x-1.5 gap-y-0.5 text-[10px] leading-4">
+    <div className="mt-0.5 flex flex-wrap gap-x-1.5 gap-y-0.5 text-[10px] leading-4">
       {rows.map((item) => (
         <span key={item.label} className={`whitespace-nowrap ${item.on ? "text-up" : "text-mute"}`}>
           {item.label}
@@ -234,10 +234,7 @@ export default function Holdings() {
     ? {
         label: selectedStatus.label,
         hold: selectedStatus.action === "hold",
-        detail: holdingCheckRows(selectedStatus)
-          .filter((row) => row.on)
-          .map((row) => row.label)
-          .join(" · "),
+        rows: holdingCheckRows(selectedStatus),
       }
     : null;
 
@@ -370,7 +367,7 @@ export default function Holdings() {
       </div>
 
       <p className="pb-1 text-center text-[11px] text-mute">
-        搜索加入或从选股点 + 。需要离场仅当个股和板块指数日 K 都跌破 MA4，并且当天收盘都低于前一日；不看板块是否还在红色趋势区间。仅供看盘学习，不构成投资建议。
+        搜索加入或从选股点 + 。看三项：股价日K高于MA4、板块概念红框、股价高于昨日。满足为红、不满足为灰；两项及以上灰色则离场清仓，否则继续持有。仅供看盘学习，不构成投资建议。
       </p>
     </div>
   );

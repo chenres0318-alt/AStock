@@ -22,6 +22,13 @@ export function closeLowerThanPrev(bars: KBar[]): boolean {
   return last != null && prev != null && last < prev;
 }
 
+export function closeHigherThanPrev(bars: KBar[]): boolean {
+  if (bars.length < 2) return false;
+  const last = bars[bars.length - 1]?.close;
+  const prev = bars[bars.length - 2]?.close;
+  return last != null && prev != null && last > prev;
+}
+
 export function consecutiveMa4Days(bars: KBar[]): number {
   if (!closeStandsOnMa4(bars)) return 0;
   let days = 1;
@@ -41,21 +48,21 @@ export function sectorHasOpenRedBox(report: {
   return report.trends.some((trend) => trend.status === "open" && trend.end === lastTime);
 }
 
+export type HoldingCheckRow = { label: string; on: boolean };
+
+/** 三项都是正面条件：红=满足，灰=不满足。灰项 ≥ 2 则离场清仓。 */
+export const HOLD_EXIT_GRAY_MIN = 2;
+
 export function holdingCheckRows(flags: {
   stockOnMa4: boolean;
-  sectorOnMa4: boolean;
   sectorInRedBox: boolean;
   conceptInRedBox: boolean;
-  stockCloseDown: boolean;
-  sectorCloseDown: boolean;
-}): Array<{ label: string; on: boolean }> {
+  stockAbovePrev: boolean;
+}): HoldingCheckRow[] {
   return [
-    { label: "个股日K站上4日线", on: flags.stockOnMa4 },
-    { label: "板块指数站上4日线", on: flags.sectorOnMa4 },
-    { label: "板块红框", on: flags.sectorInRedBox },
-    { label: "概念红框", on: flags.conceptInRedBox },
-    { label: "个股日K是否低于昨日", on: flags.stockCloseDown },
-    { label: "板块日K是否低于昨日", on: flags.sectorCloseDown },
+    { label: "股价日K高于MA4", on: flags.stockOnMa4 },
+    { label: "板块概念红框", on: flags.sectorInRedBox && flags.conceptInRedBox },
+    { label: "股价高于昨日", on: flags.stockAbovePrev },
   ];
 }
 
@@ -69,54 +76,31 @@ export function adviseHolding(input: {
   stockCloseDown?: boolean;
   sectorCloseDown?: boolean;
   conceptInRedBox?: boolean;
+  stockAbovePrev?: boolean;
 }): HoldingAdvice {
-  const sectorKnown = input.hasSector && input.sectorResolved;
   const stockCloseDown = Boolean(input.stockCloseDown);
   const sectorCloseDown = Boolean(input.sectorCloseDown);
   const conceptInRedBox = Boolean(input.conceptInRedBox);
-  const bothBroken = sectorKnown && !input.stockOnMa4 && !input.sectorOnMa4;
-  const bothLower = stockCloseDown && sectorCloseDown;
+  const stockAbovePrev = Boolean(input.stockAbovePrev);
   const flags = {
     stockOnMa4: input.stockOnMa4,
-    sectorOnMa4: sectorKnown ? input.sectorOnMa4 : false,
+    sectorOnMa4: input.hasSector && input.sectorResolved ? input.sectorOnMa4 : false,
     sectorInRedBox: input.sectorInRedBox,
     conceptInRedBox,
     stockCloseDown,
     sectorCloseDown,
+    stockAbovePrev,
   };
-
-  if (bothBroken && bothLower) {
-    return {
-      action: "exit",
-      label: "需要离场",
-      ...flags,
-      stockOnMa4: false,
-      sectorOnMa4: false,
-      notes: ["股价收盘跌破MA4且低于昨日", "板块指数跌破MA4且低于昨日"],
-    };
-  }
-
-  const notes: string[] = [];
-  if (input.stockOnMa4) {
-    notes.push(input.standDays ? `个股站上MA4共${input.standDays}日` : "个股站上MA4");
-  } else {
-    notes.push(stockCloseDown ? "股价收盘跌破MA4且低于昨日" : "股价收盘跌破MA4");
-    if (!stockCloseDown) notes.push("股价收盘未低于昨日");
-  }
-  if (!input.hasSector) {
-    notes.push("缺少所属板块，板块指数未核对");
-  } else if (!input.sectorResolved) {
-    notes.push("板块指数暂无法核对");
-  } else if (input.sectorOnMa4) {
-    notes.push("板块指数站上MA4");
-  } else {
-    notes.push(sectorCloseDown ? "板块指数跌破MA4且低于昨日" : "板块指数跌破MA4");
-    if (!sectorCloseDown) notes.push("板块指数收盘未低于昨日");
-  }
+  const rows = holdingCheckRows(flags);
+  const gray = rows.filter((row) => !row.on).length;
+  const exit = gray >= HOLD_EXIT_GRAY_MIN;
+  const notes = rows.map((row) => (row.on ? row.label : `未满足${row.label}`));
+  if (!input.hasSector) notes.push("缺少所属板块，板块红框未核对");
+  else if (!input.sectorResolved) notes.push("板块指数暂无法核对");
 
   return {
-    action: "hold",
-    label: "继续持仓",
+    action: exit ? "exit" : "hold",
+    label: exit ? "离场清仓" : "继续持有",
     ...flags,
     notes,
   };
