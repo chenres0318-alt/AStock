@@ -1,5 +1,6 @@
 import {
   collectMa4StandHits,
+  dualBoxDays,
   dualBoxMemberIds,
   conditionHoldDays,
   consecutiveMa4AboveMa7,
@@ -12,6 +13,7 @@ import {
   ma4CrossedUpMa7,
   matchIndustryBoard,
   monthStandsOnMa4,
+  trendBoxDays,
   weekStandsOnMa4,
   weekStandsOnMa4AndMa7,
   weeksOffMa4Before,
@@ -128,8 +130,8 @@ const ranked = hits([
   }),
 ]);
 assert(ranked.length === 2, "both names standing on MA4 and MA7 are kept");
-assert(ranked[0].name === "短站" && ranked[0].days === 1, "the shortest stand comes first");
-assert(ranked[1].name === "长站", "the longer stand is still listed after");
+assert(ranked[0].name === "短站" && ranked[0].days === 1, "equal box days then the shortest stock stand comes first");
+assert(ranked[1].name === "长站", "the longer stock stand is still listed after");
 assert(ranked[0].sectorCode === "881121", "the hit keeps the industry board");
 assert(ranked[0].boards.map((item) => item.name).join(",") === "半导体,测试概念", "所属板块 lists the industry then the concept");
 assert(ranked[0].price === 10, "price comes from the board roster");
@@ -278,8 +280,83 @@ const rankedDays = hits([
     ],
   }),
 ]);
-assert(rankedDays.map((row) => row.name).join(",") === "平安样,横店样", "shorter duration ranks first");
-assert(rankedDays[0]?.days === 1 && rankedDays[1]?.days === 2, "持续天数 follows the daily MA4+MA7 stand");
+assert(rankedDays.map((row) => row.name).join(",") === "平安样,横店样", "equal box days then shorter stock stand ranks first");
+assert(rankedDays[0]?.days === 1 && rankedDays[1]?.days === 2, "stock stand is the tie-break after box duration");
+assert(rankedDays[0]?.holdDays === 4 && rankedDays[1]?.holdDays === 4, "default openTrend 10-20 to 10-23 is 4 box days");
+
+assert(
+  dualBoxDays({
+    boards: [
+      { code: "881121", name: "半导体", days: 10 },
+      { code: "885001", name: "测试概念", days: 3 },
+    ],
+  }) === 3,
+  "dual box days is the overlap of the industry and concept boxes",
+);
+assert(
+  dualBoxDays({
+    boards: [
+      { code: "881121", name: "半导体", days: 10 },
+      { code: "885001", name: "短概念", days: 3 },
+      { code: "885002", name: "长概念", days: 20 },
+    ],
+  }) === 10,
+  "an extra young concept does not shrink the industry-concept overlap",
+);
+assert(
+  trendBoxDays("2026-10-20", "2026-10-23") === 4,
+  "calendar box days count the start and end dates",
+);
+assert(
+  trendBoxDays("2026-10-16", "2026-10-23", [
+    { time: "2026-10-16" },
+    { time: "2026-10-19" },
+    { time: "2026-10-20" },
+    { time: "2026-10-21" },
+    { time: "2026-10-22" },
+    { time: "2026-10-23" },
+    { time: "2026-10-24" },
+  ]) === 6,
+  "bar box days skip the weekend and ignore bars outside the box",
+);
+
+const boxRanked = collectMa4StandHits([
+  screen({
+    code: "881121",
+    name: "半导体",
+    boxDays: 8,
+    openTrend: { start: "2026-10-16", end: "2026-10-23", status: "open" },
+    crosses: [{ code: "sh600101", name: "长框", days: 1, time: "2026-10-23", ...dw }],
+    members: [{ code: "sh600101", name: "长框", price: 10, pct: 1, turnover: 1 }],
+  }),
+  screen({
+    code: "885801",
+    name: "长框概念",
+    boxDays: 8,
+    openTrend: { start: "2026-10-16", end: "2026-10-23", status: "open" },
+    crosses: [{ code: "sh600101", name: "长框", days: 1, time: "2026-10-23", ...dw }],
+    members: [{ code: "sh600101", name: "长框", price: 10, pct: 1, turnover: 1 }],
+  }),
+  screen({
+    code: "881122",
+    name: "电池",
+    boxDays: 2,
+    openTrend: { start: "2026-10-22", end: "2026-10-23", status: "open" },
+    crosses: [{ code: "sh600102", name: "短框", days: 2, time: "2026-10-22", ...dw }],
+    members: [{ code: "sh600102", name: "短框", price: 11, pct: 1, turnover: 1 }],
+  }),
+  screen({
+    code: "885802",
+    name: "短框概念",
+    boxDays: 3,
+    openTrend: { start: "2026-10-21", end: "2026-10-23", status: "open" },
+    crosses: [{ code: "sh600102", name: "短框", days: 2, time: "2026-10-22", ...dw }],
+    members: [{ code: "sh600102", name: "短框", price: 11, pct: 1, turnover: 1 }],
+  }),
+]);
+assert(boxRanked.map((row) => row.name).join(",") === "短框,长框", "shorter dual red-box duration ranks first");
+assert(boxRanked[0]?.holdDays === 2 && boxRanked[1]?.holdDays === 8, "持续天数 is the overlap of industry and concept boxes");
+assert(boxRanked[0]?.days === 2 && boxRanked[1]?.days === 1, "stock stand no longer decides the duration column");
 
 const crossDoesNotBeatShort = hits([
   screen({

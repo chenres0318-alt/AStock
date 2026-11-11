@@ -129,12 +129,12 @@ export type ScreenerHit = {
   dif: number;
   dea: number;
   hist: number;
-  /** 当前已达成条件同时成立的交易日数（含当天）。 */
+  /** 行业红框和概念红框同时开着的交易日数（含当天）。 */
   standDays: number;
   reasons: string[];
   sector: string | null;
   sectorCode: string | null;
-  boards?: Array<{ code: string; name: string }>;
+  boards?: Array<{ code: string; name: string; days?: number }>;
 };
 
 export type HoldingItem = {

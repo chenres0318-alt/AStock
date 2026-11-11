@@ -117,7 +117,7 @@ function HitTable({
   if (!items.length) {
     const scanningText = discovering
       ? "正在确认红框板块，找到就马上扫成分股，不必等全部扫完"
-      : "正在扫描，扫到的股票会马上出现，按日K站上MA4和MA7的天数从短到长排，最多2日";
+      : "正在扫描，扫到的股票会马上出现，按行业和概念红框持续天数从短到长排";
     const idleText = missingConcept
       ? "没有扫到概念红框，行业和概念都要红框才能入选。请再点一次开始选股。"
       : "没有符合条件的结果";
@@ -321,10 +321,10 @@ export default function Screener() {
 
       <section className="panel px-4 py-3">
         <div className="text-sm">
-          选股：必须行业和概念都在红框（板块与概念共振），日 K 站上 MA4 和 MA7 、周 K站上MA4和MA7，持续不超过 2 日。只过行业或只过概念的不要。
+          选股：必须行业和概念都在红框（板块与概念共振），日 K 站上 MA4 和 MA7 、周 K站上MA4和MA7。只过行业或只过概念的不要。
         </div>
         <div className="mt-2 max-w-4xl text-xs leading-5 text-mute">
-          红框不限几天内。持续天数是个股日 K 同时站上 MA4 和 MA7 的交易日数，1～2 日，越短越靠前。周 K 必须同时站上 MA4 和 MA7。扫红框行业和概念里的主板成分股，不只成交额前几名。概念名单读不到时用内置概念名单继续扫。不含科创板、创业板、北交所、ST。同一只股票只出现一次。所属板块同时列出过线的行业和概念，可点进板块页核对红框。
+          持续天数是行业红框和概念红框同时开着的交易日数，越短越靠前。个股日 K 须同时站上 MA4 和 MA7（1～2 日），周 K 必须同时站上 MA4 和 MA7。扫红框行业和概念里的主板成分股，不只成交额前几名。概念名单读不到时用内置概念名单继续扫。不含科创板、创业板、北交所、ST。同一只股票只出现一次。所属板块同时列出过线的行业和概念，可点进板块页核对红框。
         </div>
       </section>
 
@@ -363,7 +363,7 @@ export default function Screener() {
           <div className="border-b border-line px-4 py-2 text-xs text-mute">
             {meta?.discovering
               ? "正在确认红框板块，边找边扫成分股，不必等全部 300 个板块。"
-              : "边扫边显示，按日 K 站上 MA4 和 MA7 的天数从短到长，最多 2 日。"}{" "}
+              : "边扫边显示，按行业和概念红框持续天数从短到长排。"}{" "}
             已扫 {meta?.scanned ?? 0}
             {meta?.universe ? `/${meta.universe}` : ""} · 命中 {hits.length}
           </div>
