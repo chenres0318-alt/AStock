@@ -237,7 +237,7 @@ export function maStandFlags(bars: KBar[]): MaStandFlags[] {
 }
 
 function canStart(flags: MaStandFlags): boolean {
-  return flags.dayOnMa4 && flags.dayOnMa7 && flags.weekOnMa4 && flags.weekOnMa7;
+  return flags.dayOnMa4 && flags.dayOnMa7 && flags.weekOnMa4;
 }
 
 function bothDailyBroken(flags: MaStandFlags): boolean {
@@ -259,7 +259,7 @@ export function trendCoversLastBar(segments: SectorTrendSegment[], lastTime: str
 }
 
 /**
- * 指数日 K 站上 MA4 和 MA7、周 K 站上 MA4 和 MA7，趋势开始。不看月 K。
+ * 指数日 K 站上 MA4 和 MA7、周 K 站上 MA4，趋势开始。不看月 K。
  * 日 K 同时跌破 MA4 和 MA7，或周 K 同时跌破 MA4 和 MA7，红色趋势结束，改成灰框，停在跌破前最后一根，再等下一次开始信号。
  */
 export function captureSectorTrends(bars: KBar[], members: SectorMemberPath[] = []): SectorTrendSegment[] {
@@ -302,7 +302,7 @@ export function captureSectorTrends(bars: KBar[], members: SectorMemberPath[] = 
 }
 
 /**
- * 指数自己能不能把红框留到最后一根。只看日 K 和周 K 的 MA4、MA7，不扫成分股。
+ * 指数自己能不能把红框留到最后一根。开始看日 K MA4/MA7 和周 K MA4，结束看日 K 或周 K 同时跌破 MA4 和 MA7。不扫成分股。
  */
 export function indexCouldBeOpen(bars: KBar[]): boolean {
   const last = bars.at(-1)?.time;
