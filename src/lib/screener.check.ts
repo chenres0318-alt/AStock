@@ -89,15 +89,7 @@ function hits(sectors: SectorMa4Screen[]) {
   return collectMa4StandHits(plusConcept(sectors));
 }
 
-const dw = {
-  weekOnMa4: true,
-  weekOnMa7: true,
-  monthOnMa4: true,
-  weekDays: 1,
-  monthDays: 1,
-  ma4CrossUpMa7: true,
-  crossDays: 1,
-};
+const dw = { weekOnMa4: true, weekOnMa7: true, monthOnMa4: true, weekDays: 1 };
 const short = { code: "sh600001", name: "短站", days: 1, time: "2026-10-23", ...dw };
 const long = { code: "sh600002", name: "长站", days: 2, time: "2026-10-22", ...dw };
 const members = [
@@ -248,13 +240,10 @@ const weekMa4Needed = hits([
     name: "半导体",
     crosses: [
       { code: "sh600010", name: "只有日K", days: 1, time: "2026-10-23" },
-      { code: "sh600011", name: "缺周MA7", days: 1, time: "2026-10-23", ...dw },
-      { code: "sh600012", name: "缺周K", days: 1, time: "2026-10-23", monthOnMa4: true, monthDays: 1 },
-      { code: "sh600013", name: "缺月K", days: 1, time: "2026-10-23", weekOnMa4: true, weekDays: 1, ma4CrossUpMa7: true, crossDays: 1 },
-      { code: "sh600014", name: "周已两周", days: 1, time: "2026-10-23", ...dw, weekDays: 2 },
-      { code: "sh600015", name: "月已两月", days: 1, time: "2026-10-23", ...dw, monthDays: 2 },
-      { code: "sh600016", name: "上叉已两日", days: 1, time: "2026-10-23", ...dw, crossDays: 2 },
-      { code: "sh600017", name: "无上叉", days: 1, time: "2026-10-23", ...dw, ma4CrossUpMa7: false, crossDays: 0 },
+      { code: "sh600011", name: "缺周MA7", days: 1, time: "2026-10-23", weekOnMa4: true, monthOnMa4: true, weekDays: 1 },
+      { code: "sh600012", name: "缺周K", days: 1, time: "2026-10-23", monthOnMa4: true },
+      { code: "sh600013", name: "缺月K", days: 1, time: "2026-10-23", weekOnMa4: true, weekDays: 1 },
+      { code: "sh600014", name: "周已两周", days: 1, time: "2026-10-23", weekOnMa4: true, monthOnMa4: true, weekDays: 2 },
     ],
     members: [
       { code: "sh600010", name: "只有日K", price: 10, pct: 1, turnover: 1 },
@@ -262,16 +251,10 @@ const weekMa4Needed = hits([
       { code: "sh600012", name: "缺周K", price: 12, pct: 1, turnover: 1 },
       { code: "sh600013", name: "缺月K", price: 13, pct: 1, turnover: 1 },
       { code: "sh600014", name: "周已两周", price: 14, pct: 1, turnover: 1 },
-      { code: "sh600015", name: "月已两月", price: 15, pct: 1, turnover: 1 },
-      { code: "sh600016", name: "上叉已两日", price: 16, pct: 1, turnover: 1 },
-      { code: "sh600017", name: "无上叉", price: 17, pct: 1, turnover: 1 },
     ],
   }),
 ]);
-assert(
-  weekMa4Needed.map((row) => row.name).join(",") === "缺周MA7",
-  "first-day MA4/MA7 cross, first-week MA4 and first-month MA4 are required; weekly MA7 is not",
-);
+assert(weekMa4Needed.map((row) => row.name).join(",") === "缺周MA7", "weekly MA4 must be the first week on; monthly MA4 is required; weekly MA7 is not");
 
 const rankedDays = hits([
   screen({
@@ -295,8 +278,8 @@ const crossDoesNotBeatShort = hits([
     code: "881121",
     name: "半导体",
     crosses: [
-      { code: "sh600050", name: "无上叉短", days: 1, time: "2026-10-29", ...dw, ma4CrossUpMa7: false, crossDays: 0 },
-      { code: "sh600051", name: "当天上叉", days: 8, time: "2026-10-16", ...dw },
+      { code: "sh600050", name: "无上叉短", days: 1, time: "2026-10-29", ...dw },
+      { code: "sh600051", name: "有上叉长", days: 8, time: "2026-10-16", ma4CrossUpMa7: true, ...dw },
     ],
     members: [
       { code: "sh600050", name: "无上叉短", price: 10, pct: 1, turnover: 1 },
@@ -305,8 +288,8 @@ const crossDoesNotBeatShort = hits([
   }),
 ]);
 assert(
-  crossDoesNotBeatShort.map((row) => row.name).join(",") === "当天上叉",
-  "the first-day MA4/MA7 cross is required; a longer daily stand still qualifies",
+  crossDoesNotBeatShort.map((row) => row.name).join(",") === "无上叉短",
+  "a stand longer than 2 days is dropped even with a MA4/MA7 cross",
 );
 
 const twoDurations = hits([
@@ -314,8 +297,8 @@ const twoDurations = hits([
     code: "881121",
     name: "半导体",
     crosses: [
-      { code: "sh600052", name: "上叉已两日", days: 2, time: "2026-10-28", ...dw, crossDays: 2 },
-      { code: "sh600053", name: "当天上叉", days: 1, time: "2026-10-29", ...dw },
+      { code: "sh600052", name: "上叉2日", days: 2, time: "2026-10-28", ma4CrossUpMa7: true, ...dw },
+      { code: "sh600053", name: "上叉1日", days: 1, time: "2026-10-29", ma4CrossUpMa7: true, ...dw },
     ],
     members: [
       { code: "sh600052", name: "上叉2日", price: 10, pct: 1, turnover: 1 },
@@ -323,14 +306,14 @@ const twoDurations = hits([
     ],
   }),
 ]);
-assert(twoDurations.map((row) => row.name).join(",") === "当天上叉", "a MA4/MA7 cross that already held yesterday is dropped");
+assert(twoDurations.map((row) => row.name).join(",") === "上叉1日,上叉2日", "among qualifying names, shorter duration still ranks first");
 
 const weekOnlyLonger = hits([
   screen({
     code: "881121",
     name: "半导体",
     crosses: [
-      { code: "sh600036", name: "无周MA7短", days: 1, time: "2026-10-29", ...dw, weekOnMa7: false },
+      { code: "sh600036", name: "无周MA7短", days: 1, time: "2026-10-29", weekOnMa4: true, monthOnMa4: true, weekDays: 1 },
       { code: "sh600037", name: "日周都有", days: 9, time: "2026-10-13", ...dw },
     ],
     members: [
@@ -339,7 +322,7 @@ const weekOnlyLonger = hits([
     ],
   }),
 ]);
-assert(weekOnlyLonger.map((row) => row.name).join(",") === "无周MA7短,日周都有", "weekly MA7 is still not required; a longer daily stand still ranks after");
+assert(weekOnlyLonger.map((row) => row.name).join(",") === "无周MA7短", "weekly MA7 is still not required; stands longer than 2 days are dropped");
 
 const wave1 = collectMa4StandHits([
   screen({
@@ -364,7 +347,7 @@ const wave2 = hits([
     members: [{ code: "sh600041", name: "后扫更长", price: 9, pct: 1, turnover: 1 }],
   }),
 ]);
-assert(wave2.map((row) => row.name).join(",") === "先扫到,后扫更长", "a later longer daily stand still ranks after when both qualify");
+assert(wave2.map((row) => row.name).join(",") === "先扫到", "a later 5-day stand is dropped by the 2-day cap");
 
 const bothBeatsOne = collectMa4StandHits([
   screen({
@@ -405,7 +388,7 @@ const overTwo = hits([
     ],
   }),
 ]);
-assert(overTwo.map((row) => row.name).join(",") === "刚好2日,第3日", "a daily stand longer than 2 days still qualifies when the first-day cross holds");
+assert(overTwo.map((row) => row.name).join(",") === "刚好2日", "day 2 is kept and day 3 is dropped");
 
 const bothByDays = collectMa4StandHits([
   screen({
@@ -581,22 +564,6 @@ const monthDecorated = decorateMa4Crosses(
 assert(monthDecorated[0]?.monthOnMa4 === true, "decorate fills monthly MA4 from the daily tape");
 assert(monthDecorated[0]?.monthDays === 1, "the first qualified month counts as one month on MA4");
 assert((monthDecorated[0]?.holdDays ?? 0) >= 1, "decorate fills how long the current conditions have held");
-
-const firstMonthBars = [
-  ...["2026-06-15", "2026-06-30"].map((time) => bar(time, 10)),
-  ...["2026-07-15", "2026-07-31"].map((time) => bar(time, 10)),
-  ...["2026-08-14", "2026-08-31"].map((time) => bar(time, 10)),
-  ...["2026-09-15", "2026-09-30"].map((time) => bar(time, 8)),
-  ...["2026-10-09", "2026-10-29"].map((time) => bar(time, 13)),
-];
-const firstMonthDecorated = decorateMa4Crosses(
-  [{ code: "sh600039", name: "首月", days: 1, time: "2026-10-29" }],
-  [{ code: "sh600039", bars: firstMonthBars, price: 13 }],
-);
-assert(
-  firstMonthDecorated[0]?.monthOnMa4 === true && firstMonthDecorated[0]?.monthDays === 1,
-  "this month on MA4 and last month off is the first month standing",
-);
 
 {
   const missed = await raceDeadline(new Promise((resolve) => setTimeout(() => resolve("late"), 80)), 15);

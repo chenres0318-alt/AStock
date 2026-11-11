@@ -10,7 +10,7 @@ const SCAN_MAX_MS = 300_000;
 const FIRST_WAIT_MS = 2_000;
 
 function hitReasons(row: ReturnType<typeof collectMa4StandHits>[number]): string[] {
-  const reasons: string[] = ["日K站上MA4和MA7", "MA4当天上叉MA7", "周K首周站上MA4", "月K首月站上MA4", "行业红框", "概念红框"];
+  const reasons: string[] = ["日K站上MA4和MA7", "周K首周站上MA4", "月K站上MA4", "行业红框", "概念红框"];
   return reasons;
 }
 
