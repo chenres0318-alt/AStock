@@ -68,6 +68,8 @@ export type SectorMa4Screen = {
   onMa4: boolean;
   lastTime: string | undefined;
   openTrend: { start: string; end: string; status: "open" | "closed" } | null;
+  /** 当前红框从开始到最新一根的交易日数。 */
+  boxDays?: number;
   crosses: SectorMa4Cross[];
   members: SectorMa4Member[];
 };
@@ -75,6 +77,8 @@ export type SectorMa4Screen = {
 export type ScreenerBoardRef = {
   code: string;
   name: string;
+  /** 该板块当前红框已持续的交易日数。 */
+  days?: number;
 };
 
 export type Ma4StandHit = {
@@ -100,7 +104,7 @@ export type Ma4StandHit = {
   ma4OnMa7: boolean;
   /** MA4 上叉 MA7 已持续的交易日数；未上叉为 0。 */
   crossDays: number;
-  /** 右侧这些条件同时成立的交易日数。 */
+  /** 行业红框和概念红框同时开着的交易日数。 */
   holdDays: number;
 };
 
@@ -457,14 +461,41 @@ function sortScreenerBoards(boards: ScreenerBoardRef[]): ScreenerBoardRef[] {
 function withBoards(hit: Ma4StandHit, boards: ScreenerBoardRef[]): Ma4StandHit {
   const ordered = sortScreenerBoards(boards);
   const primary = ordered.find((item) => isIndustryBoard(item.code)) ?? ordered[0] ?? { code: hit.sectorCode, name: hit.sector };
-  return { ...hit, boards: ordered, sector: primary.name, sectorCode: primary.code };
+  const next = { ...hit, boards: ordered, sector: primary.name, sectorCode: primary.code };
+  return { ...next, holdDays: dualBoxDays(next) };
 }
 
 /** 选股：日 K 同时站上 MA4 和 MA7 的持续天数上限（含当天）。 */
 export const SCREENER_MAX_STAND_DAYS = 2;
 
-function standDuration(hit: { holdDays?: number; days: number }): number {
-  return hit.holdDays || hit.days;
+/** 红框从 start 到 end 的天数；有 K 线时按交易日计。 */
+export function trendBoxDays(start: string, end: string, bars?: Array<{ time: string }>): number {
+  if (bars?.length) {
+    const n = bars.filter((bar) => bar.time >= start && bar.time <= end).length;
+    if (n > 0) return n;
+  }
+  const from = Date.parse(`${start.slice(0, 10)}T00:00:00Z`);
+  const to = Date.parse(`${end.slice(0, 10)}T00:00:00Z`);
+  if (!Number.isFinite(from) || !Number.isFinite(to) || to < from) return 1;
+  return Math.floor((to - from) / 86_400_000) + 1;
+}
+
+/** 行业红框和概念红框同时开着的天数：两边最长红框的重叠。 */
+export function dualBoxDays(hit: { boards: ScreenerBoardRef[]; days?: number; holdDays?: number }): number {
+  let industry = 0;
+  let concept = 0;
+  for (const board of hit.boards) {
+    const n = board.days ?? 0;
+    if (!(n > 0)) continue;
+    if (isIndustryBoard(board.code)) industry = Math.max(industry, n);
+    else if (isConceptBoard(board.code)) concept = Math.max(concept, n);
+  }
+  if (industry > 0 && concept > 0) return Math.min(industry, concept);
+  return industry || concept || hit.holdDays || hit.days || 1;
+}
+
+function standDuration(hit: Ma4StandHit): number {
+  return dualBoxDays(hit);
 }
 
 function hitRank(hit: Ma4StandHit): number[] {
@@ -482,8 +513,8 @@ function betterHit(next: Ma4StandHit, prev: Ma4StandHit | undefined): boolean {
 }
 
 /**
- * 必须：个股日 K 站上 MA4 和 MA7，周 K 站上 MA4 和 MA7，持续不超过 2 日；所属行业和至少一个概念都要红框覆盖最新一根。
- * 只过行业或只过概念的不要。按持续天数从短到长排。同一只股票只留一条。不含科创、创业、北交所、ST。
+ * 必须：个股日 K 站上 MA4 和 MA7（1～2 日），周 K 站上 MA4 和 MA7；所属行业和至少一个概念都要红框覆盖最新一根。
+ * 只过行业或只过概念的不要。持续天数按行业和概念红框同时开着的天数从短到长排。同一只股票只留一条。不含科创、创业、北交所、ST。
  */
 export function collectMa4StandHits(sectors: SectorMa4Screen[]): Ma4StandHit[] {
   const best = new Map<string, Ma4StandHit>();
@@ -504,6 +535,8 @@ export function collectMa4StandHits(sectors: SectorMa4Screen[]): Ma4StandHit[] {
       const monthDays = cross.monthDays ?? 0;
       const ma4OnMa7 = cross.ma4OnMa7 !== false;
       const crossDays = ma4CrossUpMa7 ? Math.max(cross.crossDays ?? 1, 1) : 0;
+      const boxDays = sector.boxDays ?? trendBoxDays(open.start, open.end);
+      const boardRef = { code: sector.code, name: sector.name, days: boxDays };
       const hit = withBoards(
         {
           code: cross.code,
@@ -512,7 +545,7 @@ export function collectMa4StandHits(sectors: SectorMa4Screen[]): Ma4StandHit[] {
           since: cross.time,
           sector: sector.name,
           sectorCode: sector.code,
-          boards: [{ code: sector.code, name: sector.name }],
+          boards: [boardRef],
           price: member?.price ?? null,
           pct: member?.pct ?? null,
           turnover: member?.turnover ?? null,
@@ -525,14 +558,9 @@ export function collectMa4StandHits(sectors: SectorMa4Screen[]): Ma4StandHit[] {
           monthDays,
           ma4OnMa7,
           crossDays,
-          holdDays:
-            cross.holdDays ??
-            conditionHoldDays({
-              dailyDays: cross.days,
-              dailySince: cross.time,
-            }),
+          holdDays: boxDays,
         },
-        [{ code: sector.code, name: sector.name }],
+        [boardRef],
       );
       const prev = best.get(hit.code);
       if (!prev) {
@@ -546,12 +574,11 @@ export function collectMa4StandHits(sectors: SectorMa4Screen[]): Ma4StandHit[] {
   return [...best.values()]
     .filter(hasIndustryAndConcept)
     .filter((hit) => {
-      const days = standDuration(hit);
       return (
         hit.weekOnMa4 &&
         hit.weekOnMa7 &&
-        days >= 1 &&
-        days <= SCREENER_MAX_STAND_DAYS
+        hit.days >= 1 &&
+        hit.days <= SCREENER_MAX_STAND_DAYS
       );
     })
     .sort((a, b) => {

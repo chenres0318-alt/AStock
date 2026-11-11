@@ -14,7 +14,7 @@ import {
   type SectorMemberPath,
   type SectorTrendSegment,
 } from "./sectorTrend";
-import { decorateMa4Crosses, type SectorMa4Member, type SectorMa4Screen } from "./screenerLogic";
+import { decorateMa4Crosses, trendBoxDays, type SectorMa4Member, type SectorMa4Screen } from "./screenerLogic";
 import { alignedLivePrice, shanghaiToday, withLiveClose } from "./thsRealtime";
 import { fetchTonghuashunSeries } from "./sources/tonghuashun";
 import { fetchTencentKline } from "./sources/tencent";
@@ -205,6 +205,7 @@ export async function loadBoardMa4Roster(code: string): Promise<SectorMa4Screen 
     onMa4,
     lastTime,
     openTrend: { start: open.start, end: open.end, status: open.status },
+    boxDays: trendBoxDays(open.start, open.end, bars),
     crosses: [],
     members: toScreenMembers(members),
   };
