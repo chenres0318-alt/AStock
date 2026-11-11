@@ -89,7 +89,7 @@ function hits(sectors: SectorMa4Screen[]) {
   return collectMa4StandHits(plusConcept(sectors));
 }
 
-const dw = { weekOnMa4: true, weekOnMa7: true, monthOnMa4: true };
+const dw = { weekOnMa4: true, weekOnMa7: true, monthOnMa4: true, weekDays: 1 };
 const short = { code: "sh600001", name: "短站", days: 1, time: "2026-10-23", ...dw };
 const long = { code: "sh600002", name: "长站", days: 2, time: "2026-10-22", ...dw };
 const members = [
@@ -240,19 +240,21 @@ const weekMa4Needed = hits([
     name: "半导体",
     crosses: [
       { code: "sh600010", name: "只有日K", days: 1, time: "2026-10-23" },
-      { code: "sh600011", name: "缺周MA7", days: 1, time: "2026-10-23", weekOnMa4: true, monthOnMa4: true },
+      { code: "sh600011", name: "缺周MA7", days: 1, time: "2026-10-23", weekOnMa4: true, monthOnMa4: true, weekDays: 1 },
       { code: "sh600012", name: "缺周K", days: 1, time: "2026-10-23", monthOnMa4: true },
-      { code: "sh600013", name: "缺月K", days: 1, time: "2026-10-23", weekOnMa4: true },
+      { code: "sh600013", name: "缺月K", days: 1, time: "2026-10-23", weekOnMa4: true, weekDays: 1 },
+      { code: "sh600014", name: "周已两周", days: 1, time: "2026-10-23", weekOnMa4: true, monthOnMa4: true, weekDays: 2 },
     ],
     members: [
       { code: "sh600010", name: "只有日K", price: 10, pct: 1, turnover: 1 },
       { code: "sh600011", name: "缺周MA7", price: 11, pct: 1, turnover: 1 },
       { code: "sh600012", name: "缺周K", price: 12, pct: 1, turnover: 1 },
       { code: "sh600013", name: "缺月K", price: 13, pct: 1, turnover: 1 },
+      { code: "sh600014", name: "周已两周", price: 14, pct: 1, turnover: 1 },
     ],
   }),
 ]);
-assert(weekMa4Needed.map((row) => row.name).join(",") === "缺周MA7", "weekly MA4 and monthly MA4 are required; weekly MA7 is not");
+assert(weekMa4Needed.map((row) => row.name).join(",") === "缺周MA7", "weekly MA4 must be the first week on; monthly MA4 is required; weekly MA7 is not");
 
 const rankedDays = hits([
   screen({
@@ -311,7 +313,7 @@ const weekOnlyLonger = hits([
     code: "881121",
     name: "半导体",
     crosses: [
-      { code: "sh600036", name: "无周MA7短", days: 1, time: "2026-10-29", weekOnMa4: true, monthOnMa4: true },
+      { code: "sh600036", name: "无周MA7短", days: 1, time: "2026-10-29", weekOnMa4: true, monthOnMa4: true, weekDays: 1 },
       { code: "sh600037", name: "日周都有", days: 9, time: "2026-10-13", ...dw },
     ],
     members: [
@@ -538,7 +540,22 @@ const weekMa7Decorated = decorateMa4Crosses(
   [{ code: "sh600034", bars: weekMa7Bars, price: weekMa7Bars.at(-1)!.close }],
 );
 assert(weekMa7Decorated[0]?.weekOnMa4 === true && weekMa7Decorated[0]?.weekOnMa7 === true, "decorate fills weekly MA4 and MA7");
+assert((weekMa7Decorated[0]?.weekDays ?? 0) > 1, "a rising weekly tape has already stood more than the first week");
 assert((weekMa7Decorated[0]?.holdDays ?? 0) >= 1, "decorate fills how long daily and weekly stands have held together");
+
+const firstWeekBars = tradingBars([
+  ...Array.from({ length: 15 }, () => 10),
+  ...Array.from({ length: 5 }, () => 8),
+  ...Array.from({ length: 5 }, () => 12),
+]);
+const firstWeekDecorated = decorateMa4Crosses(
+  [{ code: "sh600038", name: "首周", days: 1, time: firstWeekBars.at(-1)!.time }],
+  [{ code: "sh600038", bars: firstWeekBars, price: 12 }],
+);
+assert(
+  firstWeekDecorated[0]?.weekOnMa4 === true && firstWeekDecorated[0]?.weekDays === 1,
+  "this week on MA4 and last week off is the first week standing",
+);
 
 const monthDecorated = decorateMa4Crosses(
   [{ code: "sh600031", name: "月装饰", days: 2, time: "2026-10-29" }],
