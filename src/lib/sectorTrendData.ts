@@ -241,7 +241,7 @@ export function applyMa4Crosses(screen: SectorMa4Screen, stocks: MemberKline[]):
 }
 
 export async function loadScreenerMemberKlines(members: BoardMember[]): Promise<MemberKline[]> {
-  return memberSeries(members, 160, 8);
+  return memberSeries(members, 80, 8);
 }
 
 /** 选股用：只要红框还开着，就扫成分股日/周 MA4+MA7，不要求指数当天还站上 MA4。 */
@@ -250,7 +250,7 @@ export async function loadBoardMa4Screen(code: string): Promise<SectorMa4Screen 
   if (!roster?.openTrend || roster.members.length < 5) return roster;
   const stocks = await memberSeries(
     roster.members.map((item) => ({ ...item, amount: null })),
-    160,
+    80,
     6,
   );
   if (stocks.length < 5) return roster;
