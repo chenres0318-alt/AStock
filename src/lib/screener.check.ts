@@ -14,6 +14,7 @@ import {
   monthStandsOnMa4,
   weekStandsOnMa4,
   weekStandsOnMa4AndMa7,
+  weeksOffMa4Before,
   type SectorMa4Screen,
 } from "./screenerLogic.ts";
 import { raceDeadline, runDynamicPool } from "./pool.ts";
@@ -89,7 +90,7 @@ function hits(sectors: SectorMa4Screen[]) {
   return collectMa4StandHits(plusConcept(sectors));
 }
 
-const dw = { weekOnMa4: true, weekOnMa7: true, monthOnMa4: true, weekDays: 1 };
+const dw = { weekOnMa4: true, weekOnMa7: true, monthOnMa4: true, weekDays: 1, weekGap: 2, ma4OnMa7: true };
 const short = { code: "sh600001", name: "短站", days: 1, time: "2026-10-23", ...dw };
 const long = { code: "sh600002", name: "长站", days: 2, time: "2026-10-22", ...dw };
 const members = [
@@ -240,10 +241,12 @@ const weekMa4Needed = hits([
     name: "半导体",
     crosses: [
       { code: "sh600010", name: "只有日K", days: 1, time: "2026-10-23" },
-      { code: "sh600011", name: "缺周MA7", days: 1, time: "2026-10-23", weekOnMa4: true, monthOnMa4: true, weekDays: 1 },
+      { code: "sh600011", name: "缺周MA7", days: 1, time: "2026-10-23", ...dw, weekOnMa7: false },
       { code: "sh600012", name: "缺周K", days: 1, time: "2026-10-23", monthOnMa4: true },
       { code: "sh600013", name: "缺月K", days: 1, time: "2026-10-23", weekOnMa4: true, weekDays: 1 },
-      { code: "sh600014", name: "周已两周", days: 1, time: "2026-10-23", weekOnMa4: true, monthOnMa4: true, weekDays: 2 },
+      { code: "sh600014", name: "周已两周", days: 1, time: "2026-10-23", ...dw, weekDays: 2 },
+      { code: "sh600018", name: "周只空一周", days: 1, time: "2026-10-23", ...dw, weekGap: 1 },
+      { code: "sh600019", name: "MA4还在下", days: 1, time: "2026-10-23", ...dw, ma4OnMa7: false },
     ],
     members: [
       { code: "sh600010", name: "只有日K", price: 10, pct: 1, turnover: 1 },
@@ -251,10 +254,15 @@ const weekMa4Needed = hits([
       { code: "sh600012", name: "缺周K", price: 12, pct: 1, turnover: 1 },
       { code: "sh600013", name: "缺月K", price: 13, pct: 1, turnover: 1 },
       { code: "sh600014", name: "周已两周", price: 14, pct: 1, turnover: 1 },
+      { code: "sh600018", name: "周只空一周", price: 18, pct: 1, turnover: 1 },
+      { code: "sh600019", name: "MA4还在下", price: 19, pct: 1, turnover: 1 },
     ],
   }),
 ]);
-assert(weekMa4Needed.map((row) => row.name).join(",") === "缺周MA7", "weekly MA4 must be the first week on; monthly MA4 is required; weekly MA7 is not");
+assert(
+  weekMa4Needed.map((row) => row.name).join(",") === "缺周MA7",
+  "weekly MA4 must be the first week after two weeks off, MA4 above MA7, monthly MA4 on; weekly MA7 is not required",
+);
 
 const rankedDays = hits([
   screen({
@@ -313,7 +321,7 @@ const weekOnlyLonger = hits([
     code: "881121",
     name: "半导体",
     crosses: [
-      { code: "sh600036", name: "无周MA7短", days: 1, time: "2026-10-29", weekOnMa4: true, monthOnMa4: true, weekDays: 1 },
+      { code: "sh600036", name: "无周MA7短", days: 1, time: "2026-10-29", ...dw, weekOnMa7: false },
       { code: "sh600037", name: "日周都有", days: 9, time: "2026-10-13", ...dw },
     ],
     members: [
@@ -545,7 +553,7 @@ assert((weekMa7Decorated[0]?.holdDays ?? 0) >= 1, "decorate fills how long daily
 
 const firstWeekBars = tradingBars([
   ...Array.from({ length: 15 }, () => 10),
-  ...Array.from({ length: 5 }, () => 8),
+  ...Array.from({ length: 10 }, () => 8),
   ...Array.from({ length: 5 }, () => 12),
 ]);
 const firstWeekDecorated = decorateMa4Crosses(
@@ -553,8 +561,30 @@ const firstWeekDecorated = decorateMa4Crosses(
   [{ code: "sh600038", bars: firstWeekBars, price: 12 }],
 );
 assert(
-  firstWeekDecorated[0]?.weekOnMa4 === true && firstWeekDecorated[0]?.weekDays === 1,
-  "this week on MA4 and last week off is the first week standing",
+  firstWeekDecorated[0]?.weekOnMa4 === true &&
+    firstWeekDecorated[0]?.weekDays === 1 &&
+    (firstWeekDecorated[0]?.weekGap ?? 0) >= 2,
+  "this week on MA4 after two weeks off is a real first week",
+);
+
+const oneWeekWiggleBars = tradingBars([
+  ...Array.from({ length: 15 }, () => 10),
+  ...Array.from({ length: 5 }, () => 8),
+  ...Array.from({ length: 5 }, () => 12),
+]);
+const oneWeekWiggleDecorated = decorateMa4Crosses(
+  [{ code: "sh600042", name: "招商样", days: 1, time: oneWeekWiggleBars.at(-1)!.time }],
+  [{ code: "sh600042", bars: oneWeekWiggleBars, price: 12 }],
+);
+assert(
+  oneWeekWiggleDecorated[0]?.weekOnMa4 === true &&
+    oneWeekWiggleDecorated[0]?.weekDays === 1 &&
+    (oneWeekWiggleDecorated[0]?.weekGap ?? 0) === 1,
+  "a one-week dip then reclaim is not a two-week gap",
+);
+assert(
+  weeksOffMa4Before(dailyToWeekly(oneWeekWiggleBars).map((item) => item.close)) === 1,
+  "招商公路-style weekly tape only left MA4 for one week",
 );
 
 const monthDecorated = decorateMa4Crosses(
