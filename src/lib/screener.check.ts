@@ -89,7 +89,7 @@ function hits(sectors: SectorMa4Screen[]) {
   return collectMa4StandHits(plusConcept(sectors));
 }
 
-const dw = { weekOnMa4: true, weekOnMa7: true };
+const dw = { weekOnMa4: true, weekOnMa7: true, monthOnMa4: true };
 const short = { code: "sh600001", name: "短站", days: 1, time: "2026-10-23", ...dw };
 const long = { code: "sh600002", name: "长站", days: 2, time: "2026-10-22", ...dw };
 const members = [
@@ -240,17 +240,19 @@ const weekMa4Needed = hits([
     name: "半导体",
     crosses: [
       { code: "sh600010", name: "只有日K", days: 1, time: "2026-10-23" },
-      { code: "sh600011", name: "缺周MA7", days: 1, time: "2026-10-23", weekOnMa4: true },
+      { code: "sh600011", name: "缺周MA7", days: 1, time: "2026-10-23", weekOnMa4: true, monthOnMa4: true },
       { code: "sh600012", name: "缺周K", days: 1, time: "2026-10-23", monthOnMa4: true },
+      { code: "sh600013", name: "缺月K", days: 1, time: "2026-10-23", weekOnMa4: true },
     ],
     members: [
       { code: "sh600010", name: "只有日K", price: 10, pct: 1, turnover: 1 },
       { code: "sh600011", name: "缺周MA7", price: 11, pct: 1, turnover: 1 },
       { code: "sh600012", name: "缺周K", price: 12, pct: 1, turnover: 1 },
+      { code: "sh600013", name: "缺月K", price: 13, pct: 1, turnover: 1 },
     ],
   }),
 ]);
-assert(weekMa4Needed.map((row) => row.name).join(",") === "缺周MA7", "weekly MA4 is required; weekly MA7 and monthly stands are not");
+assert(weekMa4Needed.map((row) => row.name).join(",") === "缺周MA7", "weekly MA4 and monthly MA4 are required; weekly MA7 is not");
 
 const rankedDays = hits([
   screen({
@@ -309,7 +311,7 @@ const weekOnlyLonger = hits([
     code: "881121",
     name: "半导体",
     crosses: [
-      { code: "sh600036", name: "无周MA7短", days: 1, time: "2026-10-29", weekOnMa4: true },
+      { code: "sh600036", name: "无周MA7短", days: 1, time: "2026-10-29", weekOnMa4: true, monthOnMa4: true },
       { code: "sh600037", name: "日周都有", days: 9, time: "2026-10-13", ...dw },
     ],
     members: [
