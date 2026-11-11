@@ -42,7 +42,7 @@ export type SectorMa4Cross = {
   monthOnMa4?: boolean;
   /** 周 K 连续站上 MA4 的周数。选股只要首周（上一周未站上）。 */
   weekDays?: number;
-  /** 本周站上之前，连续没站上周线 MA4 的周数。选股要至少空两周，避免只掉一周又站回去。 */
+  /** 本周站上之前，连续没站上周线 MA4 的周数。 */
   weekGap?: number;
   /** 月 K 连续站上 MA4 的月数。 */
   monthDays?: number;
@@ -462,10 +462,6 @@ function withBoards(hit: Ma4StandHit, boards: ScreenerBoardRef[]): Ma4StandHit {
 
 /** 选股：日 K 同时站上 MA4 和 MA7 的持续天数上限（含当天）。 */
 export const SCREENER_MAX_STAND_DAYS = 2;
-/** 选股：周 K 站上 MA4 必须是首周，上一周还没站上。 */
-export const SCREENER_WEEK_MA4_DAYS = 1;
-/** 选股：首周之前至少连续空两周，避免只掉一周又站回去的缠绕。 */
-export const SCREENER_WEEK_OFF_BEFORE = 2;
 
 function standDuration(hit: { holdDays?: number; days: number }): number {
   return hit.holdDays || hit.days;
@@ -486,8 +482,8 @@ function betterHit(next: Ma4StandHit, prev: Ma4StandHit | undefined): boolean {
 }
 
 /**
- * 必须：个股日 K 站上 MA4 和 MA7，且 MA4 在 MA7 上方；周 K 首周站上 MA4，并且上一周和上上周都没站上；月 K 站上 MA4；持续不超过 2 日；所属行业和至少一个概念都要红框覆盖最新一根。
- * 只过行业或只过概念的不要。不看周 K MA7。按持续天数从短到长排。同一只股票只留一条。不含科创、创业、北交所、ST。
+ * 必须：个股日 K 站上 MA4 和 MA7，周 K 站上 MA4 和 MA7，持续不超过 2 日；所属行业和至少一个概念都要红框覆盖最新一根。
+ * 只过行业或只过概念的不要。按持续天数从短到长排。同一只股票只留一条。不含科创、创业、北交所、ST。
  */
 export function collectMa4StandHits(sectors: SectorMa4Screen[]): Ma4StandHit[] {
   const best = new Map<string, Ma4StandHit>();
@@ -504,7 +500,7 @@ export function collectMa4StandHits(sectors: SectorMa4Screen[]): Ma4StandHit[] {
       const weekOnMa7 = Boolean(cross.weekOnMa7);
       const monthOnMa4 = Boolean(cross.monthOnMa4);
       const weekDays = cross.weekDays ?? 0;
-      const weekGap = cross.weekGap ?? SCREENER_WEEK_OFF_BEFORE;
+      const weekGap = cross.weekGap ?? 0;
       const monthDays = cross.monthDays ?? 0;
       const ma4OnMa7 = cross.ma4OnMa7 !== false;
       const crossDays = ma4CrossUpMa7 ? Math.max(cross.crossDays ?? 1, 1) : 0;
@@ -552,11 +548,8 @@ export function collectMa4StandHits(sectors: SectorMa4Screen[]): Ma4StandHit[] {
     .filter((hit) => {
       const days = standDuration(hit);
       return (
-        hit.ma4OnMa7 &&
         hit.weekOnMa4 &&
-        hit.weekDays === SCREENER_WEEK_MA4_DAYS &&
-        hit.weekGap >= SCREENER_WEEK_OFF_BEFORE &&
-        hit.monthOnMa4 &&
+        hit.weekOnMa7 &&
         days >= 1 &&
         days <= SCREENER_MAX_STAND_DAYS
       );

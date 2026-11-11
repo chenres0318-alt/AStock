@@ -90,7 +90,7 @@ function hits(sectors: SectorMa4Screen[]) {
   return collectMa4StandHits(plusConcept(sectors));
 }
 
-const dw = { weekOnMa4: true, weekOnMa7: true, monthOnMa4: true, weekDays: 1, weekGap: 2, ma4OnMa7: true };
+const dw = { weekOnMa4: true, weekOnMa7: true };
 const short = { code: "sh600001", name: "短站", days: 1, time: "2026-10-23", ...dw };
 const long = { code: "sh600002", name: "长站", days: 2, time: "2026-10-22", ...dw };
 const members = [
@@ -243,7 +243,7 @@ const weekMa4Needed = hits([
       { code: "sh600010", name: "只有日K", days: 1, time: "2026-10-23" },
       { code: "sh600011", name: "缺周MA7", days: 1, time: "2026-10-23", ...dw, weekOnMa7: false },
       { code: "sh600012", name: "缺周K", days: 1, time: "2026-10-23", monthOnMa4: true },
-      { code: "sh600013", name: "缺月K", days: 1, time: "2026-10-23", weekOnMa4: true, weekDays: 1 },
+      { code: "sh600013", name: "缺月K", days: 1, time: "2026-10-23", ...dw, monthOnMa4: false },
       { code: "sh600014", name: "周已两周", days: 1, time: "2026-10-23", ...dw, weekDays: 2 },
       { code: "sh600018", name: "周只空一周", days: 1, time: "2026-10-23", ...dw, weekGap: 1 },
       { code: "sh600019", name: "MA4还在下", days: 1, time: "2026-10-23", ...dw, ma4OnMa7: false },
@@ -260,8 +260,8 @@ const weekMa4Needed = hits([
   }),
 ]);
 assert(
-  weekMa4Needed.map((row) => row.name).join(",") === "缺周MA7",
-  "weekly MA4 must be the first week after two weeks off, MA4 above MA7, monthly MA4 on; weekly MA7 is not required",
+  weekMa4Needed.map((row) => row.name).join(",") === "缺月K,周已两周,周只空一周,MA4还在下",
+  "daily plus weekly MA4 and MA7 are required; first-week, monthly MA4 and MA4 above MA7 are not",
 );
 
 const rankedDays = hits([
@@ -322,7 +322,7 @@ const weekOnlyLonger = hits([
     name: "半导体",
     crosses: [
       { code: "sh600036", name: "无周MA7短", days: 1, time: "2026-10-29", ...dw, weekOnMa7: false },
-      { code: "sh600037", name: "日周都有", days: 9, time: "2026-10-13", ...dw },
+      { code: "sh600037", name: "日周都有", days: 2, time: "2026-10-13", ...dw },
     ],
     members: [
       { code: "sh600036", name: "无周MA7短", price: 10, pct: 1, turnover: 1 },
@@ -330,7 +330,7 @@ const weekOnlyLonger = hits([
     ],
   }),
 ]);
-assert(weekOnlyLonger.map((row) => row.name).join(",") === "无周MA7短", "weekly MA7 is still not required; stands longer than 2 days are dropped");
+assert(weekOnlyLonger.map((row) => row.name).join(",") === "日周都有", "weekly MA7 is required; a 1-2 day daily stand still qualifies");
 
 const wave1 = collectMa4StandHits([
   screen({

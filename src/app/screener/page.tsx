@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "选股 · AStock 看盘",
-  description: "必须行业和概念都在红框，日K站上MA4和MA7且MA4在MA7上方，周K空两周后首周站上MA4、月K站上MA4，持续不超过2日",
+  description: "必须行业和概念都在红框，日K站上MA4和MA7、周K站上MA4和MA7，持续不超过2日",
 };
 
 export default function ScreenerPage() {

@@ -202,7 +202,7 @@ function weekStart(time: string): string {
   return date.toISOString().slice(0, 10);
 }
 
-/** 每个交易日：日/周/月均线是否站上。周、月线用截至当天的未完成 K 线。 */
+/** 每个交易日：日/周均线是否站上。周线用截至当天的未完成 K 线。 */
 export function maStandFlags(bars: KBar[]): MaStandFlags[] {
   const dayCloses = bars.map((bar) => bar.close);
   const weekCloses: number[] = [];
@@ -237,11 +237,19 @@ export function maStandFlags(bars: KBar[]): MaStandFlags[] {
 }
 
 function canStart(flags: MaStandFlags): boolean {
-  return flags.dayOnMa4 && flags.dayOnMa7 && flags.weekOnMa4 && flags.monthOnMa4;
+  return flags.dayOnMa4 && flags.dayOnMa7 && flags.weekOnMa4 && flags.weekOnMa7;
 }
 
 function bothDailyBroken(flags: MaStandFlags): boolean {
   return !flags.dayOnMa4 && !flags.dayOnMa7;
+}
+
+function bothWeeklyBroken(flags: MaStandFlags): boolean {
+  return !flags.weekOnMa4 && !flags.weekOnMa7;
+}
+
+function shouldEnd(flags: MaStandFlags): boolean {
+  return bothDailyBroken(flags) || bothWeeklyBroken(flags);
 }
 
 /** 最后一根是否还落在某段趋势区间里。收口的灰框不含跌破当天。 */
@@ -251,8 +259,8 @@ export function trendCoversLastBar(segments: SectorTrendSegment[], lastTime: str
 }
 
 /**
- * 指数日 K 站上 MA4 和 MA7、周 K 站上 MA4、月 K 站上 MA4，趋势开始。
- * 日 K 同时跌破 MA4 和 MA7，红色趋势结束，改成灰框，停在跌破前最后一根，再等下一次开始信号。不看周 K 的 MA7、月 K 的 MA7。
+ * 指数日 K 站上 MA4 和 MA7、周 K 站上 MA4 和 MA7，趋势开始。不看月 K。
+ * 日 K 同时跌破 MA4 和 MA7，或周 K 同时跌破 MA4 和 MA7，红色趋势结束，改成灰框，停在跌破前最后一根，再等下一次开始信号。
  */
 export function captureSectorTrends(bars: KBar[], members: SectorMemberPath[] = []): SectorTrendSegment[] {
   if (bars.length < 7) return [];
@@ -284,7 +292,7 @@ export function captureSectorTrends(bars: KBar[], members: SectorMemberPath[] = 
       if (canStart(flags[i])) start = i;
       continue;
     }
-    if (bothDailyBroken(flags[i])) {
+    if (shouldEnd(flags[i])) {
       push(start, i - 1, "closed");
       start = -1;
     }
@@ -294,7 +302,7 @@ export function captureSectorTrends(bars: KBar[], members: SectorMemberPath[] = 
 }
 
 /**
- * 指数自己能不能把红框留到最后一根。只看日 K 均线、周 K MA4 和月 K MA4，不扫成分股。
+ * 指数自己能不能把红框留到最后一根。只看日 K 和周 K 的 MA4、MA7，不扫成分股。
  */
 export function indexCouldBeOpen(bars: KBar[]): boolean {
   const last = bars.at(-1)?.time;
