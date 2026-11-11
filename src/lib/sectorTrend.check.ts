@@ -45,7 +45,7 @@ function tradingBars(closes: number[], start = "2024-01-02"): KBar[] {
   return bars;
 }
 
-/** 足够长的抬升，让日 K 能站上 MA4 和 MA7，周 K 能站上 MA4。 */
+/** 足够长的抬升，让日 K 能站上 MA4 和 MA7，周 K、月 K 能站上 MA4。 */
 function risingCloses(days = 520): number[] {
   return Array.from({ length: days }, (_, i) => Number((1000 + i * 1.2).toFixed(4)));
 }
@@ -62,15 +62,15 @@ function membersFollowing(bars: KBar[]): SectorMemberPath[] {
 
 const rising = tradingBars(risingCloses());
 const risingFlags = maStandFlags(rising);
-const firstStart = risingFlags.findIndex((row) => row.dayOnMa4 && row.dayOnMa7 && row.weekOnMa4);
-assert(firstStart >= 0, "a long rise eventually stands on daily MA4/MA7 and weekly MA4");
+const firstStart = risingFlags.findIndex((row) => row.dayOnMa4 && row.dayOnMa7 && row.weekOnMa4 && row.monthOnMa4);
+assert(firstStart >= 0, "a long rise eventually stands on daily MA4/MA7, weekly MA4 and monthly MA4");
 const risingTrends = captureSectorTrends(rising, membersFollowing(rising));
 assert(risingTrends.length === 1 && risingTrends[0].status === "open", "the MA alignment opens one red box");
-assert(risingTrends[0].start === rising[firstStart].time, "the box starts on the first day daily MA4/MA7 and weekly MA4 stand");
+assert(risingTrends[0].start === rising[firstStart].time, "the box starts on the first day daily MA4/MA7, weekly MA4 and monthly MA4 stand");
 assert(risingTrends[0].end === rising.at(-1)?.time, "the open box runs through the latest bar");
 assert(risingTrends[0].leaders[0]?.name === "龙头", "member breadth still names the leader inside the box");
 assert(indexCouldBeOpen(rising), "the rise still looks open on the index alone");
-assert(indexCouldBeOpen(rising.slice(-80)), "a short recent window still sees an open box");
+assert(indexCouldBeOpen(rising.slice(-120)), "a short recent window still sees an open box");
 assert(trendCoversLastBar(risingTrends, rising.at(-1)?.time), "an open box covers the latest bar");
 
 const noMembers = captureSectorTrends(rising, []);
@@ -118,9 +118,29 @@ assert(captureSectorTrends(threeWeeks).length === 0, "fewer than 4 weekly bars c
 assert(!indexCouldBeOpen(threeWeeks), "a 3-week rise cannot start the red box");
 
 const shortDaily = tradingBars(Array.from({ length: 25 }, (_, i) => 100 + i));
-const shortDailyTrends = captureSectorTrends(shortDaily);
-assert(shortDailyTrends.length === 1 && shortDailyTrends[0].status === "open", "daily MA4/MA7 plus weekly MA4 is enough to start");
-assert(indexCouldBeOpen(shortDaily), "a 25-day rise can be an open red box");
+assert(captureSectorTrends(shortDaily).length === 0, "daily MA4/MA7 plus weekly MA4 is not enough without monthly MA4");
+assert(!indexCouldBeOpen(shortDaily), "a 25-day rise cannot start the red box");
+
+const threeMonths = tradingBars(Array.from({ length: 62 }, (_, i) => 100 + i));
+assert(captureSectorTrends(threeMonths).length === 0, "fewer than 4 monthly bars cannot stand on monthly MA4");
+assert(!indexCouldBeOpen(threeMonths), "a 3-month rise cannot start the red box");
+
+const fourMonths = tradingBars(Array.from({ length: 90 }, (_, i) => 100 + i));
+const fourMonthFlags = maStandFlags(fourMonths);
+const fourMonthStart = fourMonthFlags.findIndex((row) => row.dayOnMa4 && row.dayOnMa7 && row.weekOnMa4 && row.monthOnMa4);
+assert(fourMonthStart >= 0, "four months of rising closes can stand on monthly MA4");
+const fourMonthTrends = captureSectorTrends(fourMonths);
+assert(fourMonthTrends.length === 1 && fourMonthTrends[0].status === "open", "daily MA4/MA7, weekly MA4 and monthly MA4 start the red box");
+assert(indexCouldBeOpen(fourMonths), "a 4-month rise can be an open red box");
+
+const reopenCloses = risingCloses(90);
+const reopenLast = reopenCloses[reopenCloses.length - 1]!;
+for (let i = 1; i <= 8; i += 1) reopenCloses.push(Number((reopenLast * (1 - 0.08 * i)).toFixed(4)));
+for (let i = 1; i <= 90; i += 1) reopenCloses.push(Number((reopenLast * 0.4 + i * 1.2).toFixed(4)));
+const reopened = tradingBars(reopenCloses);
+const reopenedTrends = captureSectorTrends(reopened);
+assert(reopenedTrends.some((row) => row.status === "closed"), "breaking both daily MAs still closes the first box");
+assert(reopenedTrends.some((row) => row.status === "open"), "after the gray box, the next daily/weekly/monthly stand opens a new red box");
 
 assert(isTonghuashunIndustry("881121") && !isTonghuashunConcept("881121"), "an industry code stays an industry");
 assert(isTonghuashunConcept("885457") && isTonghuashunConcept("886056"), "concept indexes use 885 and 886");

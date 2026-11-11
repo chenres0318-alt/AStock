@@ -29,6 +29,7 @@ export type MaStandFlags = {
   dayOnMa7: boolean;
   weekOnMa4: boolean;
   weekOnMa7: boolean;
+  monthOnMa4: boolean;
 };
 
 function closeOn(closes: Map<string, number>, times: string[], index: number): number | null {
@@ -201,11 +202,13 @@ function weekStart(time: string): string {
   return date.toISOString().slice(0, 10);
 }
 
-/** 每个交易日：日/周均线是否站上。周线用截至当天的未完成 K 线。 */
+/** 每个交易日：日/周/月均线是否站上。周、月线用截至当天的未完成 K 线。 */
 export function maStandFlags(bars: KBar[]): MaStandFlags[] {
   const dayCloses = bars.map((bar) => bar.close);
   const weekCloses: number[] = [];
+  const monthCloses: number[] = [];
   let weekKey = "";
+  let monthKey = "";
   return bars.map((bar, index) => {
     const week = weekStart(bar.time);
     if (week !== weekKey) {
@@ -214,18 +217,27 @@ export function maStandFlags(bars: KBar[]): MaStandFlags[] {
     } else {
       weekCloses[weekCloses.length - 1] = bar.close;
     }
+    const month = bar.time.slice(0, 7);
+    if (month !== monthKey) {
+      monthCloses.push(bar.close);
+      monthKey = month;
+    } else {
+      monthCloses[monthCloses.length - 1] = bar.close;
+    }
     const w = weekCloses.length - 1;
+    const m = monthCloses.length - 1;
     return {
       dayOnMa4: closeOnMa(dayCloses, 4, index),
       dayOnMa7: closeOnMa(dayCloses, 7, index),
       weekOnMa4: closeOnMa(weekCloses, 4, w),
       weekOnMa7: closeOnMa(weekCloses, 7, w),
+      monthOnMa4: closeOnMa(monthCloses, 4, m),
     };
   });
 }
 
 function canStart(flags: MaStandFlags): boolean {
-  return flags.dayOnMa4 && flags.dayOnMa7 && flags.weekOnMa4;
+  return flags.dayOnMa4 && flags.dayOnMa7 && flags.weekOnMa4 && flags.monthOnMa4;
 }
 
 function bothDailyBroken(flags: MaStandFlags): boolean {
@@ -239,8 +251,8 @@ export function trendCoversLastBar(segments: SectorTrendSegment[], lastTime: str
 }
 
 /**
- * 指数日 K 站上 MA4 和 MA7、周 K 站上 MA4，趋势开始。
- * 日 K 同时跌破 MA4 和 MA7，红色趋势结束，改成灰框，停在跌破前最后一根。不看周 K 的 MA7、月 K。
+ * 指数日 K 站上 MA4 和 MA7、周 K 站上 MA4、月 K 站上 MA4，趋势开始。
+ * 日 K 同时跌破 MA4 和 MA7，红色趋势结束，改成灰框，停在跌破前最后一根，再等下一次开始信号。不看周 K 的 MA7、月 K 的 MA7。
  */
 export function captureSectorTrends(bars: KBar[], members: SectorMemberPath[] = []): SectorTrendSegment[] {
   if (bars.length < 7) return [];
@@ -282,7 +294,7 @@ export function captureSectorTrends(bars: KBar[], members: SectorMemberPath[] = 
 }
 
 /**
- * 指数自己能不能把红框留到最后一根。只看日 K 均线和周 K MA4，不扫成分股。
+ * 指数自己能不能把红框留到最后一根。只看日 K 均线、周 K MA4 和月 K MA4，不扫成分股。
  */
 export function indexCouldBeOpen(bars: KBar[]): boolean {
   const last = bars.at(-1)?.time;

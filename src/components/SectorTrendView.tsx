@@ -216,7 +216,7 @@ export default function SectorTrendView() {
           <div>
             <div className="text-sm">近期趋势捕捉</div>
             <div className="mt-1 max-w-3xl text-xs leading-5 text-mute">
-              板块指数日 K 站上 MA4 和 MA7、周 K 站上 MA4，趋势开始，画出红框。日 K 同时跌破 MA4 和 MA7，红色趋势结束，改成灰框，停在跌破前最后一根。不看周 K 的 MA7、月 K。
+              板块指数日 K 站上 MA4 和 MA7、周 K 站上 MA4、月 K 站上 MA4，趋势开始，画出红框。日 K 同时跌破 MA4 和 MA7，红色趋势结束，改成灰框，停在跌破前最后一根，再等下一次开始信号。不看周 K 的 MA7、月 K 的 MA7。
             </div>
           </div>
           <BoardPicker
