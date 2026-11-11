@@ -104,6 +104,19 @@ function maAt(values: number[], period: number, index: number): number | null {
   return sum / period;
 }
 
+function priceOnMa(spot: number, ma: number | null): boolean {
+  if (ma == null || !(ma > 0) || !Number.isFinite(spot) || !(spot > 0)) return false;
+  return Math.round(spot * 100) >= Math.round(ma * 100);
+}
+
+/** 现价明显高于前复权收盘时，多半是未复权行情，不能叠到均线上。 */
+function alignedLivePrice(price: number | null | undefined, lastClose: number): number | null {
+  if (price == null || !(price > 0)) return null;
+  if (!(lastClose > 0)) return price;
+  if (price > lastClose * 1.25) return null;
+  return price;
+}
+
 function stockId(code: string): string {
   return code.replace(/^[a-z]+/i, "").replace(/\D/g, "").slice(-6);
 }
@@ -173,8 +186,7 @@ export function dailyToMonthly(bars: KBar[]): KBar[] {
 }
 
 function closeOnMa(closes: number[], period: number, index: number, spot = closes[index]): boolean {
-  const ma = maAt(closes, period, index);
-  return ma != null && ma > 0 && spot >= ma;
+  return priceOnMa(spot, maAt(closes, period, index));
 }
 
 function closeOnMa4(closes: number[], index: number, spot = closes[index]): boolean {
@@ -185,7 +197,7 @@ function consecutiveOnPeriods(closes: number[], periods: number[], spot?: number
   const minIndex = Math.max(...periods) - 1;
   if (closes.length <= minIndex) return 0;
   const last = closes.length - 1;
-  const lastSpot = spot != null && spot > 0 ? spot : closes[last];
+  const lastSpot = alignedLivePrice(spot, closes[last]) ?? closes[last];
   const onAll = (index: number, price = closes[index]) =>
     periods.every((period) => closeOnMa(closes, period, index, price));
   if (!onAll(last, lastSpot)) return 0;

@@ -10,7 +10,7 @@
     "lint": "eslint",
     "check:indicators": "node --experimental-strip-types --no-warnings src/lib/indicators.check.ts",
     "check:extremes": "node --experimental-strip-types --no-warnings src/lib/intradayExtreme.check.ts",
-    "check:trend": "node --experimental-strip-types --no-warnings src/lib/sectorTrend.check.ts && node --experimental-strip-types --no-warnings src/lib/boardLive.check.ts && node --experimental-strip-types --no-warnings src/lib/cache.check.ts",
+    "check:trend": "node --experimental-strip-types --no-warnings src/lib/sectorTrend.check.ts && node --experimental-strip-types --no-warnings src/lib/boardLive.check.ts && node --experimental-strip-types --no-warnings src/lib/cache.check.ts && node --experimental-strip-types --no-warnings src/lib/thsRealtime.check.ts",
     "check:screener": "node --experimental-strip-types --no-warnings src/lib/screener.check.ts",
     "check:holdings": "node --experimental-strip-types --no-warnings src/lib/holdingAdvice.check.ts && node --experimental-strip-types --no-warnings src/lib/thsSwIndustry.check.ts",
     "check:board-extras": "node --experimental-strip-types --no-warnings src/lib/boardExtras.check.ts",

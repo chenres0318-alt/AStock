@@ -451,6 +451,33 @@ assert(consecutiveOnMa4([10, 11, 12, 13]) === 1, "four rising closes are the fir
 assert(consecutiveOnMa4AndMa7([10, 11, 12, 13, 14, 15, 16]) === 1, "seven rising closes are the first bar that can stand on MA4 and MA7");
 assert(consecutiveOnMa4AndMa7(Array.from({ length: 10 }, () => 12)) === 4, "a flat tape stands on both MAs from the seventh bar onward");
 assert(consecutiveOnMa4AndMa7([10, 11, 12, 13, 14, 15, 9]) === 0, "a last close under MA7 is not standing on both");
+function fenTouchCloses(price: number): number[] {
+  const lead = Array.from({ length: 6 }, () => Math.round((price - 0.5) * 100) / 100);
+  const bump = Math.round((price + 0.01) * 100) / 100;
+  return [...lead, price, price, bump, price];
+}
+
+for (const price of [2.44, 5.81, 9.82, 10.21, 18.29]) {
+  const closes = fenTouchCloses(price);
+  assert(
+    consecutiveOnMa4AndMa7(closes) === 4,
+    `a fen-touch under MA4 at ${price} still counts as standing for any stock`,
+  );
+  assert(
+    consecutiveOnMa4AndMa7(closes, price * 1.8) === 4,
+    `an unadjusted live quote far above ${price} is ignored`,
+  );
+}
+
+const batianCloses = [10.21, 9.46, 9.57, 9.37, 9.48, 9.53, 9.56, 9.72, 9.82, 9.85, 9.8, 9.82, 10.21];
+assert(
+  consecutiveOnMa4AndMa7(batianCloses) === 6,
+  "a 0.0025 miss under MA4 still counts as standing, so a 芭田-style tape is six days not one",
+);
+assert(
+  consecutiveOnMa4AndMa7([...fenTouchCloses(9.82).slice(0, -1), 9.81]) === 0,
+  "a full fen under MA4 still breaks the stand",
+);
 
 const crossCloses = [10, 10, 10, 10, 10, 10, 10, 14];
 assert(ma4CrossedUpMa7(crossCloses), "a jump that lifts MA4 through MA7 is a golden cross");
