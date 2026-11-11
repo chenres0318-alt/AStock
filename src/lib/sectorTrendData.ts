@@ -111,7 +111,7 @@ function toMemberPaths(series: Array<{ code: string; name: string; bars: KBar[] 
   });
 }
 
-/** 月K MA4 大约要 4 个月日线；多留一些以便红框从更早的起点走到现在。 */
+/** 周K MA7 大约要 7 周日线；多留一些以便红框从更早的起点走到现在。 */
 const TREND_BARS = 700;
 /** 红框是否还开着只看最近一段，不必把多年日线都拉一遍。 */
 const LIVE_BARS = 120;
@@ -336,7 +336,7 @@ async function scanOpenTrend(
 
 /**
  * 最新一根还落在趋势区间里的板块代码。
- * 下拉标红只看指数日/周/月均线能不能把红框留到最后一根，避免对全市场成分股再扫一遍把当前板块拖死。
+ * 下拉标红只看指数日/周均线能不能把红框留到最后一根，避免对全市场成分股再扫一遍把当前板块拖死。
  * 选股扫行业和概念。板块页一进就扫指数红框给下拉标红，不等点进某个板块；点进去后仍用成分股补龙头名单。
  */
 export async function listBoardsInTrend(
