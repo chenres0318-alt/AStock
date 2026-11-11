@@ -434,10 +434,12 @@ function withBoards(hit: Ma4StandHit, boards: ScreenerBoardRef[]): Ma4StandHit {
   return { ...hit, boards: ordered, sector: primary.name, sectorCode: primary.code };
 }
 
-/** 选股：日 K 同时站上 MA4 和 MA7 的持续天数上限（含当天）。 */
-export const SCREENER_MAX_STAND_DAYS = 2;
+/** 选股：MA4 上叉 MA7 必须是当天首次，昨天还没上叉。 */
+export const SCREENER_CROSS_DAYS = 1;
 /** 选股：周 K 站上 MA4 必须是首周，上一周还没站上。 */
 export const SCREENER_WEEK_MA4_DAYS = 1;
+/** 选股：月 K 站上 MA4 必须是首月，上个月还没站上。 */
+export const SCREENER_MONTH_MA4_DAYS = 1;
 
 function standDuration(hit: { holdDays?: number; days: number }): number {
   return hit.holdDays || hit.days;
@@ -458,8 +460,8 @@ function betterHit(next: Ma4StandHit, prev: Ma4StandHit | undefined): boolean {
 }
 
 /**
- * 必须：个股日 K 站上 MA4 和 MA7，周 K 首周站上 MA4（上一周未站上），月 K 站上 MA4，持续不超过 2 日；所属行业和至少一个概念都要红框覆盖最新一根。
- * 只过行业或只过概念的不要。不看周 K MA7。按持续天数从短到长排。同一只股票只留一条。不含科创、创业、北交所、ST。
+ * 必须：个股日 K 站上 MA4 和 MA7，MA4 当天首次上叉 MA7（昨天未上叉），周 K 首周站上 MA4（上一周未站上），月 K 首月站上 MA4（上个月未站上）；所属行业和至少一个概念都要红框覆盖最新一根。
+ * 只过行业或只过概念的不要。不看周 K MA7。按日 K 连续站上天数从短到长排。同一只股票只留一条。不含科创、创业、北交所、ST。
  */
 export function collectMa4StandHits(sectors: SectorMa4Screen[]): Ma4StandHit[] {
   const best = new Map<string, Ma4StandHit>();
@@ -477,7 +479,7 @@ export function collectMa4StandHits(sectors: SectorMa4Screen[]): Ma4StandHit[] {
       const monthOnMa4 = Boolean(cross.monthOnMa4);
       const weekDays = cross.weekDays ?? 0;
       const monthDays = cross.monthDays ?? 0;
-      const crossDays = ma4CrossUpMa7 ? Math.max(cross.crossDays ?? 1, 1) : 0;
+      const crossDays = ma4CrossUpMa7 ? (cross.crossDays ?? 0) : 0;
       const hit = withBoards(
         {
           code: cross.code,
@@ -520,11 +522,13 @@ export function collectMa4StandHits(sectors: SectorMa4Screen[]): Ma4StandHit[] {
     .filter((hit) => {
       const days = standDuration(hit);
       return (
+        hit.ma4CrossUpMa7 &&
+        hit.crossDays === SCREENER_CROSS_DAYS &&
         hit.weekOnMa4 &&
         hit.weekDays === SCREENER_WEEK_MA4_DAYS &&
         hit.monthOnMa4 &&
-        days >= 1 &&
-        days <= SCREENER_MAX_STAND_DAYS
+        hit.monthDays === SCREENER_MONTH_MA4_DAYS &&
+        days >= 1
       );
     })
     .sort((a, b) => {
