@@ -19,7 +19,7 @@ export default function StockWatchPane({
 }: {
   code: string | null;
   auto: boolean;
-  hint?: { label: string; hold: boolean; detail?: string } | null;
+  hint?: { label: string; hold: boolean; rows?: Array<{ label: string; on: boolean }>; detail?: string } | null;
 }) {
   const [mode, setMode] = useState<ChartMode>("trend");
   const [quote, setQuote] = useState<Quote | undefined>();

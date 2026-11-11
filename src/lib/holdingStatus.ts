@@ -2,7 +2,7 @@ import { forcedBoardForStock } from "./boardExtras";
 import { listAllIndustryBoards } from "./boards";
 import { cached } from "./cache";
 import { bareCode, isEtf, toTencentCode } from "./codes";
-import { adviseHolding, closeLowerThanPrev, closeStandsOnMa4, consecutiveMa4Days, sectorHasOpenRedBox } from "./holdingAdvice";
+import { adviseHolding, closeHigherThanPrev, closeLowerThanPrev, closeStandsOnMa4, consecutiveMa4Days, sectorHasOpenRedBox } from "./holdingAdvice";
 import { getKline } from "./market";
 import { mapPool } from "./pool";
 import { getSectorTrend, listBoardsInTrend, type SectorTrendReport } from "./sectorTrendData";
@@ -107,6 +107,7 @@ export async function evaluateHoldings(items: HoldingItem[]): Promise<HoldingSta
       standDays,
       stockCloseDown: closeLowerThanPrev(bars),
       sectorCloseDown: report ? closeLowerThanPrev(report.bars) : false,
+      stockAbovePrev: closeHigherThanPrev(bars),
       conceptInRedBox: concepts.some((board) => conceptRed.has(board.code)),
     });
     return {
