@@ -36,3 +36,55 @@ export function withToday(bars: KBar[], today: KBar | null): KBar[] {
   if (sameOhlc(today, last)) return bars;
   return [...bars, today];
 }
+
+export function shanghaiToday(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+/** 现价明显高于前复权收盘时，多半是未复权行情，不能叠到均线上。 */
+export function alignedLivePrice(
+  price: number | null | undefined,
+  lastClose: number | null | undefined,
+): number | null {
+  if (price == null || !(price > 0)) return null;
+  if (lastClose == null || !(lastClose > 0)) return price;
+  if (price > lastClose * 1.25) return null;
+  return price;
+}
+
+/** 把成分股现价接到日 K：同一天替换收盘，新的交易日补一根。周末不补。 */
+export function withLiveClose(
+  bars: KBar[],
+  price: number | null | undefined,
+  today?: string | null,
+): KBar[] {
+  if (!bars.length) return bars;
+  const last = bars[bars.length - 1];
+  const spot = alignedLivePrice(price, last.close);
+  if (spot == null) return bars;
+  const session = today && !isShanghaiWeekend(today) ? today : last.time;
+  if (session < last.time) return bars;
+  const live: KBar =
+    session === last.time
+      ? {
+          ...last,
+          close: spot,
+          high: Math.max(last.high, spot),
+          low: Math.min(last.low, spot),
+        }
+      : {
+          time: session,
+          open: last.close,
+          high: Math.max(last.close, spot),
+          low: Math.min(last.close, spot),
+          close: spot,
+          volume: 0,
+          turnover: null,
+        };
+  return withToday(bars, live);
+}

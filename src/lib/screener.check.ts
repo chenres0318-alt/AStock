@@ -451,6 +451,15 @@ assert(consecutiveOnMa4([10, 11, 12, 13]) === 1, "four rising closes are the fir
 assert(consecutiveOnMa4AndMa7([10, 11, 12, 13, 14, 15, 16]) === 1, "seven rising closes are the first bar that can stand on MA4 and MA7");
 assert(consecutiveOnMa4AndMa7(Array.from({ length: 10 }, () => 12)) === 4, "a flat tape stands on both MAs from the seventh bar onward");
 assert(consecutiveOnMa4AndMa7([10, 11, 12, 13, 14, 15, 9]) === 0, "a last close under MA7 is not standing on both");
+const batianCloses = [10.21, 9.46, 9.57, 9.37, 9.48, 9.53, 9.56, 9.72, 9.82, 9.85, 9.8, 9.82, 10.21];
+assert(
+  consecutiveOnMa4AndMa7(batianCloses) === 6,
+  "a 0.0025 miss under MA4 still counts as standing, so 芭田-style tape is six days not one",
+);
+assert(
+  consecutiveOnMa4AndMa7(batianCloses, 18.23) === 6,
+  "an unadjusted live quote far above the qfq last close is ignored",
+);
 
 const crossCloses = [10, 10, 10, 10, 10, 10, 10, 14];
 assert(ma4CrossedUpMa7(crossCloses), "a jump that lifts MA4 through MA7 is a golden cross");

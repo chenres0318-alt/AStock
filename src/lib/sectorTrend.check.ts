@@ -202,6 +202,13 @@ assert(
   "a last close under MA7 is not a daily MA4+MA7 stand",
 );
 
+const batianBars = datedBars([10.21, 9.46, 9.57, 9.37, 9.48, 9.53, 9.56, 9.72, 9.82, 9.85, 9.8, 9.82, 10.21]);
+const batianHits = listMa4Ma7StandStocks(
+  { start: batianBars[0].time, end: batianBars[batianBars.length - 1].time },
+  [{ code: "sz002170", name: "芭田股份", bars: batianBars }],
+);
+assert(batianHits[0]?.days === 6, "a fen-touch under MA4 does not reset 芭田-style tape to one day");
+
 console.log("sectorTrend.check ok", {
   start: risingTrends[0].start,
   closedEnd: crashedTrends[0].end,

@@ -103,6 +103,18 @@ function maAt(values: number[], period: number, index: number): number | null {
   return sum / period;
 }
 
+function priceOnMa(spot: number, ma: number | null): boolean {
+  if (ma == null || !(ma > 0) || !Number.isFinite(spot) || !(spot > 0)) return false;
+  return Math.round(spot * 100) >= Math.round(ma * 100);
+}
+
+function alignedLivePrice(price: number | null | undefined, lastClose: number): number | null {
+  if (price == null || !(price > 0)) return null;
+  if (!(lastClose > 0)) return price;
+  if (price > lastClose * 1.25) return null;
+  return price;
+}
+
 function closeOnMa(closes: number[], period: number, index: number, spot = closes[index]): boolean {
   const ma = maAt(closes, period, index);
   return ma != null && ma > 0 && spot >= ma;
@@ -137,9 +149,9 @@ function listStandStocks(
       if (time >= segment.start && time <= segment.end) last = i;
     }
     if (last < minIndex) continue;
-    const spot = stock.price != null && stock.price > 0 ? stock.price : closes[last];
+    const spot = alignedLivePrice(stock.price, closes[last]) ?? closes[last];
     const onAll = (index: number, price = closes[index]) =>
-      periods.every((period) => closeOnMa(closes, period, index, price));
+      periods.every((period) => priceOnMa(price, maAt(closes, period, index)));
     if (!onAll(last, spot)) continue;
     let from = last;
     for (let i = last - 1; i >= minIndex; i -= 1) {

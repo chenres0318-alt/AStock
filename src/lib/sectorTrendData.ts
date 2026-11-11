@@ -15,6 +15,7 @@ import {
   type SectorTrendSegment,
 } from "./sectorTrend";
 import { decorateMa4Crosses, type SectorMa4Member, type SectorMa4Screen } from "./screenerLogic";
+import { alignedLivePrice, shanghaiToday, withLiveClose } from "./thsRealtime";
 import { fetchTonghuashunSeries } from "./sources/tonghuashun";
 import { fetchTencentKline } from "./sources/tencent";
 import { SCREENER_BOARD_MEMBER_LIMIT, TREND_BOARD_MEMBER_LIMIT } from "./thsMemberPages";
@@ -57,11 +58,18 @@ async function memberSeries(
 ): Promise<Array<{ code: string; name: string; bars: KBar[]; price: number | null }>> {
   const rows = await mapPool(members, concurrency, async (member) => {
     try {
-      const bars = await cached(`trend-member:${member.code}:${count}`, 10 * 60_000, () =>
+      const history = await cached(`trend-member:${member.code}:${count}`, 10 * 60_000, () =>
         fetchTencentKline(member.code, "day", count),
       );
-      if (!bars.length) return null;
-      return { code: member.code, name: member.name, bars, price: member.price };
+      if (!history.length) return null;
+      const bars = withLiveClose(history, member.price, shanghaiToday());
+      const lastClose = bars.at(-1)?.close ?? null;
+      return {
+        code: member.code,
+        name: member.name,
+        bars,
+        price: alignedLivePrice(member.price, lastClose) ?? lastClose,
+      };
     } catch {
       return null;
     }
@@ -77,17 +85,20 @@ function fillMemberQuotes(
 ): BoardMember[] {
   const byId = new Map(stocks.map((stock) => [bareCode(stock.code), stock]));
   return members.map((item) => {
-    if (item.price != null && item.pct != null) return item;
     const series = byId.get(bareCode(item.code));
-    if (!series) return item;
-    const last = series.bars.at(-1);
-    const prev = series.bars.at(-2);
+    const last = series?.bars.at(-1);
+    const prev = series?.bars.at(-2);
+    const lastClose = last?.close ?? series?.price ?? null;
+    const price = alignedLivePrice(item.price, lastClose) ?? lastClose ?? item.price;
+    const keepRosterPct = item.pct != null && alignedLivePrice(item.price, lastClose) != null;
     return {
       ...item,
-      price: item.price ?? series.price ?? last?.close ?? null,
-      pct:
-        item.pct ??
-        (last && prev && prev.close > 0 ? (last.close / prev.close - 1) * 100 : null),
+      price,
+      pct: keepRosterPct
+        ? item.pct
+        : last && prev && prev.close > 0
+          ? (last.close / prev.close - 1) * 100
+          : item.pct,
     };
   });
 }
