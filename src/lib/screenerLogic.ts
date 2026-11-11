@@ -42,8 +42,12 @@ export type SectorMa4Cross = {
   monthOnMa4?: boolean;
   /** 周 K 连续站上 MA4 的周数。选股只要首周（上一周未站上）。 */
   weekDays?: number;
+  /** 本周站上之前，连续没站上周线 MA4 的周数。选股要至少空两周，避免只掉一周又站回去。 */
+  weekGap?: number;
   /** 月 K 连续站上 MA4 的月数。 */
   monthDays?: number;
+  /** 最新一根日线 MA4 在 MA7 上方。 */
+  ma4OnMa7?: boolean;
   /** MA4 上叉 MA7 已持续的交易日数；未上叉为 0。 */
   crossDays?: number;
   /** 当前这些条件同时成立的交易日数。 */
@@ -90,7 +94,10 @@ export type Ma4StandHit = {
   weekOnMa7: boolean;
   monthOnMa4: boolean;
   weekDays: number;
+  weekGap: number;
   monthDays: number;
+  /** 最新一根日线 MA4 在 MA7 上方。 */
+  ma4OnMa7: boolean;
   /** MA4 上叉 MA7 已持续的交易日数；未上叉为 0。 */
   crossDays: number;
   /** 右侧这些条件同时成立的交易日数。 */
@@ -257,6 +264,19 @@ export function consecutiveMa4AboveMa7(closes: number[]): number {
   return n;
 }
 
+/** 本周收盘站上周线 MA4 之前，连续没站上的周数。还没有 MA4 的周不算空。 */
+export function weeksOffMa4Before(closes: number[]): number {
+  if (closes.length < 4) return 0;
+  const last = closes.length - 1;
+  if (!closeOnMa4(closes, last)) return 0;
+  let n = 0;
+  for (let i = last - 1; i >= 3; i -= 1) {
+    if (closeOnMa4(closes, i)) break;
+    n += 1;
+  }
+  return n;
+}
+
 /**
  * 当前这些条件同时成立的交易日数：取日 K / 周 K（可选月 K、上叉）里最晚开始的那段。
  * 没有日线时按各周期根数近似。
@@ -343,17 +363,21 @@ export function decorateMa4Crosses(
         weekOnMa7: false,
         monthOnMa4: false,
         weekDays: 0,
+        weekGap: 0,
         monthDays: 0,
+        ma4OnMa7: false,
         crossDays: 0,
         holdDays: cross.days,
       };
     }
     const closes = stock.bars.map((bar) => bar.close);
-    const weekMa4 = periodStand(dailyToWeekly(stock.bars), stock.price);
-    const week = periodStand(dailyToWeekly(stock.bars), stock.price, [4, 7]);
+    const weekBars = dailyToWeekly(stock.bars);
+    const weekMa4 = periodStand(weekBars, stock.price);
+    const week = periodStand(weekBars, stock.price, [4, 7]);
     const month = periodStand(dailyToMonthly(stock.bars), stock.price);
+    const weekCloses = weekBars.map((bar) => bar.close);
     const crossed = ma4CrossedUpMa7(closes);
-    const crossDays = crossed ? consecutiveMa4AboveMa7(closes) : 0;
+    const crossDays = consecutiveMa4AboveMa7(closes);
     const dailyDays = consecutiveOnMa4AndMa7(closes, stock.price) || cross.days;
     const dailySince =
       dailyDays && stock.bars.length >= dailyDays ? stock.bars[stock.bars.length - dailyDays]?.time : cross.time;
@@ -363,10 +387,12 @@ export function decorateMa4Crosses(
       days: dailyDays,
       time: dailySince || cross.time,
       ma4CrossUpMa7: crossed,
+      ma4OnMa7: ma4AboveMa7(closes, closes.length - 1),
       weekOnMa4: weekMa4.on,
       weekOnMa7: week.on,
       monthOnMa4: month.on,
       weekDays: weekMa4.days,
+      weekGap: weeksOffMa4Before(weekCloses),
       monthDays: month.days,
       crossDays,
       holdDays: conditionHoldDays({
@@ -438,6 +464,8 @@ function withBoards(hit: Ma4StandHit, boards: ScreenerBoardRef[]): Ma4StandHit {
 export const SCREENER_MAX_STAND_DAYS = 2;
 /** 选股：周 K 站上 MA4 必须是首周，上一周还没站上。 */
 export const SCREENER_WEEK_MA4_DAYS = 1;
+/** 选股：首周之前至少连续空两周，避免只掉一周又站回去的缠绕。 */
+export const SCREENER_WEEK_OFF_BEFORE = 2;
 
 function standDuration(hit: { holdDays?: number; days: number }): number {
   return hit.holdDays || hit.days;
@@ -458,7 +486,7 @@ function betterHit(next: Ma4StandHit, prev: Ma4StandHit | undefined): boolean {
 }
 
 /**
- * 必须：个股日 K 站上 MA4 和 MA7，周 K 首周站上 MA4（上一周未站上），月 K 站上 MA4，持续不超过 2 日；所属行业和至少一个概念都要红框覆盖最新一根。
+ * 必须：个股日 K 站上 MA4 和 MA7，且 MA4 在 MA7 上方；周 K 首周站上 MA4，并且上一周和上上周都没站上；月 K 站上 MA4；持续不超过 2 日；所属行业和至少一个概念都要红框覆盖最新一根。
  * 只过行业或只过概念的不要。不看周 K MA7。按持续天数从短到长排。同一只股票只留一条。不含科创、创业、北交所、ST。
  */
 export function collectMa4StandHits(sectors: SectorMa4Screen[]): Ma4StandHit[] {
@@ -476,7 +504,9 @@ export function collectMa4StandHits(sectors: SectorMa4Screen[]): Ma4StandHit[] {
       const weekOnMa7 = Boolean(cross.weekOnMa7);
       const monthOnMa4 = Boolean(cross.monthOnMa4);
       const weekDays = cross.weekDays ?? 0;
+      const weekGap = cross.weekGap ?? SCREENER_WEEK_OFF_BEFORE;
       const monthDays = cross.monthDays ?? 0;
+      const ma4OnMa7 = cross.ma4OnMa7 !== false;
       const crossDays = ma4CrossUpMa7 ? Math.max(cross.crossDays ?? 1, 1) : 0;
       const hit = withBoards(
         {
@@ -495,7 +525,9 @@ export function collectMa4StandHits(sectors: SectorMa4Screen[]): Ma4StandHit[] {
           weekOnMa7,
           monthOnMa4,
           weekDays,
+          weekGap,
           monthDays,
+          ma4OnMa7,
           crossDays,
           holdDays:
             cross.holdDays ??
@@ -520,8 +552,10 @@ export function collectMa4StandHits(sectors: SectorMa4Screen[]): Ma4StandHit[] {
     .filter((hit) => {
       const days = standDuration(hit);
       return (
+        hit.ma4OnMa7 &&
         hit.weekOnMa4 &&
         hit.weekDays === SCREENER_WEEK_MA4_DAYS &&
+        hit.weekGap >= SCREENER_WEEK_OFF_BEFORE &&
         hit.monthOnMa4 &&
         days >= 1 &&
         days <= SCREENER_MAX_STAND_DAYS
