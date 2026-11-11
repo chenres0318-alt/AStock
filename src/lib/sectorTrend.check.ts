@@ -202,12 +202,35 @@ assert(
   "a last close under MA7 is not a daily MA4+MA7 stand",
 );
 
+function fenTouchCloses(price: number): number[] {
+  const lead = Array.from({ length: 6 }, () => Math.round((price - 0.5) * 100) / 100);
+  const bump = Math.round((price + 0.01) * 100) / 100;
+  return [...lead, price, price, bump, price];
+}
+
+const fenTouchPool = [
+  { code: "sz002239", name: "两元样", price: 2.44 },
+  { code: "sh603839", name: "五元样", price: 5.81 },
+  { code: "sz002136", name: "十元样", price: 10.21 },
+  { code: "sh603638", name: "十八元样", price: 18.29 },
+].map((item) => ({
+  ...item,
+  bars: datedBars(fenTouchCloses(item.price)),
+}));
+const fenWindow = { start: fenTouchPool[0].bars[0].time, end: fenTouchPool[0].bars.at(-1)!.time };
+const fenHits = listMa4Ma7StandStocks(fenWindow, fenTouchPool);
+assert(fenHits.length === 4, "every board name with a fen-touch still stands on MA4 and MA7");
+assert(
+  fenHits.every((row) => row.days === 4),
+  "a fen-touch under MA4 does not reset any stock to one day",
+);
+
 const batianBars = datedBars([10.21, 9.46, 9.57, 9.37, 9.48, 9.53, 9.56, 9.72, 9.82, 9.85, 9.8, 9.82, 10.21]);
 const batianHits = listMa4Ma7StandStocks(
   { start: batianBars[0].time, end: batianBars[batianBars.length - 1].time },
   [{ code: "sz002170", name: "芭田股份", bars: batianBars }],
 );
-assert(batianHits[0]?.days === 6, "a fen-touch under MA4 does not reset 芭田-style tape to one day");
+assert(batianHits[0]?.days === 6, "a 0.0025 miss under MA4 does not reset a 芭田-style tape to one day");
 
 console.log("sectorTrend.check ok", {
   start: risingTrends[0].start,

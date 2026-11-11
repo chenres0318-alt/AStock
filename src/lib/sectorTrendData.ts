@@ -210,9 +210,22 @@ export async function loadBoardMa4Roster(code: string): Promise<SectorMa4Screen 
   };
 }
 
+function prepareScreenerStocks(stocks: MemberKline[]): MemberKline[] {
+  const asOf = shanghaiToday();
+  return stocks.map((stock) => {
+    const bars = withLiveClose(stock.bars, stock.price, asOf);
+    const lastClose = bars.at(-1)?.close ?? null;
+    return {
+      ...stock,
+      bars,
+      price: alignedLivePrice(stock.price, lastClose) ?? lastClose,
+    };
+  });
+}
+
 export function applyMa4Crosses(screen: SectorMa4Screen, stocks: MemberKline[]): SectorMa4Screen {
   const memberIds = new Set(screen.members.map((item) => bareCode(item.code)));
-  const inBoard = stocks.filter((stock) => memberIds.has(bareCode(stock.code)));
+  const inBoard = prepareScreenerStocks(stocks.filter((stock) => memberIds.has(bareCode(stock.code))));
   if (!screen.openTrend || !inBoard.length) return { ...screen, crosses: [] };
   const eligible = inBoard.filter((stock) => !isGrowthBoardShare(stock.code) && !isStName(stock.name));
   const crosses = decorateMa4Crosses(listMa4Ma7StandStocks(screen.openTrend, eligible), inBoard);
