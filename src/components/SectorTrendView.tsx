@@ -11,8 +11,7 @@ import {
   type ISeriesApi,
   type Time,
 } from "lightweight-charts";
-import { applyBoardLive, ingestLiveScan, mergeLiveCodes, readStoredLiveCodes, writeStoredLiveCodes } from "@/lib/boardLive";
-import { indexCouldBeOpen } from "@/lib/sectorTrend";
+import { ingestLiveScan, mergeLiveCodes, readStoredLiveCodes, writeStoredLiveCodes } from "@/lib/boardLive";
 import { displaySymbol, isTonghuashunBoard, isTonghuashunConcept, priceDigits, toTencentCode } from "@/lib/codes";
 import { formatPct, formatPrice, toneClass } from "@/lib/format";
 import type { KBar, SectorItem } from "@/lib/types";
@@ -70,7 +69,6 @@ export default function SectorTrendView() {
   const [industryLiveReady, setIndustryLiveReady] = useState(false);
   const [conceptLiveReady, setConceptLiveReady] = useState(false);
   const [conceptCatalogReady, setConceptCatalogReady] = useState(false);
-  const settledBoards = useRef(new Set<string>());
   const codeRef = useRef(code);
   codeRef.current = code;
 
@@ -132,14 +130,6 @@ export default function SectorTrendView() {
   }, [liveCodes, liveHydrated]);
 
   useEffect(() => {
-    if (!report) return;
-    const live = indexCouldBeOpen(report.bars);
-    settledBoards.current.add(report.board.code);
-    setLiveCodes((prev) => applyBoardLive(prev, report.board.code, live));
-    setOffMa4Codes((prev) => applyBoardLive(prev, report.board.code, live && report.onMa4 === false));
-  }, [report]);
-
-  useEffect(() => {
     if (!isTonghuashunBoard(code)) return;
     let cancelled = false;
     setLoading(true);
@@ -177,9 +167,8 @@ export default function SectorTrendView() {
       const incoming = data.codes ?? [];
       if (!incoming.length) return;
       const incomingOff = data.offMa4 ?? [];
-      const settled = settledBoards.current;
-      setLiveCodes((prev) => ingestLiveScan(prev, incoming, settled, scope));
-      setOffMa4Codes((prev) => ingestLiveScan(prev, incomingOff, settled, scope));
+      setLiveCodes((prev) => ingestLiveScan(prev, incoming, new Set(), scope));
+      setOffMa4Codes((prev) => ingestLiveScan(prev, incomingOff, new Set(), scope));
     };
     const load = (url: string, scope: "industry" | "concept", attempt: number, onDone?: () => void) => {
       readJson<{ codes: string[]; offMa4?: string[] }>(url, 120_000)
@@ -216,7 +205,7 @@ export default function SectorTrendView() {
           <div>
             <div className="text-sm">近期趋势捕捉</div>
             <div className="mt-1 max-w-3xl text-xs leading-5 text-mute">
-              板块指数日 K 站上 MA4 和 MA7、周 K 站上 MA4，趋势开始，画出红框。日 K 同时跌破 MA4 和 MA7，或周 K 同时跌破 MA4 和 MA7，红色趋势结束，改成灰框，停在跌破前最后一根，再等下一次开始信号。不看月 K。
+              板块指数日 K 站上 MA4 和 MA7，趋势开始，画出红框。不看周 K。日 K 同时跌破 MA4 和 MA7，或周 K 同时跌破 MA4 和 MA7，红色趋势结束，改成灰框，停在跌破前最后一根，再等下一次开始信号。不看月 K。
             </div>
           </div>
           <BoardPicker
