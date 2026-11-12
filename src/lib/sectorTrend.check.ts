@@ -52,17 +52,19 @@ function fromWeeks(weekCloses: number[]): KBar[] {
   return tradingBars(days, "2024-01-01");
 }
 
-const tooShort = fromWeeks(Array.from({ length: 9 }, () => 100));
-assert(captureSectorTrends(tooShort).length === 0, "nine weeks cannot stand on weekly MA10");
-assert(!indexCouldBeOpen(tooShort), "nine weeks is not an open weekly trend");
+const tooShort = fromWeeks(Array.from({ length: 3 }, () => 100));
+assert(captureSectorTrends(tooShort).length === 0, "three weeks cannot stand on weekly MA4");
+assert(!indexCouldBeOpen(tooShort), "three weeks is not an open weekly trend");
+const fourWeeks = fromWeeks(Array.from({ length: 4 }, () => 100));
+assert(indexCouldBeOpen(fourWeeks), "four flat weeks on weekly MA4 start an open red box");
 
 const standing = fromWeeks(Array.from({ length: 12 }, () => 100));
 const standingTrends = captureSectorTrends(standing);
 assert(
   standingTrends.length === 1 && standingTrends[0].status === "open" && standingTrends[0].end === standing.at(-1)?.time,
-  "twelve flat weeks on MA4 and MA10 stay an open red box",
+  "twelve flat weeks on MA4 stay an open red box",
 );
-assert(indexCouldBeOpen(standing), "a weekly MA4+MA10 stand looks open on price alone");
+assert(indexCouldBeOpen(standing), "a weekly MA4 stand looks open on price alone");
 assert(openPriceTrend(standing)?.end === standing.at(-1)?.time, "price-only window covers the latest bar");
 assert(trendCoversLastBar(standingTrends, standing.at(-1)?.time), "the open box covers the latest bar");
 assert(captureSectorTrends(standing, []).length === 1, "drawing the weekly box does not need constituents");
@@ -77,10 +79,10 @@ assert(
 assert(!indexCouldBeOpen(crashed), "a weekly MA4 break is no longer an open trend");
 assert(!trendCoversLastBar(crashedTrends, crashed.at(-1)?.time), "a closed box does not cover the break day");
 
-/** 周线站上 MA4 但还在 MA10 下面，不能启动。 */
+/** 周线站上 MA4 即可启动，不必再站上 MA10。 */
 const ma4OnlyWeek = fromWeeks([120, 119, 118, 117, 116, 108, 108, 108, 108.2, 108.3]);
-assert(captureSectorTrends(ma4OnlyWeek).length === 0, "weekly MA4 without MA10 is not a start");
-assert(!indexCouldBeOpen(ma4OnlyWeek), "an index on weekly MA4 but under MA10 is not open");
+assert(captureSectorTrends(ma4OnlyWeek).some((item) => item.status === "open"), "weekly MA4 without MA10 still starts a red box");
+assert(indexCouldBeOpen(ma4OnlyWeek), "an index on weekly MA4 but under MA10 is still open");
 
 const restarted = fromWeeks([
   ...Array.from({ length: 12 }, () => 100),
@@ -93,7 +95,7 @@ assert(
   restartedTrends.length === 2 &&
     restartedTrends[0].status === "closed" &&
     restartedTrends[1].status === "open",
-  "after a weekly MA4 break, standing on MA4 and MA10 again starts a new red box",
+  "after a weekly MA4 break, standing on MA4 again starts a new red box",
 );
 
 assert(isTonghuashunIndustry("881121") && !isTonghuashunConcept("881121"), "an industry code stays an industry");
