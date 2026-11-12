@@ -4,11 +4,17 @@ import type { KBar } from "./types";
 const MIN_BARS = 2;
 /** 从起点收盘到终点收盘，至少这段涨幅才算一段趋势。 */
 const MIN_GAIN = 0.02;
+/** 已经走完的灰框至少要有这么多根，才不像短脉冲。 */
+const MIN_CLOSED_BARS = 5;
+/** 已经走完的灰框至少要有这么多收盘涨幅，4% 上下的小波段丢掉。 */
+const MIN_CLOSED_GAIN = 0.05;
 /** 从高点回吐掉这段涨幅的四成，并且已经离开高点，视为这段走完。 */
 const COMPLETE_GIVEBACK = 0.4;
 /** 跌破起点，或者把这段涨幅回吐掉八成，收成灰框，终点留在高点。 */
 const FAIL_GIVEBACK = 0.8;
 const COMPLETE_LAG = 2;
+/** 锤线之后还没确认成趋势，最多看到这么多根；再走不出来就放弃。 */
+const LAUNCH_WAIT = 20;
 /** 净涨幅 / 路径长度。横盘来回拉锯过不了。 */
 const MIN_EFFICIENCY = 0.4;
 const MIN_UP_RATIO = 0.5;
@@ -162,14 +168,7 @@ export function memberGainsInWindow(
   return segmentBreadth(bars, members, from, end).ranked;
 }
 
-function qualifies(
-  bars: KBar[],
-  members: SectorMemberPath[],
-  start: number,
-  end: number,
-): { gain: number; breadth: ReturnType<typeof segmentBreadth> } | null {
-  const count = end - start + 1;
-  if (count < MIN_BARS || !(bars[start].close > 0)) return null;
+function swingStats(bars: KBar[], start: number, end: number) {
   let path = 0;
   let maxHigh = bars[start].high;
   let minLow = bars[start].low;
@@ -178,10 +177,31 @@ function qualifies(
     if (bars[i].high > maxHigh) maxHigh = bars[i].high;
     if (bars[i].low < minLow) minLow = bars[i].low;
   }
+  const reversal = priceReversal(bars, start);
+  const closeGain = bars[start].close > 0 ? bars[end].close / bars[start].close - 1 : 0;
+  const base = reversal ? bars[start].low : bars[start].close;
+  const wick = reversal ? Math.max(0, bars[start].close - bars[start].low) : 0;
+  const lift = bars[end].close - base;
+  const efficiency = path + wick > 0 ? lift / (path + wick) : 0;
+  const amplitude = bars[start].close > 0 ? (maxHigh - minLow) / bars[start].close : 0;
+  return { closeGain, efficiency, amplitude };
+}
+
+/** 收盘涨幅够，并且从低点拉起的路径够顺。锤线后先回一下再走，效率按低点算。 */
+function priceSwingQualifies(bars: KBar[], start: number, end: number): boolean {
+  if (end - start + 1 < MIN_BARS || !(bars[start].close > 0)) return false;
+  const stats = swingStats(bars, start, end);
+  return stats.closeGain >= MIN_GAIN && stats.efficiency >= MIN_EFFICIENCY && stats.amplitude >= MIN_GAIN;
+}
+
+function qualifies(
+  bars: KBar[],
+  members: SectorMemberPath[],
+  start: number,
+  end: number,
+): { gain: number; breadth: ReturnType<typeof segmentBreadth> } | null {
+  if (!priceSwingQualifies(bars, start, end)) return null;
   const gain = bars[end].close / bars[start].close - 1;
-  const efficiency = path > 0 ? (bars[end].close - bars[start].close) / path : 0;
-  const amplitude = (maxHigh - minLow) / bars[start].close;
-  if (gain < MIN_GAIN || efficiency < MIN_EFFICIENCY || amplitude < MIN_GAIN) return null;
   const breadth = segmentBreadth(bars, members, start, end);
   const leader = breadth.leaders[0];
   if (breadth.memberCount < MIN_MEMBERS || breadth.upRatio < MIN_UP_RATIO) return null;
@@ -190,10 +210,10 @@ function qualifies(
 }
 
 /**
- * 从每个局部低点走到启动日。价格条件第一次满足，当天就留下框。
- * 还守着起点、涨幅也没回吐光：红框一直画到最新一根。
- * 之后跌破起点或回吐八成：不把这段擦掉，收成灰框，终点留在仍然符合条件的高点。
- * 还没满足条件就失败的脉冲，不画框。
+ * 从每个局部低点走到启动日。当天收在高位只算疑似启动，真正成段要等收盘涨幅和路径都够。
+ * 还没成段时只看有没有跌破低点，锤线后的回吐不收口，好把 V 形波段连成一段。
+ * 成段之后守着起点、涨幅也没回吐光：红框一直画到最新一根。
+ * 之后跌破起点或回吐八成：收成灰框，终点留在高点。还没成段就失败的脉冲不画框。
  */
 function walkSegments(
   bars: KBar[],
@@ -207,14 +227,17 @@ function walkSegments(
     const floor = bars[start].low;
     const launched = launchedAt(start);
     let peak = start;
-    let bornPeak = launched ? start : -1;
+    let bornPeak = -1;
     let outcome: "open" | "closed" | "fail" | "pending" = "pending";
     let endAt = start;
     for (let j = start + 1; j < bars.length; j += 1) {
       if (bars[j].close >= bars[peak].close) peak = j;
       if (qualifiesAt(start, j)) bornPeak = peak;
       const giveback = givebackRatio(bars, start, peak, j, launched);
-      const failed = bars[j].close < floor || giveback >= FAIL_GIVEBACK;
+      const failed =
+        bars[j].close < floor ||
+        (bornPeak >= 0 && giveback >= FAIL_GIVEBACK) ||
+        (bornPeak < 0 && j - start + 1 > LAUNCH_WAIT);
       if (failed) {
         if (bornPeak >= 0) {
           outcome = "closed";
@@ -230,14 +253,21 @@ function walkSegments(
       endAt = j;
     }
     if (outcome === "pending") {
-      if (bornPeak < 0) continue;
-      const giveback = givebackRatio(bars, start, peak, endAt, launched);
-      if (endAt === bars.length - 1 && giveback < COMPLETE_GIVEBACK) {
-        outcome = "open";
-        endAt = bars.length - 1;
+      if (bornPeak < 0) {
+        if (launched && endAt === bars.length - 1 && bars[endAt].close >= floor) {
+          outcome = "open";
+          endAt = bars.length - 1;
+          bornPeak = start;
+        } else continue;
       } else {
-        outcome = "closed";
-        endAt = bornPeak;
+        const giveback = givebackRatio(bars, start, peak, endAt, launched);
+        if (endAt === bars.length - 1 && giveback < COMPLETE_GIVEBACK) {
+          outcome = "open";
+          endAt = bars.length - 1;
+        } else {
+          outcome = "closed";
+          endAt = bornPeak;
+        }
       }
     }
     if (outcome !== "open" && outcome !== "closed") continue;
@@ -442,37 +472,20 @@ export function maStandFlags(bars: KBar[]): MaStandFlags[] {
 
 function priceWindowCouldStayOpen(bars: KBar[], start: number): boolean {
   const floor = bars[start].low;
-  const startClose = bars[start].close;
-  if (!(startClose > 0)) return false;
+  if (!(bars[start].close > 0)) return false;
   let peak = start;
-  let path = 0;
-  let maxHigh = bars[start].high;
-  let minLow = bars[start].low;
   const reversal = priceReversal(bars, start);
-  let born = reversal;
+  let born = false;
   for (let j = start + 1; j < bars.length; j += 1) {
     if (bars[j].close < floor) return false;
-    path += Math.abs(bars[j].close - bars[j - 1].close);
-    if (bars[j].high > maxHigh) maxHigh = bars[j].high;
-    if (bars[j].low < minLow) minLow = bars[j].low;
+    if (born === false && j - start + 1 > LAUNCH_WAIT) return false;
     if (bars[j].close >= bars[peak].close) peak = j;
-    const gain = bars[j].close / startClose - 1;
-    const efficiency = path > 0 ? (bars[j].close - startClose) / path : 0;
-    const amplitude = (maxHigh - minLow) / startClose;
-    if (
-      !born &&
-      j - start + 1 >= MIN_BARS &&
-      gain >= MIN_GAIN &&
-      efficiency >= MIN_EFFICIENCY &&
-      amplitude >= MIN_GAIN
-    ) {
-      born = true;
-    }
+    if (priceSwingQualifies(bars, start, j)) born = true;
     const giveback = givebackRatio(bars, start, peak, j, reversal);
-    if (giveback >= FAIL_GIVEBACK) return false;
+    if (born && giveback >= FAIL_GIVEBACK) return false;
     if (born && j >= peak + COMPLETE_LAG && giveback >= COMPLETE_GIVEBACK) return false;
   }
-  if (!born) return false;
+  if (!born) return reversal && bars[bars.length - 1].close >= floor;
   if (start === bars.length - 1) return true;
   return givebackRatio(bars, start, peak, bars.length - 1, reversal) < COMPLETE_GIVEBACK;
 }
@@ -506,8 +519,9 @@ export function trendCoversLastBar(segments: SectorTrendSegment[], lastTime: str
 }
 
 /**
- * 同花顺近期趋势捕捉波段：从局部低点走到启动日。当天收在高位、涨幅够、多数个股在涨且有领涨龙头，就画红框。
- * 低点守住则延伸到最新一根；跌破低点或回吐八成收成灰框，终点留在高点。还没满足就失败的脉冲不画框。
+ * 同花顺近期趋势捕捉波段：从局部低点走到启动日。当天收在高位只算疑似启动；收盘涨幅和路径够了才成段。
+ * 低点守住则延伸到最新一根；跌破低点或回吐八成收成灰框，终点留在高点。
+ * 还没成段就失败的脉冲、以及走完后太短太浅的小波段不画框。
  */
 export function captureSectorTrends(bars: KBar[], members: SectorMemberPath[] = []): SectorTrendSegment[] {
   if (bars.length < LEFT_WING + 1 || members.length < MIN_MEMBERS) return [];
@@ -522,10 +536,13 @@ export function captureSectorTrends(bars: KBar[], members: SectorMemberPath[] = 
         ? sameDayLaunch(bars, members, raw.start)
         : qualifies(bars, members, raw.start, raw.metricEnd);
     if (!passed || !(bars[raw.end].close > 0) || !(bars[raw.start].close > 0)) continue;
+    const gain = raw.end === raw.start ? passed.gain : bars[raw.end].close / bars[raw.start].close - 1;
+    const barCount = raw.end - raw.start + 1;
+    if (raw.status === "closed" && (barCount < MIN_CLOSED_BARS || gain < MIN_CLOSED_GAIN)) continue;
     segments.push({
       start: bars[raw.start].time,
       end: bars[raw.end].time,
-      gain: raw.end === raw.start ? passed.gain : bars[raw.end].close / bars[raw.start].close - 1,
+      gain,
       status: raw.status,
       upCount: passed.breadth.upCount,
       memberCount: passed.breadth.memberCount,
