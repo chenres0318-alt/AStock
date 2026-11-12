@@ -15,7 +15,7 @@ import {
   type SectorTrendSegment,
 } from "./sectorTrend";
 import { decorateMa4Crosses, trendBoxDays, type SectorMa4Member, type SectorMa4Screen } from "./screenerLogic";
-import { alignedLivePrice, shanghaiToday, withLiveClose } from "./thsRealtime";
+import { alignedLivePrice, shanghaiTradeDate, withLiveClose } from "./thsRealtime";
 import { fetchTonghuashunSeries } from "./sources/tonghuashun";
 import { fetchTencentKline } from "./sources/tencent";
 import { SCREENER_BOARD_MEMBER_LIMIT, TREND_BOARD_MEMBER_LIMIT } from "./thsMemberPages";
@@ -62,7 +62,7 @@ async function memberSeries(
         fetchTencentKline(member.code, "day", count),
       );
       if (!history.length) return null;
-      const bars = withLiveClose(history, member.price, shanghaiToday());
+      const bars = withLiveClose(history, member.price, shanghaiTradeDate());
       const lastClose = bars.at(-1)?.close ?? null;
       return {
         code: member.code,
@@ -208,7 +208,7 @@ export async function loadBoardMa4Roster(code: string): Promise<SectorMa4Screen 
 }
 
 function prepareScreenerStocks(stocks: MemberKline[]): MemberKline[] {
-  const asOf = shanghaiToday();
+  const asOf = shanghaiTradeDate();
   return stocks.map((stock) => {
     const bars = withLiveClose(stock.bars, stock.price, asOf);
     const lastClose = bars.at(-1)?.close ?? null;
