@@ -9,9 +9,8 @@ const RESULT_TTL_MS = 2 * 60_000;
 const SCAN_MAX_MS = 300_000;
 const FIRST_WAIT_MS = 2_000;
 
-function hitReasons(row: ReturnType<typeof collectMa4StandHits>[number]): string[] {
-  const reasons: string[] = ["日K站上MA4和MA7", "周K站上MA4和MA7", "行业红框", "概念红框"];
-  return reasons;
+function hitReasons(): string[] {
+  return ["日K站上MA4、MA7、MA10", "行业红框", "概念红框"];
 }
 
 function toHit(row: ReturnType<typeof collectMa4StandHits>[number]): ScreenerHit {
@@ -29,8 +28,8 @@ function toHit(row: ReturnType<typeof collectMa4StandHits>[number]): ScreenerHit
     dif: 0,
     dea: 0,
     hist: 0,
-    standDays: row.holdDays || row.days,
-    reasons: hitReasons(row),
+    standDays: row.days,
+    reasons: hitReasons(),
     sector: row.sector,
     sectorCode: row.sectorCode,
     boards: row.boards,

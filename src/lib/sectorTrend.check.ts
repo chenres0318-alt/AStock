@@ -4,6 +4,7 @@ import {
   indexCouldBeOpen,
   listMa4CrossStocks,
   listMa4Ma7StandStocks,
+  listMa4Ma7Ma10StandStocks,
   maStandFlags,
   standsOnMa4,
   trendCoversLastBar,
@@ -219,6 +220,22 @@ assert(
   listMa4Ma7StandStocks({ start: ma4Only[3].time, end: ma4Only[6].time }, [{ code: "sh600004", name: "只站MA4", bars: ma4Only }]).length === 0,
   "a last close under MA7 is not a daily MA4+MA7 stand",
 );
+
+const missMa10Closes = [16, 16, 16, 12, 12, 12, 12, 12, 12, 12];
+const missMa10 = datedBars(missMa10Closes);
+const missMa10Window = { start: missMa10[0].time, end: missMa10[missMa10.length - 1].time };
+assert(
+  listMa4Ma7StandStocks(missMa10Window, [{ code: "sh600005", name: "未站MA10", bars: missMa10 }]).length === 1,
+  "a last close under MA10 can still stand on MA4 and MA7",
+);
+assert(
+  listMa4Ma7Ma10StandStocks(missMa10Window, [{ code: "sh600005", name: "未站MA10", bars: missMa10 }]).length === 0,
+  "a last close under MA10 is not a daily MA4+MA7+MA10 stand",
+);
+const allThreeFlat = datedBars(Array.from({ length: 16 }, () => 12));
+const allThreeWindow = { start: allThreeFlat[0].time, end: allThreeFlat[allThreeFlat.length - 1].time };
+const allThreeHits = listMa4Ma7Ma10StandStocks(allThreeWindow, [{ code: "sh600006", name: "三线都站", bars: allThreeFlat }]);
+assert(allThreeHits.length === 1 && allThreeHits[0].days === 7, "a flat tape stands on MA4, MA7 and MA10 from the tenth bar onward");
 
 function fenTouchCloses(price: number): number[] {
   const lead = Array.from({ length: 6 }, () => Math.round((price - 0.5) * 100) / 100);

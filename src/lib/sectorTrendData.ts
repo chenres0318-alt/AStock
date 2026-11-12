@@ -8,7 +8,7 @@ import {
   captureSectorTrends,
   indexCouldBeOpen,
   listMa4CrossStocks,
-  listMa4Ma7StandStocks,
+  listMa4Ma7Ma10StandStocks,
   memberGainsInWindow,
   standsOnMa4,
   type SectorMemberPath,
@@ -229,7 +229,7 @@ export function applyMa4Crosses(screen: SectorMa4Screen, stocks: MemberKline[]):
   const inBoard = prepareScreenerStocks(stocks.filter((stock) => memberIds.has(bareCode(stock.code))));
   if (!screen.openTrend || !inBoard.length) return { ...screen, crosses: [] };
   const eligible = inBoard.filter((stock) => !isGrowthBoardShare(stock.code) && !isStName(stock.name));
-  const crosses = decorateMa4Crosses(listMa4Ma7StandStocks(screen.openTrend, eligible), inBoard);
+  const crosses = decorateMa4Crosses(listMa4Ma7Ma10StandStocks(screen.openTrend, eligible), inBoard);
   const quoted = fillMemberQuotes(
     screen.members.map((item) => ({ ...item, amount: null })),
     inBoard,
