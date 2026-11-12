@@ -111,10 +111,10 @@ function toMemberPaths(series: Array<{ code: string; name: string; bars: KBar[] 
   });
 }
 
-/** 周K MA7 大约要 7 周日线；多留一些以便红框从更早的起点走到现在。 */
+/** 月 MA4 向上大约要 5 个月日线；多留一些以便红框从更早的起点走到现在。 */
 const TREND_BARS = 700;
-/** 红框是否还开着只看最近一段，不必把多年日线都拉一遍。 */
-const LIVE_BARS = 120;
+/** 红框是否还开着要够算月 MA4 和上一根月 MA4，大约 5～6 个月。 */
+const LIVE_BARS = 160;
 
 async function boardSeries(code: string, count: number): Promise<{ name: string; bars: KBar[] }> {
   return cached(`ths-industry-series:${code}:${count}`, 10 * 60_000, () => fetchTonghuashunSeries(code, count));
@@ -145,7 +145,7 @@ export async function getSectorTrend(code: string): Promise<SectorTrendReport> {
   const boardCode = code.trim();
   if (!isTonghuashunBoard(boardCode)) throw new UpstreamError("请从同花顺行业或概念里选择一个板块", 400);
   return cached(
-    `sector-trend-report:v14:${boardCode}`,
+    `sector-trend-report:v15:${boardCode}`,
     10 * 60_000,
     () => loadSectorTrend(boardCode),
     (report) => report.memberCount >= 5 || report.trends.length > 0,
@@ -337,7 +337,7 @@ async function scanOpenTrend(
 
 /**
  * 最新一根还落在趋势区间里的板块代码。
- * 下拉标红只看指数日 K MA4/MA7/MA10 能不能把红框留到最后一根，避免对全市场成分股再扫一遍把当前板块拖死。
+ * 下拉标红只看指数月/周/日 MA4 能不能把红框留到最后一根，避免对全市场成分股再扫一遍把当前板块拖死。
  * 选股扫行业和概念。板块页一进就扫指数红框给下拉标红，不等点进某个板块；点进去只补成分股龙头，不再改红白。
  */
 export async function listBoardsInTrend(
@@ -353,13 +353,13 @@ export async function listBoardsInTrend(
       return mergeTrendScan(industry, concept);
     }
     if (scope === "concept") {
-      return await loadTrendScan("boards-in-open-trend:concept:v12", onLive, async (emit) => {
+      return await loadTrendScan("boards-in-open-trend:concept:v13", onLive, async (emit) => {
         const boards = await listTonghuashunConcepts().catch(() => [] as SectorItem[]);
         if (!boards.length) return { codes: [] as string[], offMa4: [] as string[] };
         return scanOpenTrend(boards, 10, emit);
       });
     }
-    return await loadTrendScan("boards-in-open-trend:v16", onLive, async (emit) => {
+    return await loadTrendScan("boards-in-open-trend:v17", onLive, async (emit) => {
       const boards = await listAllIndustryBoards();
       return scanOpenTrend(boards, 8, emit);
     });
