@@ -31,12 +31,12 @@ assert(
   "a fresh industry scan drops stale red industry names and keeps concepts",
 );
 assert(
-  ingestLiveScan(["881121"], ["881174"], new Set(["881121"]), "industry").sort().join(",") === "881121,881174",
-  "an opened live board stays red even if this scan has not listed it yet",
+  ingestLiveScan(["881121"], ["881174"], new Set(["881121"]), "industry").sort().join(",") === "881174",
+  "a fresh industry scan replaces stale reds even if that board was opened",
 );
 assert(
-  ingestLiveScan([], ["881121"], new Set(["881121"]), "industry").join(",") === "",
-  "an opened board that is no longer live is not painted red by the scan",
+  ingestLiveScan(["881121"], [], new Set(["881121"]), "industry").join(",") === "",
+  "an opened board that is no longer live is dropped when the scan omits it",
 );
 assert(
   ingestLiveScan(["885001"], ["885799"], new Set(), "concept").sort().join(",") === "885799",
