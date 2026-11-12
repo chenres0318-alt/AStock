@@ -1,4 +1,4 @@
-import { alignedLivePrice, thsRealtimeTradeDate, withLiveClose, withToday } from "./thsRealtime.ts";
+import { alignedLivePrice, shanghaiTradeDate, thsRealtimeTradeDate, withLiveClose, withToday } from "./thsRealtime.ts";
 import type { KBar } from "./types.ts";
 
 function assert(cond: unknown, message: string) {
@@ -51,5 +51,15 @@ assert(liveToday.at(-1)?.time === "2026-11-11" && liveToday.at(-1)?.close === 10
 assert(liveToday.at(-2)?.close === 9.82, "yesterday's close stays on its own bar");
 assert(withLiveClose(thruNov10, 9.9, "2026-11-10").at(-1)?.close === 9.9, "the same session replaces the last close");
 assert(withLiveClose(thruNov10, 18.23, "2026-11-11").at(-1)?.time === "2026-11-10", "a mismatched unadjusted quote is not appended");
+
+assert(shanghaiTradeDate(new Date("2026-11-12T16:00:00+08:00")) === "2026-11-12", "after the close it is still that session");
+assert(shanghaiTradeDate(new Date("2026-11-13T01:14:00+08:00")) === "2026-11-12", "before 9:15 the next calendar day is still the previous session");
+assert(shanghaiTradeDate(new Date("2026-11-13T09:30:00+08:00")) === "2026-11-13", "after 9:15 the new weekday is a new session");
+assert(shanghaiTradeDate(new Date("2026-11-14T12:00:00+08:00")) === "2026-11-13", "Saturday stays on Friday");
+assert(shanghaiTradeDate(new Date("2026-11-16T01:00:00+08:00")) === "2026-11-13", "Monday before the open stays on Friday");
+assert(shanghaiTradeDate(new Date("2026-11-16T09:30:00+08:00")) === "2026-11-16", "Monday after 9:15 is a new session");
+
+const overnight = withLiveClose(thruNov10, 10.21, shanghaiTradeDate(new Date("2026-11-11T01:14:00+08:00")));
+assert(overnight.at(-1)?.time === "2026-11-10" && overnight.at(-1)?.close === 10.21, "overnight live price updates the last session instead of minting a new day");
 
 console.log("thsRealtime.check ok");

@@ -22,6 +22,7 @@ import {
   type SectorMa4Screen,
 } from "./screenerLogic.ts";
 import { raceDeadline, runDynamicPool } from "./pool.ts";
+import { shanghaiTradeDate, withLiveClose } from "./thsRealtime.ts";
 import type { KBar, SectorItem } from "./types.ts";
 
 function assert(cond: unknown, message: string) {
@@ -753,5 +754,30 @@ assert((monthDecorated[0]?.holdDays ?? 0) >= 1, "decorate fills how long the cur
   assert(seen.slice().sort().join(",") === "1,2,3,4", "dynamic pool works items as they arrive");
   assert(seen[0] === 1, "the first queued item starts before the producer finishes");
 }
+
+const firstStandBars = [
+  bar("2026-11-06", 10),
+  bar("2026-11-09", 10),
+  bar("2026-11-10", 10),
+  bar("2026-11-11", 9),
+  bar("2026-11-12", 12),
+];
+assert(consecutiveOnMa4(firstStandBars.map((item) => item.close)) === 1, "Thursday is the first close on MA4");
+const overnightFirst = withLiveClose(
+  firstStandBars,
+  12,
+  shanghaiTradeDate(new Date("2026-11-13T01:14:00+08:00")),
+);
+assert(overnightFirst.at(-1)?.time === "2026-11-12", "before the open, live price does not add a Friday bar");
+assert(
+  consecutiveOnMa4(overnightFirst.map((item) => item.close), 12) === 1,
+  "a first day on MA4 stays one day overnight instead of becoming two",
+);
+const afterOpenFirst = withLiveClose(
+  firstStandBars,
+  12.2,
+  shanghaiTradeDate(new Date("2026-11-13T09:30:00+08:00")),
+);
+assert(afterOpenFirst.at(-1)?.time === "2026-11-13", "after 9:15 a new print becomes a new daily bar");
 
 console.log("screener.check ok");

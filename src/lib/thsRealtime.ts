@@ -46,6 +46,43 @@ export function shanghaiToday(): string {
   }).format(new Date());
 }
 
+function shanghaiClock(at: Date): { date: string; minutes: number } {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(at);
+  const pick = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
+  return {
+    date: `${pick("year")}-${pick("month")}-${pick("day")}`,
+    minutes: Number(pick("hour")) * 60 + Number(pick("minute")),
+  };
+}
+
+function shiftIsoDate(iso: string, days: number): string {
+  const date = new Date(`${iso}T12:00:00+08:00`);
+  date.setUTCDate(date.getUTCDate() + days);
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * 当前 A 股交易日：9:15 开盘前仍算上一交易日，周末回退到周五。
+ * 选股叠现价用这个日期，避免凌晨把日历下一天补成新 K 线，把「今天刚站上」算成 2 日。
+ */
+export function shanghaiTradeDate(at = new Date()): string {
+  const { date, minutes } = shanghaiClock(at);
+  let session = minutes < 9 * 60 + 15 ? shiftIsoDate(date, -1) : date;
+  while (isShanghaiWeekend(session)) session = shiftIsoDate(session, -1);
+  return session;
+}
+
 /** 现价明显高于前复权收盘时，多半是未复权行情，不能叠到均线上。 */
 export function alignedLivePrice(
   price: number | null | undefined,
@@ -57,7 +94,7 @@ export function alignedLivePrice(
   return price;
 }
 
-/** 把成分股现价接到日 K：同一天替换收盘，新的交易日补一根。周末不补。 */
+/** 把成分股现价接到日 K：同一交易日替换收盘，新的交易日补一根。周末和开盘前不补。 */
 export function withLiveClose(
   bars: KBar[],
   price: number | null | undefined,
