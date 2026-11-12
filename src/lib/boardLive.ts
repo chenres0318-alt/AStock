@@ -44,7 +44,7 @@ export function parseActiveListScope(raw: string | null | undefined): "industry"
   return "industry";
 }
 
-const STORAGE_KEY = "astock.boards-in-trend.v3";
+const STORAGE_KEY = "astock.boards-in-trend.v4";
 
 export function readStoredLiveCodes(): string[] {
   if (typeof sessionStorage === "undefined") return [];
