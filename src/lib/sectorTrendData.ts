@@ -146,7 +146,7 @@ export async function getSectorTrend(code: string): Promise<SectorTrendReport> {
   const boardCode = code.trim();
   if (!isTonghuashunBoard(boardCode)) throw new UpstreamError("请从同花顺行业或概念里选择一个板块", 400);
   return cached(
-    `sector-trend-report:v17:${boardCode}`,
+    `sector-trend-report:v18:${boardCode}`,
     10 * 60_000,
     () => loadSectorTrend(boardCode),
     (report) => report.memberCount >= 5 || report.trends.length > 0,
@@ -350,13 +350,13 @@ export async function listBoardsInTrend(
       return mergeTrendScan(industry, concept);
     }
     if (scope === "concept") {
-      return await loadTrendScan("boards-in-open-trend:concept:v15", onLive, async (emit) => {
+      return await loadTrendScan("boards-in-open-trend:concept:v16", onLive, async (emit) => {
         const boards = await listTonghuashunConcepts().catch(() => [] as SectorItem[]);
         if (!boards.length) return { codes: [] as string[], offMa4: [] as string[] };
         return scanOpenTrend(boards, 10, emit);
       });
     }
-    return await loadTrendScan("boards-in-open-trend:v19", onLive, async (emit) => {
+    return await loadTrendScan("boards-in-open-trend:v20", onLive, async (emit) => {
       const boards = await listAllIndustryBoards();
       return scanOpenTrend(boards, 8, emit);
     });

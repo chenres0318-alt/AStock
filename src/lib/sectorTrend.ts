@@ -10,7 +10,7 @@ const MIN_CLOSED_BARS = 5;
 const MIN_CLOSED_GAIN = 0.05;
 /** 从高点回吐掉这段涨幅的四成，并且已经离开高点，视为这段走完。 */
 const COMPLETE_GIVEBACK = 0.4;
-/** 跌破起点，或者把这段涨幅回吐掉八成，收成灰框，终点留在高点。 */
+/** 跌破起点、日收盘同时跌破 MA4 和 MA7，或者把这段涨幅回吐掉八成，收成灰框，终点留在高点。 */
 const FAIL_GIVEBACK = 0.8;
 const COMPLETE_LAG = 2;
 /** 锤线之后还没确认成趋势，最多看到这么多根；再走不出来就放弃。 */
@@ -213,7 +213,7 @@ function qualifies(
  * 从每个局部低点走到启动日。当天收在高位只算疑似启动，真正成段要等收盘涨幅和路径都够。
  * 还没成段时只看有没有跌破低点，锤线后的回吐不收口，好把 V 形波段连成一段。
  * 成段之后守着起点、涨幅也没回吐光：红框一直画到最新一根。
- * 之后跌破起点或回吐八成：收成灰框，终点留在高点。还没成段就失败的脉冲不画框。
+ * 之后跌破起点、日收盘同时跌破 MA4 和 MA7、或回吐八成：收成灰框，终点留在高点。还没成段就失败的脉冲不画框。
  */
 function walkSegments(
   bars: KBar[],
@@ -221,6 +221,7 @@ function walkSegments(
   qualifiesAt: (start: number, end: number) => boolean,
 ): RawSegment[] {
   const found: RawSegment[] = [];
+  const closes = bars.map((bar) => bar.close);
   let cursor = 0;
   for (let start = LEFT_WING; start < bars.length; start += 1) {
     if (start < cursor || !isPivotLow(bars, start)) continue;
@@ -234,6 +235,7 @@ function walkSegments(
       if (bars[j].close >= bars[peak].close) peak = j;
       if (qualifiesAt(start, j)) bornPeak = peak;
       const giveback = givebackRatio(bars, start, peak, j, launched);
+      const lostMas = bornPeak >= 0 && brokeDayMa4AndMa7(closes, j);
       const failed =
         bars[j].close < floor ||
         (bornPeak >= 0 && giveback >= FAIL_GIVEBACK) ||
@@ -245,7 +247,7 @@ function walkSegments(
         } else outcome = "fail";
         break;
       }
-      if (bornPeak >= 0 && j >= peak + COMPLETE_LAG && giveback >= COMPLETE_GIVEBACK) {
+      if (lostMas || (bornPeak >= 0 && j >= peak + COMPLETE_LAG && giveback >= COMPLETE_GIVEBACK)) {
         outcome = "closed";
         endAt = peak;
         break;
@@ -333,6 +335,11 @@ function closeAboveMa(closes: number[], period: number, index: number, spot = cl
 function closeBelowMa(closes: number[], period: number, index: number, spot = closes[index]): boolean {
   const ma = maAt(closes, period, index);
   return ma != null && ma > 0 && spot < ma;
+}
+
+/** 日收盘同时跌破 MA4 和 MA7。均线还没出来时不算。 */
+function brokeDayMa4AndMa7(closes: number[], index: number): boolean {
+  return closeBelowMa(closes, 4, index) && closeBelowMa(closes, 7, index);
 }
 
 function maRising(closes: number[], period: number, index: number): boolean {
@@ -473,6 +480,7 @@ export function maStandFlags(bars: KBar[]): MaStandFlags[] {
 function priceWindowCouldStayOpen(bars: KBar[], start: number): boolean {
   const floor = bars[start].low;
   if (!(bars[start].close > 0)) return false;
+  const closes = bars.map((bar) => bar.close);
   let peak = start;
   const reversal = priceReversal(bars, start);
   let born = false;
@@ -482,7 +490,7 @@ function priceWindowCouldStayOpen(bars: KBar[], start: number): boolean {
     if (bars[j].close >= bars[peak].close) peak = j;
     if (priceSwingQualifies(bars, start, j)) born = true;
     const giveback = givebackRatio(bars, start, peak, j, reversal);
-    if (born && giveback >= FAIL_GIVEBACK) return false;
+    if (born && (giveback >= FAIL_GIVEBACK || brokeDayMa4AndMa7(closes, j))) return false;
     if (born && j >= peak + COMPLETE_LAG && giveback >= COMPLETE_GIVEBACK) return false;
   }
   if (!born) return reversal && bars[bars.length - 1].close >= floor;
@@ -492,7 +500,7 @@ function priceWindowCouldStayOpen(bars: KBar[], start: number): boolean {
 
 /**
  * 指数自己还有没有可能把红框留到最后一根。
- * 只看价格：局部低点、没跌破起点、跨度够、曾经涨够且路径顺、回吐还没把这段收口。
+ * 只看价格：局部低点、没跌破起点、跨度够、曾经涨够且路径顺、回吐还没把这段收口，也还没同时跌破日 MA4 和 MA7。
  * 成分股同步和龙头要另外确认；这里放过的，完整计算里可能仍被否掉。
  */
 export function indexCouldBeOpen(bars: KBar[]): boolean {
@@ -520,7 +528,7 @@ export function trendCoversLastBar(segments: SectorTrendSegment[], lastTime: str
 
 /**
  * 同花顺近期趋势捕捉波段：从局部低点走到启动日。当天收在高位只算疑似启动；收盘涨幅和路径够了才成段。
- * 低点守住则延伸到最新一根；跌破低点或回吐八成收成灰框，终点留在高点。
+ * 低点守住则延伸到最新一根；跌破低点、日收盘同时跌破 MA4 和 MA7、或回吐八成收成灰框，终点留在高点。
  * 还没成段就失败的脉冲、以及走完后太短太浅的小波段不画框。
  */
 export function captureSectorTrends(bars: KBar[], members: SectorMemberPath[] = []): SectorTrendSegment[] {
