@@ -266,9 +266,11 @@ const weekMa4Needed = hits([
 ]);
 assert(
   weekMa4Needed.map((row) => row.name).sort().join(",") ===
-    ["MA4还在下", "只有日K", "周只空一周", "周已两周", "缺周K", "缺周MA7", "缺月K"].sort().join(","),
-  "daily MA4 plus dual red boxes is enough; weekly MA4 is not required",
+    ["MA4还在下", "周只空一周", "缺周MA7", "缺月K"].sort().join(","),
+  "this week on weekly MA4 after last week off is required; weekly MA7 and monthly MA4 are not",
 );
+assert(!weekMa4Needed.some((row) => row.name === "周已两周"), "a second consecutive week on MA4 is dropped");
+assert(!weekMa4Needed.some((row) => row.name === "只有日K" || row.name === "缺周K"), "missing this-week MA4 is dropped");
 
 const rankedDays = hits([
   screen({
