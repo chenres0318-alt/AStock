@@ -508,7 +508,8 @@ export function isFirstWeekOnMa4(hit: { weekOnMa4?: boolean; weekDays?: number }
 }
 
 /**
- * 必须：个股日 K 站上 MA4。所属行业和至少一个概念都要红框覆盖最新一根。只过行业或只过概念的不要。
+ * 必须：个股日 K 站上 MA4；周 K 本周站上 MA4 且上周未站上（第一周）。
+ * 所属行业和至少一个概念都要红框覆盖最新一根。只过行业或只过概念的不要。
  * 持续天数按日 K 站上 MA4 的天数从短到长排。同一只股票只留一条。不含科创、创业、北交所、ST。
  */
 export function collectMa4StandHits(sectors: SectorMa4Screen[]): Ma4StandHit[] {
@@ -568,7 +569,7 @@ export function collectMa4StandHits(sectors: SectorMa4Screen[]): Ma4StandHit[] {
   }
   return [...best.values()]
     .filter(hasIndustryAndConcept)
-    .filter((hit) => hit.days >= 1)
+    .filter((hit) => hit.days >= 1 && isFirstWeekOnMa4(hit))
     .sort((a, b) => {
       const left = hitRank(a);
       const right = hitRank(b);
