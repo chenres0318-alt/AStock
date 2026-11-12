@@ -131,7 +131,7 @@ const ranked = hits([
     members,
   }),
 ]);
-assert(ranked.length === 2, "both names standing on MA4, MA7 and MA10 are kept");
+assert(ranked.length === 2, "both names standing on MA4 are kept");
 assert(ranked[0].name === "短站" && ranked[0].days === 1, "the shortest daily MA4 stand comes first");
 assert(ranked[1].name === "长站", "the longer MA4 stand is still listed after");
 assert(ranked[0].sectorCode === "881121", "the hit keeps the industry board");
@@ -265,11 +265,9 @@ const weekMa4Needed = hits([
 ]);
 assert(
   weekMa4Needed.map((row) => row.name).sort().join(",") ===
-    ["MA4还在下", "周只空一周", "缺周MA7", "缺月K"].sort().join(","),
-  "this week on weekly MA4 after last week off is required; weekly MA7 and monthly MA4 are not",
+    ["MA4还在下", "只有日K", "周只空一周", "周已两周", "缺周K", "缺周MA7", "缺月K"].sort().join(","),
+  "daily MA4 plus dual red boxes is enough; weekly MA4 is not required",
 );
-assert(!weekMa4Needed.some((row) => row.name === "周已两周"), "a second consecutive week on MA4 is dropped");
-assert(!weekMa4Needed.some((row) => row.name === "只有日K" || row.name === "缺周K"), "missing this-week MA4 is dropped");
 
 const rankedDays = hits([
   screen({
@@ -287,7 +285,7 @@ const rankedDays = hits([
 ]);
 assert(rankedDays.map((row) => row.name).join(",") === "平安样,横店样", "shorter daily MA4 stand ranks first");
 assert(rankedDays[0]?.days === 1 && rankedDays[1]?.days === 2, "持续天数 is consecutive daily MA4 stand days");
-assert(rankedDays[0]?.holdDays === 1 && rankedDays[1]?.holdDays === 2, "all-three stand days stay on holdDays when decorate is skipped");
+assert(rankedDays[0]?.holdDays === 1 && rankedDays[1]?.holdDays === 2, "holdDays still copies the stand when decorate is skipped");
 
 assert(
   dualBoxDays({
@@ -361,7 +359,7 @@ const boxRanked = collectMa4StandHits([
 ]);
 assert(boxRanked.map((row) => row.name).join(",") === "长框,短框", "shorter daily MA4 stand ranks first even when its red boxes lasted longer");
 assert(boxRanked[0]?.days === 1 && boxRanked[1]?.days === 2, "持续天数 follows daily MA4 stand days, not the red-box overlap");
-assert(boxRanked[0]?.holdDays === 1 && boxRanked[1]?.holdDays === 2, "all-three stand days still cap who qualifies");
+assert(boxRanked[0]?.holdDays === 1 && boxRanked[1]?.holdDays === 2, "holdDays still copies the stand when decorate is skipped");
 
 const crossDoesNotBeatShort = hits([
   screen({
@@ -378,8 +376,8 @@ const crossDoesNotBeatShort = hits([
   }),
 ]);
 assert(
-  crossDoesNotBeatShort.map((row) => row.name).join(",") === "无上叉短",
-  "a simultaneous MA4/MA7/MA10 stand longer than 2 days is dropped even with a MA4/MA7 cross",
+  crossDoesNotBeatShort.map((row) => row.name).join(",") === "无上叉短,有上叉长",
+  "a MA4/MA7 cross does not outrank a shorter daily MA4 stand",
 );
 
 const twoDurations = hits([
@@ -437,7 +435,7 @@ const wave2 = hits([
     members: [{ code: "sh600041", name: "后扫更长", price: 9, pct: 1, turnover: 1 }],
   }),
 ]);
-assert(wave2.map((row) => row.name).join(",") === "先扫到", "a later 5-day stand is dropped by the 2-day cap");
+assert(wave2.map((row) => row.name).join(",") === "先扫到,后扫更长", "a later longer MA4 stand still lists after the shorter one");
 
 const bothBeatsOne = collectMa4StandHits([
   screen({
@@ -478,7 +476,7 @@ const overTwo = hits([
     ],
   }),
 ]);
-assert(overTwo.map((row) => row.name).join(",") === "刚好2日", "day 2 is kept and day 3 is dropped");
+assert(overTwo.map((row) => row.name).join(",") === "刚好2日,第3日", "stands longer than two days still list, shorter first");
 
 const ma4Longer = hits([
   screen({
@@ -497,10 +495,10 @@ const ma4Longer = hits([
   }),
 ]);
 assert(
-  ma4Longer.map((row) => row.name).join(",") === "三线刚1日,MA4已5日",
-  "the 1-2 day cap is on MA4+MA7+MA10; MA4-only duration still ranks shorter first",
+  ma4Longer.map((row) => row.name).join(",") === "三线刚1日,三线已3日,MA4已5日",
+  "any daily MA4 stand qualifies; shorter consecutive days still rank first",
 );
-assert(ma4Longer[0]?.days === 1 && ma4Longer[1]?.days === 5, "持续天数 follows daily MA4 stand even past two days");
+assert(ma4Longer[0]?.days === 1 && ma4Longer[2]?.days === 5, "持续天数 follows daily MA4 stand even past two days");
 
 const bothByDays = collectMa4StandHits([
   screen({

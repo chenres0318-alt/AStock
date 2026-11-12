@@ -222,7 +222,7 @@ export function listMa4Ma7StandStocks(
   return listStandStocks(segment, stocks, [4, 7]);
 }
 
-/** 选股用：日 K 同时站上 MA4、MA7、MA10，按连续站上天数从少到多。不含科创、创业。 */
+/** 日 K 同时站上 MA4、MA7、MA10，按连续站上天数从少到多。不含科创、创业。 */
 export function listMa4Ma7Ma10StandStocks(
   segment: { start: string; end: string },
   stocks: Array<{ code: string; name: string; bars: KBar[]; price?: number | null }>,

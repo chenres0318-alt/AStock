@@ -8,7 +8,6 @@ import {
   captureSectorTrends,
   indexCouldBeOpen,
   listMa4CrossStocks,
-  listMa4Ma7Ma10StandStocks,
   memberGainsInWindow,
   openPriceTrend,
   standsOnMa4,
@@ -226,7 +225,7 @@ export function applyMa4Crosses(screen: SectorMa4Screen, stocks: MemberKline[]):
   const inBoard = prepareScreenerStocks(stocks.filter((stock) => memberIds.has(bareCode(stock.code))));
   if (!screen.openTrend || !inBoard.length) return { ...screen, crosses: [] };
   const eligible = inBoard.filter((stock) => !isGrowthBoardShare(stock.code) && !isStName(stock.name));
-  const crosses = decorateMa4Crosses(listMa4Ma7Ma10StandStocks(screen.openTrend, eligible), inBoard);
+  const crosses = decorateMa4Crosses(listMa4CrossStocks(screen.openTrend, eligible), inBoard);
   const quoted = fillMemberQuotes(
     screen.members.map((item) => ({ ...item, amount: null })),
     inBoard,
@@ -242,7 +241,7 @@ export async function loadScreenerMemberKlines(members: BoardMember[]): Promise<
   return memberSeries(members, 80, 8);
 }
 
-/** 选股用：只要红框还开着，就扫成分股日/周 MA4+MA7，不要求指数当天还站上 MA4。 */
+/** 选股用：只要红框还开着，就扫成分股日 K 是否站上 MA4，不要求指数当天还站上 MA4。 */
 export async function loadBoardMa4Screen(code: string): Promise<SectorMa4Screen | null> {
   const roster = await loadBoardMa4Roster(code);
   if (!roster?.openTrend || roster.members.length < 5) return roster;

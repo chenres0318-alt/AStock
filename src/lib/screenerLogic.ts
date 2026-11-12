@@ -462,9 +462,6 @@ function withBoards(hit: Ma4StandHit, boards: ScreenerBoardRef[]): Ma4StandHit {
   return { ...hit, boards: ordered, sector: primary.name, sectorCode: primary.code };
 }
 
-/** 选股：日 K 同时站上 MA4、MA7、MA10 的持续天数上限（含当天）。 */
-export const SCREENER_MAX_STAND_DAYS = 2;
-
 /** 红框从 start 到 end 的天数；有 K 线时按交易日计。 */
 export function trendBoxDays(start: string, end: string, bars?: Array<{ time: string }>): number {
   if (bars?.length) {
@@ -511,8 +508,7 @@ export function isFirstWeekOnMa4(hit: { weekOnMa4?: boolean; weekDays?: number }
 }
 
 /**
- * 必须：个股日 K 同时站上 MA4、MA7、MA10（1～2 日）；周 K 本周站上 MA4 且上周未站上。
- * 所属行业和至少一个概念都要红框覆盖最新一根。只过行业或只过概念的不要。
+ * 必须：个股日 K 站上 MA4。所属行业和至少一个概念都要红框覆盖最新一根。只过行业或只过概念的不要。
  * 持续天数按日 K 站上 MA4 的天数从短到长排。同一只股票只留一条。不含科创、创业、北交所、ST。
  */
 export function collectMa4StandHits(sectors: SectorMa4Screen[]): Ma4StandHit[] {
@@ -572,14 +568,7 @@ export function collectMa4StandHits(sectors: SectorMa4Screen[]): Ma4StandHit[] {
   }
   return [...best.values()]
     .filter(hasIndustryAndConcept)
-    .filter((hit) => {
-      const allThreeDays = hit.holdDays || hit.days;
-      return (
-        isFirstWeekOnMa4(hit) &&
-        allThreeDays >= 1 &&
-        allThreeDays <= SCREENER_MAX_STAND_DAYS
-      );
-    })
+    .filter((hit) => hit.days >= 1)
     .sort((a, b) => {
       const left = hitRank(a);
       const right = hitRank(b);
