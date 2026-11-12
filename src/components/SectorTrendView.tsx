@@ -50,8 +50,8 @@ function boxSpan(trend: { start: string; end: string }): string {
 
 function boxState(trend: { status: string; start: string; end: string }): string {
   if (trend.status === "closed") return "灰框已收口";
-  if (trend.start === trend.end) return "红框开始";
-  return "红框运行";
+  if (trend.start === trend.end) return "疑似启动";
+  return "红框试运行";
 }
 
 export default function SectorTrendView() {
@@ -205,7 +205,7 @@ export default function SectorTrendView() {
           <div>
             <div className="text-sm">近期趋势捕捉</div>
             <div className="mt-1 max-w-3xl text-xs leading-5 text-mute">
-              板块指数月收盘大于月 MA4 且月 MA4 向上，周收盘大于周 MA4 且周 MA4 向上，日收盘大于日 MA4，趋势开始，画出红框。日 K 或周 K 跌破 MA4，红色趋势结束，改成灰框，停在跌破前最后一根，再等下一次开始信号。
+              同花顺近期趋势捕捉波段：打出低点的当天，收盘拉到日内高位，当天涨幅或从低点拉起的幅度够，并且多数个股在涨、有领涨龙头，就按疑似启动画出红框。低点守住之后，框延伸到最新一根。跌破这个低点，疑似启动撤回。已经走出的一段如果涨幅回吐，改成灰框，终点留在高点。
             </div>
           </div>
           <BoardPicker

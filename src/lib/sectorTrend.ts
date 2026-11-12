@@ -1,5 +1,25 @@
 import type { KBar } from "./types";
 
+/** 低点当天加上启动当天，两根就够。涨幅和成分股也过了，启动日收盘就画框。 */
+const MIN_BARS = 2;
+/** 从起点收盘到终点收盘，至少这段涨幅才算一段趋势。 */
+const MIN_GAIN = 0.02;
+/** 从高点回吐掉这段涨幅的四成，并且已经离开高点，视为这段走完。 */
+const COMPLETE_GIVEBACK = 0.4;
+/** 跌破起点，或者把这段涨幅回吐掉八成，收成灰框，终点留在高点。 */
+const FAIL_GIVEBACK = 0.8;
+const COMPLETE_LAG = 2;
+/** 净涨幅 / 路径长度。横盘来回拉锯过不了。 */
+const MIN_EFFICIENCY = 0.4;
+const MIN_UP_RATIO = 0.5;
+/** 领涨个股至少要比板块指数多出的涨幅。 */
+const LEADER_GAP = 0.03;
+const MIN_MEMBERS = 5;
+/** 起点要比前两根的低点更低。最新一根也可以是当天打出的低点。 */
+const LEFT_WING = 2;
+/** 收盘落在当天振幅的上沿，才像从低点拉起来。 */
+const CLOSE_FINISH = 0.6;
+
 export type SectorMemberPath = {
   code: string;
   name: string;
@@ -42,6 +62,59 @@ export type MaStandFlags = {
   /** 周收盘跌破周线 MA4。 */
   weekBelowMa4: boolean;
 };
+
+type RawSegment = {
+  start: number;
+  end: number;
+  /** 用来计算龙头和上涨家数的那一根。红框可能延伸到更新的一天。 */
+  metricEnd: number;
+  status: "open" | "closed";
+};
+
+function isPivotLow(bars: KBar[], index: number): boolean {
+  if (index < LEFT_WING) return false;
+  const low = bars[index].low;
+  for (let j = index - LEFT_WING; j < index; j += 1) {
+    if (bars[j].low < low) return false;
+  }
+  // 横着的一段低点取最右边那根。还没有下一根时，当天这个低点先算疑似启动。
+  if (index + 1 < bars.length && bars[index + 1].low <= low) return false;
+  return true;
+}
+
+/** 低点当天收在高位，并且当天收涨，从低点拉起或收盘涨幅已经够。 */
+function priceReversal(bars: KBar[], index: number): boolean {
+  if (index < 1) return false;
+  const bar = bars[index];
+  const prevClose = bars[index - 1].close;
+  if (!(bar.low > 0) || !(prevClose > 0) || !(bar.high >= bar.low)) return false;
+  const range = bar.high - bar.low;
+  const finish = range > 0 ? (bar.close - bar.low) / range : 0;
+  const rebound = bar.close / bar.low - 1;
+  const dayGain = bar.close / prevClose - 1;
+  return finish >= CLOSE_FINISH && dayGain > 0 && (rebound >= MIN_GAIN || dayGain >= MIN_GAIN);
+}
+
+function sameDayLaunch(
+  bars: KBar[],
+  members: SectorMemberPath[],
+  index: number,
+): { gain: number; breadth: ReturnType<typeof segmentBreadth> } | null {
+  if (!priceReversal(bars, index)) return null;
+  const dayGain = bars[index].close / bars[index - 1].close - 1;
+  const breadth = segmentBreadth(bars, members, index - 1, index);
+  const leader = breadth.leaders[0];
+  if (breadth.memberCount < MIN_MEMBERS || breadth.upRatio < MIN_UP_RATIO) return null;
+  if (!leader || leader.gain < dayGain + LEADER_GAP) return null;
+  return { gain: dayGain, breadth };
+}
+
+function givebackRatio(bars: KBar[], start: number, peak: number, at: number, fromLow: boolean): number {
+  const fromClose = bars[peak].close - bars[start].close;
+  const advance = fromClose > 0 ? fromClose : fromLow ? bars[peak].close - bars[start].low : 0;
+  if (!(advance > 0)) return 0;
+  return Math.max(0, (bars[peak].close - bars[at].close) / advance);
+}
 
 function closeOn(closes: Map<string, number>, times: string[], index: number): number | null {
   for (let i = index; i >= Math.max(0, index - 4); i -= 1) {
@@ -87,6 +160,94 @@ export function memberGainsInWindow(
   if (start < 0 || end < start) return [];
   const from = start === end && start > 0 ? start - 1 : start;
   return segmentBreadth(bars, members, from, end).ranked;
+}
+
+function qualifies(
+  bars: KBar[],
+  members: SectorMemberPath[],
+  start: number,
+  end: number,
+): { gain: number; breadth: ReturnType<typeof segmentBreadth> } | null {
+  const count = end - start + 1;
+  if (count < MIN_BARS || !(bars[start].close > 0)) return null;
+  let path = 0;
+  let maxHigh = bars[start].high;
+  let minLow = bars[start].low;
+  for (let i = start + 1; i <= end; i += 1) {
+    path += Math.abs(bars[i].close - bars[i - 1].close);
+    if (bars[i].high > maxHigh) maxHigh = bars[i].high;
+    if (bars[i].low < minLow) minLow = bars[i].low;
+  }
+  const gain = bars[end].close / bars[start].close - 1;
+  const efficiency = path > 0 ? (bars[end].close - bars[start].close) / path : 0;
+  const amplitude = (maxHigh - minLow) / bars[start].close;
+  if (gain < MIN_GAIN || efficiency < MIN_EFFICIENCY || amplitude < MIN_GAIN) return null;
+  const breadth = segmentBreadth(bars, members, start, end);
+  const leader = breadth.leaders[0];
+  if (breadth.memberCount < MIN_MEMBERS || breadth.upRatio < MIN_UP_RATIO) return null;
+  if (!leader || leader.gain < gain + LEADER_GAP) return null;
+  return { gain, breadth };
+}
+
+/**
+ * 从每个局部低点走到启动日。价格条件第一次满足，当天就留下框。
+ * 还守着起点、涨幅也没回吐光：红框一直画到最新一根。
+ * 之后跌破起点或回吐八成：不把这段擦掉，收成灰框，终点留在仍然符合条件的高点。
+ * 还没满足条件就失败的脉冲，不画框。
+ */
+function walkSegments(
+  bars: KBar[],
+  launchedAt: (index: number) => boolean,
+  qualifiesAt: (start: number, end: number) => boolean,
+): RawSegment[] {
+  const found: RawSegment[] = [];
+  let cursor = 0;
+  for (let start = LEFT_WING; start < bars.length; start += 1) {
+    if (start < cursor || !isPivotLow(bars, start)) continue;
+    const floor = bars[start].low;
+    const launched = launchedAt(start);
+    let peak = start;
+    let bornPeak = launched ? start : -1;
+    let outcome: "open" | "closed" | "fail" | "pending" = "pending";
+    let endAt = start;
+    for (let j = start + 1; j < bars.length; j += 1) {
+      if (bars[j].close >= bars[peak].close) peak = j;
+      if (qualifiesAt(start, j)) bornPeak = peak;
+      const giveback = givebackRatio(bars, start, peak, j, launched);
+      const failed = bars[j].close < floor || giveback >= FAIL_GIVEBACK;
+      if (failed) {
+        if (bornPeak >= 0) {
+          outcome = "closed";
+          endAt = bornPeak;
+        } else outcome = "fail";
+        break;
+      }
+      if (bornPeak >= 0 && j >= peak + COMPLETE_LAG && giveback >= COMPLETE_GIVEBACK) {
+        outcome = "closed";
+        endAt = peak;
+        break;
+      }
+      endAt = j;
+    }
+    if (outcome === "pending") {
+      if (bornPeak < 0) continue;
+      const giveback = givebackRatio(bars, start, peak, endAt, launched);
+      if (endAt === bars.length - 1 && giveback < COMPLETE_GIVEBACK) {
+        outcome = "open";
+        endAt = bars.length - 1;
+      } else {
+        outcome = "closed";
+        endAt = bornPeak;
+      }
+    }
+    if (outcome !== "open" && outcome !== "closed") continue;
+    const stillQualified = endAt === start ? launched : qualifiesAt(start, endAt);
+    const metricEnd = outcome === "open" && stillQualified ? endAt : bornPeak;
+    if (metricEnd < start) continue;
+    found.push({ start, end: endAt, metricEnd, status: outcome });
+    cursor = endAt + 1;
+  }
+  return found;
 }
 
 export type MaCrossStock = {
@@ -279,67 +440,98 @@ export function maStandFlags(bars: KBar[]): MaStandFlags[] {
   });
 }
 
-function canStart(flags: MaStandFlags): boolean {
-  return flags.dayOnMa4 && flags.weekOnMa4 && flags.weekMa4Up && flags.monthOnMa4 && flags.monthMa4Up;
+function priceWindowCouldStayOpen(bars: KBar[], start: number): boolean {
+  const floor = bars[start].low;
+  const startClose = bars[start].close;
+  if (!(startClose > 0)) return false;
+  let peak = start;
+  let path = 0;
+  let maxHigh = bars[start].high;
+  let minLow = bars[start].low;
+  const reversal = priceReversal(bars, start);
+  let born = reversal;
+  for (let j = start + 1; j < bars.length; j += 1) {
+    if (bars[j].close < floor) return false;
+    path += Math.abs(bars[j].close - bars[j - 1].close);
+    if (bars[j].high > maxHigh) maxHigh = bars[j].high;
+    if (bars[j].low < minLow) minLow = bars[j].low;
+    if (bars[j].close >= bars[peak].close) peak = j;
+    const gain = bars[j].close / startClose - 1;
+    const efficiency = path > 0 ? (bars[j].close - startClose) / path : 0;
+    const amplitude = (maxHigh - minLow) / startClose;
+    if (
+      !born &&
+      j - start + 1 >= MIN_BARS &&
+      gain >= MIN_GAIN &&
+      efficiency >= MIN_EFFICIENCY &&
+      amplitude >= MIN_GAIN
+    ) {
+      born = true;
+    }
+    const giveback = givebackRatio(bars, start, peak, j, reversal);
+    if (giveback >= FAIL_GIVEBACK) return false;
+    if (born && j >= peak + COMPLETE_LAG && giveback >= COMPLETE_GIVEBACK) return false;
+  }
+  if (!born) return false;
+  if (start === bars.length - 1) return true;
+  return givebackRatio(bars, start, peak, bars.length - 1, reversal) < COMPLETE_GIVEBACK;
 }
 
-function shouldEnd(flags: MaStandFlags): boolean {
-  return flags.dayBelowMa4 || flags.weekBelowMa4;
+/**
+ * 指数自己还有没有可能把红框留到最后一根。
+ * 只看价格：局部低点、没跌破起点、跨度够、曾经涨够且路径顺、回吐还没把这段收口。
+ * 成分股同步和龙头要另外确认；这里放过的，完整计算里可能仍被否掉。
+ */
+export function indexCouldBeOpen(bars: KBar[]): boolean {
+  return openPriceTrend(bars) != null;
 }
 
-/** 最后一根是否还落在某段趋势区间里。收口的灰框不含跌破当天。 */
+/** 价格波段上仍开着的红框区间，不扫成分股。选股名单先用这一段。 */
+export function openPriceTrend(bars: KBar[]): { start: string; end: string; status: "open" } | null {
+  if (bars.length < LEFT_WING + 1) return null;
+  const last = bars.length - 1;
+  for (let start = LEFT_WING; start < bars.length; start += 1) {
+    if (!isPivotLow(bars, start)) continue;
+    if (priceWindowCouldStayOpen(bars, start)) {
+      return { start: bars[start].time, end: bars[last].time, status: "open" };
+    }
+  }
+  return null;
+}
+
+/** 最后一根是否还落在某段趋势区间里。收口的灰框终点在高点，不含后来的交易日。 */
 export function trendCoversLastBar(segments: SectorTrendSegment[], lastTime: string | undefined): boolean {
   if (!lastTime) return false;
   return segments.some((segment) => segment.status === "open" && segment.end === lastTime);
 }
 
 /**
- * 指数月收盘大于月 MA4 且月 MA4 向上，周收盘大于周 MA4 且周 MA4 向上，日收盘大于日 MA4，趋势开始。
- * 日 K 或周 K 跌破 MA4，红色趋势结束，改成灰框，停在跌破前最后一根，再等下一次开始信号。
+ * 同花顺近期趋势捕捉波段：从局部低点走到启动日。当天收在高位、涨幅够、多数个股在涨且有领涨龙头，就画红框。
+ * 低点守住则延伸到最新一根；跌破低点或回吐八成收成灰框，终点留在高点。还没满足就失败的脉冲不画框。
  */
 export function captureSectorTrends(bars: KBar[], members: SectorMemberPath[] = []): SectorTrendSegment[] {
-  if (bars.length < 4) return [];
-  const flags = maStandFlags(bars);
+  if (bars.length < LEFT_WING + 1 || members.length < MIN_MEMBERS) return [];
   const segments: SectorTrendSegment[] = [];
-  let start = -1;
-  const push = (from: number, to: number, status: "open" | "closed") => {
-    if (to < from || !(bars[from].close > 0) || !(bars[to].close > 0)) return;
-    if (status === "closed" && to === from) return;
-    const breadth = members.length ? segmentBreadth(bars, members, from === to && from > 0 ? from - 1 : from, to) : {
-      upCount: 0,
-      memberCount: 0,
-      upRatio: 0,
-      leaders: [] as TrendLeader[],
-    };
+  for (const raw of walkSegments(
+    bars,
+    (index) => sameDayLaunch(bars, members, index) != null,
+    (start, end) => qualifies(bars, members, start, end) != null,
+  )) {
+    const passed =
+      raw.metricEnd === raw.start
+        ? sameDayLaunch(bars, members, raw.start)
+        : qualifies(bars, members, raw.start, raw.metricEnd);
+    if (!passed || !(bars[raw.end].close > 0) || !(bars[raw.start].close > 0)) continue;
     segments.push({
-      start: bars[from].time,
-      end: bars[to].time,
-      gain: bars[to].close / bars[from].close - 1,
-      status,
-      upCount: breadth.upCount,
-      memberCount: breadth.memberCount,
-      upRatio: breadth.upRatio,
-      leaders: breadth.leaders,
+      start: bars[raw.start].time,
+      end: bars[raw.end].time,
+      gain: raw.end === raw.start ? passed.gain : bars[raw.end].close / bars[raw.start].close - 1,
+      status: raw.status,
+      upCount: passed.breadth.upCount,
+      memberCount: passed.breadth.memberCount,
+      upRatio: passed.breadth.upRatio,
+      leaders: passed.breadth.leaders,
     });
-  };
-  for (let i = 0; i < bars.length; i += 1) {
-    if (start < 0) {
-      if (canStart(flags[i])) start = i;
-      continue;
-    }
-    if (shouldEnd(flags[i])) {
-      push(start, i - 1, "closed");
-      start = -1;
-    }
   }
-  if (start >= 0) push(start, bars.length - 1, "open");
   return segments;
-}
-
-/**
- * 指数自己能不能把红框留到最后一根。开始看月/周/日收盘大于 MA4，且月、周 MA4 向上；结束看日或周跌破 MA4。不扫成分股。
- */
-export function indexCouldBeOpen(bars: KBar[]): boolean {
-  const last = bars.at(-1)?.time;
-  return trendCoversLastBar(captureSectorTrends(bars), last);
 }

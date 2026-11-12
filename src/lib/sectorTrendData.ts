@@ -10,6 +10,7 @@ import {
   listMa4CrossStocks,
   listMa4Ma7Ma10StandStocks,
   memberGainsInWindow,
+  openPriceTrend,
   standsOnMa4,
   type SectorMemberPath,
   type SectorTrendSegment,
@@ -111,9 +112,9 @@ function toMemberPaths(series: Array<{ code: string; name: string; bars: KBar[] 
   });
 }
 
-/** 月 MA4 向上大约要 5 个月日线；多留一些以便红框从更早的起点走到现在。 */
+/** 波段红框要从更早的低点走到现在。 */
 const TREND_BARS = 700;
-/** 红框是否还开着要够算月 MA4 和上一根月 MA4，大约 5～6 个月。 */
+/** 红框是否还开着只看最近一段波段，不必把多年日线都拉一遍。 */
 const LIVE_BARS = 160;
 
 async function boardSeries(code: string, count: number): Promise<{ name: string; bars: KBar[] }> {
@@ -145,7 +146,7 @@ export async function getSectorTrend(code: string): Promise<SectorTrendReport> {
   const boardCode = code.trim();
   if (!isTonghuashunBoard(boardCode)) throw new UpstreamError("请从同花顺行业或概念里选择一个板块", 400);
   return cached(
-    `sector-trend-report:v15:${boardCode}`,
+    `sector-trend-report:v16:${boardCode}`,
     10 * 60_000,
     () => loadSectorTrend(boardCode),
     (report) => report.memberCount >= 5 || report.trends.length > 0,
@@ -189,12 +190,8 @@ export async function loadBoardMa4Roster(code: string): Promise<SectorMa4Screen 
   const lastTime = bars.at(-1)?.time;
   const onMa4 = standsOnMa4(bars);
   const name = series.name || boardCode;
-  if (!lastTime || !indexCouldBeOpen(bars)) {
-    return emptyBoardScreen(boardCode, name, onMa4, lastTime);
-  }
-  const trends = captureSectorTrends(bars, []);
-  const open = trends.find((trend) => trend.status === "open" && trend.end === lastTime) ?? null;
-  if (!open) {
+  const open = lastTime ? openPriceTrend(bars) : null;
+  if (!lastTime || !open || open.end !== lastTime) {
     return emptyBoardScreen(boardCode, name, onMa4, lastTime);
   }
   const members = await loadMembers(boardCode, SCREENER_BOARD_MEMBER_LIMIT);
@@ -337,7 +334,7 @@ async function scanOpenTrend(
 
 /**
  * 最新一根还落在趋势区间里的板块代码。
- * 下拉标红只看指数月/周/日 MA4 能不能把红框留到最后一根，避免对全市场成分股再扫一遍把当前板块拖死。
+ * 下拉标红只看指数波段红框能不能留到最后一根，避免对全市场成分股再扫一遍把当前板块拖死。
  * 选股扫行业和概念。板块页一进就扫指数红框给下拉标红，不等点进某个板块；点进去只补成分股龙头，不再改红白。
  */
 export async function listBoardsInTrend(
@@ -353,13 +350,13 @@ export async function listBoardsInTrend(
       return mergeTrendScan(industry, concept);
     }
     if (scope === "concept") {
-      return await loadTrendScan("boards-in-open-trend:concept:v13", onLive, async (emit) => {
+      return await loadTrendScan("boards-in-open-trend:concept:v14", onLive, async (emit) => {
         const boards = await listTonghuashunConcepts().catch(() => [] as SectorItem[]);
         if (!boards.length) return { codes: [] as string[], offMa4: [] as string[] };
         return scanOpenTrend(boards, 10, emit);
       });
     }
-    return await loadTrendScan("boards-in-open-trend:v17", onLive, async (emit) => {
+    return await loadTrendScan("boards-in-open-trend:v18", onLive, async (emit) => {
       const boards = await listAllIndustryBoards();
       return scanOpenTrend(boards, 8, emit);
     });

@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "板块趋势 · AStock 看盘",
-  description: "板块红色趋势：月周收盘大于MA4且MA4向上、日收盘大于MA4为开始，日或周跌破MA4为结束并改成灰框",
+  description: "板块近期趋势捕捉：低点当天拉起并有领涨龙头则画红框，守住低点延伸，回吐或跌破低点收成灰框",
 };
 
 export default function SectorPage() {
