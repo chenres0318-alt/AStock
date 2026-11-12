@@ -505,9 +505,15 @@ function betterHit(next: Ma4StandHit, prev: Ma4StandHit | undefined): boolean {
   return next.sector.localeCompare(prev.sector, "zh-CN") < 0;
 }
 
+/** 周 K 本周站上 MA4，且上周未站上（连续站上周数为 1）。 */
+export function isFirstWeekOnMa4(hit: { weekOnMa4?: boolean; weekDays?: number }): boolean {
+  return Boolean(hit.weekOnMa4) && (hit.weekDays ?? 0) === 1;
+}
+
 /**
- * 必须：个股日 K 同时站上 MA4、MA7、MA10（1～2 日）；所属行业和至少一个概念都要红框覆盖最新一根。不看周 K。
- * 只过行业或只过概念的不要。持续天数按日 K 站上 MA4 的天数从短到长排。同一只股票只留一条。不含科创、创业、北交所、ST。
+ * 必须：个股日 K 同时站上 MA4、MA7、MA10（1～2 日）；周 K 本周站上 MA4 且上周未站上。
+ * 所属行业和至少一个概念都要红框覆盖最新一根。只过行业或只过概念的不要。
+ * 持续天数按日 K 站上 MA4 的天数从短到长排。同一只股票只留一条。不含科创、创业、北交所、ST。
  */
 export function collectMa4StandHits(sectors: SectorMa4Screen[]): Ma4StandHit[] {
   const best = new Map<string, Ma4StandHit>();
@@ -568,7 +574,11 @@ export function collectMa4StandHits(sectors: SectorMa4Screen[]): Ma4StandHit[] {
     .filter(hasIndustryAndConcept)
     .filter((hit) => {
       const allThreeDays = hit.holdDays || hit.days;
-      return allThreeDays >= 1 && allThreeDays <= SCREENER_MAX_STAND_DAYS;
+      return (
+        isFirstWeekOnMa4(hit) &&
+        allThreeDays >= 1 &&
+        allThreeDays <= SCREENER_MAX_STAND_DAYS
+      );
     })
     .sort((a, b) => {
       const left = hitRank(a);

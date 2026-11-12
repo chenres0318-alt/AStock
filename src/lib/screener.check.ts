@@ -10,6 +10,7 @@ import {
   dailyToMonthly,
   dailyToWeekly,
   decorateMa4Crosses,
+  isFirstWeekOnMa4,
   isScreenerShare,
   ma4CrossedUpMa7,
   matchIndustryBoard,
@@ -93,7 +94,7 @@ function hits(sectors: SectorMa4Screen[]) {
   return collectMa4StandHits(plusConcept(sectors));
 }
 
-const dw = { weekOnMa4: true, weekOnMa7: true };
+const dw = { weekOnMa4: true, weekOnMa7: true, weekDays: 1 };
 const short = { code: "sh600001", name: "短站", days: 1, time: "2026-10-23", ...dw };
 const long = { code: "sh600002", name: "长站", days: 2, time: "2026-10-22", ...dw };
 const members = [
@@ -262,12 +263,13 @@ const weekMa4Needed = hits([
     ],
   }),
 ]);
-assert(weekMa4Needed.length === 7, "weekly MA4/MA7 is not required");
 assert(
   weekMa4Needed.map((row) => row.name).sort().join(",") ===
-    ["MA4还在下", "只有日K", "周只空一周", "周已两周", "缺周K", "缺周MA7", "缺月K"].sort().join(","),
-  "daily MA4/MA7/MA10 still hits when weekly or monthly flags are missing",
+    ["MA4还在下", "周只空一周", "缺周MA7", "缺月K"].sort().join(","),
+  "this week on weekly MA4 after last week off is required; weekly MA7 and monthly MA4 are not",
 );
+assert(!weekMa4Needed.some((row) => row.name === "周已两周"), "a second consecutive week on MA4 is dropped");
+assert(!weekMa4Needed.some((row) => row.name === "只有日K" || row.name === "缺周K"), "missing this-week MA4 is dropped");
 
 const rankedDays = hits([
   screen({
@@ -410,7 +412,7 @@ const weekOnlyLonger = hits([
     ],
   }),
 ]);
-assert(weekOnlyLonger.map((row) => row.name).join(",") === "无周MA7短,日周都有", "weekly MA7 is not required; shorter daily MA4 stand still ranks first");
+assert(weekOnlyLonger.map((row) => row.name).join(",") === "无周MA7短,日周都有", "weekly MA7 is not required on the first week; shorter daily MA4 stand still ranks first");
 
 const wave1 = collectMa4StandHits([
   screen({
@@ -561,6 +563,11 @@ assert(months[0].time === "2026-07-31" && months[0].close === 10, "July closes o
 assert(months[3].time === "2026-10-29" && months[3].close === 13, "the unfinished month still uses the latest close");
 assert(monthStandsOnMa4(monthBars), "a rising monthly tape stands on monthly MA4");
 assert(!monthStandsOnMa4(monthBars.slice(0, 8)), "fewer than four monthly bars cannot stand on monthly MA4");
+assert(isFirstWeekOnMa4({ weekOnMa4: true, weekDays: 1 }), "this week on MA4 and last week off is the first week");
+assert(!isFirstWeekOnMa4({ weekOnMa4: true, weekDays: 2 }), "two consecutive weeks on MA4 is not the first week");
+assert(!isFirstWeekOnMa4({ weekOnMa4: false, weekDays: 1 }), "last week off does not count if this week is also off");
+assert(!isFirstWeekOnMa4({ weekOnMa4: true }), "this week on MA4 without a 1-week count is not the first week");
+
 assert(consecutiveOnMa4([10, 11, 12, 13]) === 1, "four rising closes are the first monthly/weekly bar that can stand on MA4");
 assert(consecutiveOnMa4AndMa7([10, 11, 12, 13, 14, 15, 16]) === 1, "seven rising closes are the first bar that can stand on MA4 and MA7");
 assert(consecutiveOnMa4AndMa7(Array.from({ length: 10 }, () => 12)) === 4, "a flat tape stands on both MAs from the seventh bar onward");

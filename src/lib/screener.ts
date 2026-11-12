@@ -10,7 +10,7 @@ const SCAN_MAX_MS = 300_000;
 const FIRST_WAIT_MS = 2_000;
 
 function hitReasons(): string[] {
-  return ["日K站上MA4、MA7、MA10", "行业红框", "概念红框"];
+  return ["日K站上MA4、MA7、MA10", "周K本周站上MA4", "行业红框", "概念红框"];
 }
 
 function toHit(row: ReturnType<typeof collectMa4StandHits>[number]): ScreenerHit {
