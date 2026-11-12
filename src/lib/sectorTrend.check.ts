@@ -144,6 +144,27 @@ const brokenPeak = broken.reduce((best, bar, index) => (bar.close > broken[best]
 assert(brokenTrends.length === 1 && brokenTrends[0].status === "closed", "a qualified rise that later breaks the start stays on the chart");
 assert(brokenTrends[0].end === broken[brokenPeak].time, "that box ends on the high before the break");
 
+/** 涨够之后收盘同时跌破日 MA4 和 MA7，即使低点还在、回吐不到四成，也收成灰框。 */
+const lostBothMasCloses = [...Array.from({ length: 8 }, () => 100), 102, 104, 106, 108, 110, 112, 114, 108.5];
+const lostBothMas = barsFromCloses(lostBothMasCloses);
+const lostBothTrends = captureSectorTrends(lostBothMas, membersFollowing(lostBothMas));
+const lostBothPeak = lostBothMas.reduce((best, bar, index) => (bar.close > lostBothMas[best].close ? index : best), 0);
+assert(
+  lostBothTrends.length === 1 && lostBothTrends[0].status === "closed" && lostBothTrends[0].end === lostBothMas[lostBothPeak].time,
+  "closing below daily MA4 and MA7 ends the box on the high",
+);
+assert(!indexCouldBeOpen(lostBothMas), "an index that lost both MA4 and MA7 is no longer an open trend");
+
+/** 只跌破 MA4、还站在 MA7 上，红框继续。 */
+const lostMa4Closes = [...Array.from({ length: 8 }, () => 100), 102, 104, 106, 108, 110, 112, 114, 111];
+const lostMa4 = barsFromCloses(lostMa4Closes);
+const lostMa4Trends = captureSectorTrends(lostMa4, membersFollowing(lostMa4));
+assert(
+  lostMa4Trends.length === 1 && lostMa4Trends[0].status === "open" && lostMa4Trends[0].end === lostMa4.at(-1)?.time,
+  "losing MA4 while still on MA7 does not end the trend",
+);
+assert(indexCouldBeOpen(lostMa4), "the index still looks open when only MA4 is lost");
+
 const weakIndex = barsFromCloses(rise(100, [1.02, 1.02, 1.02, 1.02, 1.02]));
 assert(
   captureSectorTrends(weakIndex, membersFollowing(weakIndex, 2)).length === 0,
