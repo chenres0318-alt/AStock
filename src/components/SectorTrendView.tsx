@@ -205,7 +205,7 @@ export default function SectorTrendView() {
           <div>
             <div className="text-sm">近期趋势捕捉</div>
             <div className="mt-1 max-w-3xl text-xs leading-5 text-mute">
-              同花顺近期趋势捕捉波段：打出低点的当天，收盘拉到日内高位，当天涨幅或从低点拉起的幅度够，并且多数个股在涨、有领涨龙头，就按疑似启动画出红框。低点守住之后，框延伸到最新一根，锤线后先回一下再拉起也算同一段。跌破这个低点，疑似启动撤回。已经走出的一段如果涨幅回吐，或日收盘同时跌破 MA4 和 MA7，改成灰框，终点留在高点。走完后太短、太浅的小波段不画框。
+              周 K 收盘站上周线 MA4 和 MA10，按趋势开始画出红框。之后只要周线还站在 MA4 上，框延伸到最新一根。周 K 收盘跌破 MA4，改成灰框，停在跌破前最后一根。
             </div>
           </div>
           <BoardPicker
