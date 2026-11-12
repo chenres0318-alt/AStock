@@ -230,6 +230,23 @@ assert(
 );
 assert(!indexCouldBeOpen(softClose), "a weak close on the low day is not an open trend");
 
+/** 下跌里的锤线收盘仍在 MA4 下，不算启动。 */
+const dump = Array.from({ length: 8 }, (_, i) => kbar(i, 110 - i * 2, 109.5 - i * 2, 110.5 - i * 2));
+const belowMa4Hammer = [...dump, kbar(8, 97.5, 94, 99, 96)];
+assert(
+  captureSectorTrends(belowMa4Hammer, membersAheadFrom(belowMa4Hammer, 8)).length === 0,
+  "a hammer that still closes below MA4 is not a launch",
+);
+assert(!indexCouldBeOpen(belowMa4Hammer), "price-only window also waits until the index stands on MA4");
+
+/** 从低点反弹 3%，但始终没站上 MA4，不成段。 */
+const missMa4Swing = barsFromCloses([120, 118, 116, 114, 112, 110, 100, 101, 103]);
+assert(
+  captureSectorTrends(missMa4Swing, membersFollowing(missMa4Swing)).length === 0,
+  "a bounce that never stands on MA4 is not a trend",
+);
+assert(!indexCouldBeOpen(missMa4Swing), "an index still under MA4 is not an open trend");
+
 const brokenLow = [...reversal, kbar(9, 94, 93, 97, 103)];
 assert(
   captureSectorTrends(brokenLow, membersAheadFrom(brokenLow, 8)).length === 0,

@@ -106,7 +106,7 @@ function sameDayLaunch(
   members: SectorMemberPath[],
   index: number,
 ): { gain: number; breadth: ReturnType<typeof segmentBreadth> } | null {
-  if (!priceReversal(bars, index)) return null;
+  if (!priceReversal(bars, index) || !barOnMa4(bars, index)) return null;
   const dayGain = bars[index].close / bars[index - 1].close - 1;
   const breadth = segmentBreadth(bars, members, index - 1, index);
   const leader = breadth.leaders[0];
@@ -187,9 +187,9 @@ function swingStats(bars: KBar[], start: number, end: number) {
   return { closeGain, efficiency, amplitude };
 }
 
-/** 收盘涨幅够，并且从低点拉起的路径够顺。锤线后先回一下再走，效率按低点算。 */
+/** 收盘涨幅够，并且从低点拉起的路径够顺。锤线后先回一下再走，效率按低点算。启动当天指数还要站上 MA4。 */
 function priceSwingQualifies(bars: KBar[], start: number, end: number): boolean {
-  if (end - start + 1 < MIN_BARS || !(bars[start].close > 0)) return false;
+  if (end - start + 1 < MIN_BARS || !(bars[start].close > 0) || !barOnMa4(bars, end)) return false;
   const stats = swingStats(bars, start, end);
   return stats.closeGain >= MIN_GAIN && stats.efficiency >= MIN_EFFICIENCY && stats.amplitude >= MIN_GAIN;
 }
@@ -210,7 +210,7 @@ function qualifies(
 }
 
 /**
- * 从每个局部低点走到启动日。当天收在高位只算疑似启动，真正成段要等收盘涨幅和路径都够。
+ * 从每个局部低点走到启动日。当天收在高位且指数站上 MA4 只算疑似启动，真正成段要等收盘涨幅和路径都够。
  * 还没成段时只看有没有跌破低点，锤线后的回吐不收口，好把 V 形波段连成一段。
  * 成段之后守着起点、涨幅也没回吐光：红框一直画到最新一根。
  * 之后跌破起点、日收盘同时跌破 MA4 和 MA7、或回吐八成：收成灰框，终点留在高点。还没成段就失败的脉冲不画框。
@@ -350,6 +350,15 @@ function maRising(closes: number[], period: number, index: number): boolean {
 
 function closeOnMa4(closes: number[], index: number, spot = closes[index]): boolean {
   return closeOnMa(closes, 4, index, spot);
+}
+
+/** 这一根收盘是否站上日线 MA4。均线还没出来时不算。 */
+function barOnMa4(bars: KBar[], index: number): boolean {
+  if (index < 3 || index >= bars.length) return false;
+  return closeOnMa4(
+    [bars[index - 3].close, bars[index - 2].close, bars[index - 1].close, bars[index].close],
+    3,
+  );
 }
 
 /** 指数或个股最新价是否站上 4 日均线。 */
@@ -493,7 +502,10 @@ function priceWindowCouldStayOpen(bars: KBar[], start: number): boolean {
     if (born && (giveback >= FAIL_GIVEBACK || brokeDayMa4AndMa7(closes, j))) return false;
     if (born && j >= peak + COMPLETE_LAG && giveback >= COMPLETE_GIVEBACK) return false;
   }
-  if (!born) return reversal && bars[bars.length - 1].close >= floor;
+  if (!born) {
+    const last = bars.length - 1;
+    return reversal && bars[last].close >= floor && barOnMa4(bars, last);
+  }
   if (start === bars.length - 1) return true;
   return givebackRatio(bars, start, peak, bars.length - 1, reversal) < COMPLETE_GIVEBACK;
 }
@@ -527,7 +539,7 @@ export function trendCoversLastBar(segments: SectorTrendSegment[], lastTime: str
 }
 
 /**
- * 同花顺近期趋势捕捉波段：从局部低点走到启动日。当天收在高位只算疑似启动；收盘涨幅和路径够了才成段。
+ * 同花顺近期趋势捕捉波段：从局部低点走到启动日。当天收在高位且指数站上 MA4 只算疑似启动；收盘涨幅和路径够了才成段。
  * 低点守住则延伸到最新一根；跌破低点、日收盘同时跌破 MA4 和 MA7、或回吐八成收成灰框，终点留在高点。
  * 还没成段就失败的脉冲、以及走完后太短太浅的小波段不画框。
  */
