@@ -129,7 +129,7 @@ export type ScreenerHit = {
   dif: number;
   dea: number;
   hist: number;
-  /** 行业红框和概念红框同时开着的交易日数（含当天）。 */
+  /** 日 K 连续站上 MA4 的交易日数（含当天）。 */
   standDays: number;
   reasons: string[];
   sector: string | null;

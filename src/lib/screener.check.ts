@@ -6,6 +6,7 @@ import {
   consecutiveMa4AboveMa7,
   consecutiveOnMa4,
   consecutiveOnMa4AndMa7,
+  consecutiveOnMa4AndMa7AndMa10,
   dailyToMonthly,
   dailyToWeekly,
   decorateMa4Crosses,
@@ -129,9 +130,9 @@ const ranked = hits([
     members,
   }),
 ]);
-assert(ranked.length === 2, "both names standing on MA4 and MA7 are kept");
-assert(ranked[0].name === "短站" && ranked[0].days === 1, "equal box days then the shortest stock stand comes first");
-assert(ranked[1].name === "长站", "the longer stock stand is still listed after");
+assert(ranked.length === 2, "both names standing on MA4, MA7 and MA10 are kept");
+assert(ranked[0].name === "短站" && ranked[0].days === 1, "the shortest daily MA4 stand comes first");
+assert(ranked[1].name === "长站", "the longer MA4 stand is still listed after");
 assert(ranked[0].sectorCode === "881121", "the hit keeps the industry board");
 assert(ranked[0].boards.map((item) => item.name).join(",") === "半导体,测试概念", "所属板块 lists the industry then the concept");
 assert(ranked[0].price === 10, "price comes from the board roster");
@@ -261,9 +262,11 @@ const weekMa4Needed = hits([
     ],
   }),
 ]);
+assert(weekMa4Needed.length === 7, "weekly MA4/MA7 is not required");
 assert(
-  weekMa4Needed.map((row) => row.name).join(",") === "缺月K,周已两周,周只空一周,MA4还在下",
-  "daily plus weekly MA4 and MA7 are required; first-week, monthly MA4 and MA4 above MA7 are not",
+  weekMa4Needed.map((row) => row.name).sort().join(",") ===
+    ["MA4还在下", "只有日K", "周只空一周", "周已两周", "缺周K", "缺周MA7", "缺月K"].sort().join(","),
+  "daily MA4/MA7/MA10 still hits when weekly or monthly flags are missing",
 );
 
 const rankedDays = hits([
@@ -280,9 +283,9 @@ const rankedDays = hits([
     ],
   }),
 ]);
-assert(rankedDays.map((row) => row.name).join(",") === "平安样,横店样", "equal box days then shorter stock stand ranks first");
-assert(rankedDays[0]?.days === 1 && rankedDays[1]?.days === 2, "stock stand is the tie-break after box duration");
-assert(rankedDays[0]?.holdDays === 4 && rankedDays[1]?.holdDays === 4, "default openTrend 10-20 to 10-23 is 4 box days");
+assert(rankedDays.map((row) => row.name).join(",") === "平安样,横店样", "shorter daily MA4 stand ranks first");
+assert(rankedDays[0]?.days === 1 && rankedDays[1]?.days === 2, "持续天数 is consecutive daily MA4 stand days");
+assert(rankedDays[0]?.holdDays === 1 && rankedDays[1]?.holdDays === 2, "all-three stand days stay on holdDays when decorate is skipped");
 
 assert(
   dualBoxDays({
@@ -354,9 +357,9 @@ const boxRanked = collectMa4StandHits([
     members: [{ code: "sh600102", name: "短框", price: 11, pct: 1, turnover: 1 }],
   }),
 ]);
-assert(boxRanked.map((row) => row.name).join(",") === "短框,长框", "shorter dual red-box duration ranks first");
-assert(boxRanked[0]?.holdDays === 2 && boxRanked[1]?.holdDays === 8, "持续天数 is the overlap of industry and concept boxes");
-assert(boxRanked[0]?.days === 2 && boxRanked[1]?.days === 1, "stock stand no longer decides the duration column");
+assert(boxRanked.map((row) => row.name).join(",") === "长框,短框", "shorter daily MA4 stand ranks first even when its red boxes lasted longer");
+assert(boxRanked[0]?.days === 1 && boxRanked[1]?.days === 2, "持续天数 follows daily MA4 stand days, not the red-box overlap");
+assert(boxRanked[0]?.holdDays === 1 && boxRanked[1]?.holdDays === 2, "all-three stand days still cap who qualifies");
 
 const crossDoesNotBeatShort = hits([
   screen({
@@ -374,7 +377,7 @@ const crossDoesNotBeatShort = hits([
 ]);
 assert(
   crossDoesNotBeatShort.map((row) => row.name).join(",") === "无上叉短",
-  "a stand longer than 2 days is dropped even with a MA4/MA7 cross",
+  "a simultaneous MA4/MA7/MA10 stand longer than 2 days is dropped even with a MA4/MA7 cross",
 );
 
 const twoDurations = hits([
@@ -407,7 +410,7 @@ const weekOnlyLonger = hits([
     ],
   }),
 ]);
-assert(weekOnlyLonger.map((row) => row.name).join(",") === "日周都有", "weekly MA7 is required; a 1-2 day daily stand still qualifies");
+assert(weekOnlyLonger.map((row) => row.name).join(",") === "无周MA7短,日周都有", "weekly MA7 is not required; shorter daily MA4 stand still ranks first");
 
 const wave1 = collectMa4StandHits([
   screen({
@@ -475,6 +478,28 @@ const overTwo = hits([
 ]);
 assert(overTwo.map((row) => row.name).join(",") === "刚好2日", "day 2 is kept and day 3 is dropped");
 
+const ma4Longer = hits([
+  screen({
+    code: "881121",
+    name: "半导体",
+    crosses: [
+      { code: "sh600080", name: "MA4已5日", days: 5, holdDays: 1, time: "2026-10-23", ...dw },
+      { code: "sh600081", name: "三线刚1日", days: 1, holdDays: 1, time: "2026-10-23", ...dw },
+      { code: "sh600082", name: "三线已3日", days: 4, holdDays: 3, time: "2026-10-23", ...dw },
+    ],
+    members: [
+      { code: "sh600080", name: "MA4已5日", price: 10, pct: 1, turnover: 1 },
+      { code: "sh600081", name: "三线刚1日", price: 11, pct: 1, turnover: 1 },
+      { code: "sh600082", name: "三线已3日", price: 12, pct: 1, turnover: 1 },
+    ],
+  }),
+]);
+assert(
+  ma4Longer.map((row) => row.name).join(",") === "三线刚1日,MA4已5日",
+  "the 1-2 day cap is on MA4+MA7+MA10; MA4-only duration still ranks shorter first",
+);
+assert(ma4Longer[0]?.days === 1 && ma4Longer[1]?.days === 5, "持续天数 follows daily MA4 stand even past two days");
+
 const bothByDays = collectMa4StandHits([
   screen({
     code: "881121",
@@ -540,6 +565,10 @@ assert(consecutiveOnMa4([10, 11, 12, 13]) === 1, "four rising closes are the fir
 assert(consecutiveOnMa4AndMa7([10, 11, 12, 13, 14, 15, 16]) === 1, "seven rising closes are the first bar that can stand on MA4 and MA7");
 assert(consecutiveOnMa4AndMa7(Array.from({ length: 10 }, () => 12)) === 4, "a flat tape stands on both MAs from the seventh bar onward");
 assert(consecutiveOnMa4AndMa7([10, 11, 12, 13, 14, 15, 9]) === 0, "a last close under MA7 is not standing on both");
+assert(consecutiveOnMa4AndMa7AndMa10(Array.from({ length: 10 }, (_, i) => 10 + i)) === 1, "ten rising closes are the first bar that can stand on MA4, MA7 and MA10");
+assert(consecutiveOnMa4AndMa7AndMa10(Array.from({ length: 14 }, () => 12)) === 5, "a flat tape stands on MA4, MA7 and MA10 from the tenth bar onward");
+assert(consecutiveOnMa4AndMa7AndMa10([16, 16, 16, 12, 12, 12, 12, 12, 12, 12]) === 0, "a last close under MA10 is not standing on all three");
+assert(consecutiveOnMa4AndMa7([16, 16, 16, 12, 12, 12, 12, 12, 12, 12]) === 1, "the same tape still stands on MA4 and MA7");
 function fenTouchCloses(price: number): number[] {
   const lead = Array.from({ length: 6 }, () => Math.round((price - 0.5) * 100) / 100);
   const bump = Math.round((price + 0.01) * 100) / 100;
@@ -626,7 +655,8 @@ const weekMa7Decorated = decorateMa4Crosses(
 );
 assert(weekMa7Decorated[0]?.weekOnMa4 === true && weekMa7Decorated[0]?.weekOnMa7 === true, "decorate fills weekly MA4 and MA7");
 assert((weekMa7Decorated[0]?.weekDays ?? 0) > 1, "a rising weekly tape has already stood more than the first week");
-assert((weekMa7Decorated[0]?.holdDays ?? 0) >= 1, "decorate fills how long daily and weekly stands have held together");
+assert((weekMa7Decorated[0]?.holdDays ?? 0) >= 1, "decorate fills how long daily MA4, MA7 and MA10 have held together");
+assert((weekMa7Decorated[0]?.days ?? 0) >= (weekMa7Decorated[0]?.holdDays ?? 0), "MA4 stand days are at least as long as the all-three stand");
 
 const firstWeekBars = tradingBars([
   ...Array.from({ length: 15 }, () => 10),

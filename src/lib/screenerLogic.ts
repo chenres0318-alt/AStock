@@ -50,7 +50,7 @@ export type SectorMa4Cross = {
   ma4OnMa7?: boolean;
   /** MA4 上叉 MA7 已持续的交易日数；未上叉为 0。 */
   crossDays?: number;
-  /** 当前这些条件同时成立的交易日数。 */
+  /** 日 K 同时站上 MA4、MA7、MA10 的交易日数。 */
   holdDays?: number;
 };
 
@@ -84,6 +84,7 @@ export type ScreenerBoardRef = {
 export type Ma4StandHit = {
   code: string;
   name: string;
+  /** 日 K 连续站上 MA4 的交易日数（含当天）。 */
   days: number;
   since: string;
   sector: string;
@@ -104,7 +105,7 @@ export type Ma4StandHit = {
   ma4OnMa7: boolean;
   /** MA4 上叉 MA7 已持续的交易日数；未上叉为 0。 */
   crossDays: number;
-  /** 行业红框和概念红框同时开着的交易日数。 */
+  /** 日 K 同时站上 MA4、MA7、MA10 的交易日数。 */
   holdDays: number;
 };
 
@@ -230,6 +231,11 @@ export function consecutiveOnMa4AndMa7(closes: number[], spot?: number | null): 
   return consecutiveOnPeriods(closes, [4, 7], spot);
 }
 
+/** 从最新一根往前数，收盘连续同时站上 MA4、MA7、MA10 的根数。 */
+export function consecutiveOnMa4AndMa7AndMa10(closes: number[], spot?: number | null): number {
+  return consecutiveOnPeriods(closes, [4, 7, 10], spot);
+}
+
 function periodStand(
   bars: KBar[],
   price?: number | null,
@@ -334,10 +340,7 @@ export function signalDurationLines(hit: {
   monthDays?: number;
   days: number;
 }): string[] {
-  const lines: string[] = [];
-  if (hit.weekOnMa4 && hit.weekOnMa7 !== false) lines.push(`周${Math.max(hit.weekDays, 1)}周`);
-  lines.push(`日${hit.days}日`);
-  return lines;
+  return [`日${hit.days}日`];
 }
 
 export function weekStandsOnMa4(bars: KBar[], price?: number | null): boolean {
@@ -382,14 +385,13 @@ export function decorateMa4Crosses(
     const weekCloses = weekBars.map((bar) => bar.close);
     const crossed = ma4CrossedUpMa7(closes);
     const crossDays = consecutiveMa4AboveMa7(closes);
-    const dailyDays = consecutiveOnMa4AndMa7(closes, stock.price) || cross.days;
-    const dailySince =
-      dailyDays && stock.bars.length >= dailyDays ? stock.bars[stock.bars.length - dailyDays]?.time : cross.time;
-    const weekSince = week.on && week.since ? weekStart(week.since) : "";
+    const ma4Days = consecutiveOnMa4(closes, stock.price) || cross.days;
+    const allThreeDays = consecutiveOnMa4AndMa7AndMa10(closes, stock.price);
+    const ma4Since = ma4Days && stock.bars.length >= ma4Days ? stock.bars[stock.bars.length - ma4Days]?.time : cross.time;
     return {
       ...cross,
-      days: dailyDays,
-      time: dailySince || cross.time,
+      days: ma4Days,
+      time: ma4Since || cross.time,
       ma4CrossUpMa7: crossed,
       ma4OnMa7: ma4AboveMa7(closes, closes.length - 1),
       weekOnMa4: weekMa4.on,
@@ -399,11 +401,7 @@ export function decorateMa4Crosses(
       weekGap: weeksOffMa4Before(weekCloses),
       monthDays: month.days,
       crossDays,
-      holdDays: conditionHoldDays({
-        dailyDays,
-        dailySince,
-        bars: stock.bars,
-      }),
+      holdDays: allThreeDays,
     };
   });
 }
@@ -461,11 +459,10 @@ function sortScreenerBoards(boards: ScreenerBoardRef[]): ScreenerBoardRef[] {
 function withBoards(hit: Ma4StandHit, boards: ScreenerBoardRef[]): Ma4StandHit {
   const ordered = sortScreenerBoards(boards);
   const primary = ordered.find((item) => isIndustryBoard(item.code)) ?? ordered[0] ?? { code: hit.sectorCode, name: hit.sector };
-  const next = { ...hit, boards: ordered, sector: primary.name, sectorCode: primary.code };
-  return { ...next, holdDays: dualBoxDays(next) };
+  return { ...hit, boards: ordered, sector: primary.name, sectorCode: primary.code };
 }
 
-/** 选股：日 K 同时站上 MA4 和 MA7 的持续天数上限（含当天）。 */
+/** 选股：日 K 同时站上 MA4、MA7、MA10 的持续天数上限（含当天）。 */
 export const SCREENER_MAX_STAND_DAYS = 2;
 
 /** 红框从 start 到 end 的天数；有 K 线时按交易日计。 */
@@ -494,12 +491,8 @@ export function dualBoxDays(hit: { boards: ScreenerBoardRef[]; days?: number; ho
   return industry || concept || hit.holdDays || hit.days || 1;
 }
 
-function standDuration(hit: Ma4StandHit): number {
-  return dualBoxDays(hit);
-}
-
 function hitRank(hit: Ma4StandHit): number[] {
-  return [standDuration(hit), hit.days];
+  return [hit.days];
 }
 
 function betterHit(next: Ma4StandHit, prev: Ma4StandHit | undefined): boolean {
@@ -513,8 +506,8 @@ function betterHit(next: Ma4StandHit, prev: Ma4StandHit | undefined): boolean {
 }
 
 /**
- * 必须：个股日 K 站上 MA4 和 MA7（1～2 日），周 K 站上 MA4 和 MA7；所属行业和至少一个概念都要红框覆盖最新一根。
- * 只过行业或只过概念的不要。持续天数按行业和概念红框同时开着的天数从短到长排。同一只股票只留一条。不含科创、创业、北交所、ST。
+ * 必须：个股日 K 同时站上 MA4、MA7、MA10（1～2 日）；所属行业和至少一个概念都要红框覆盖最新一根。不看周 K。
+ * 只过行业或只过概念的不要。持续天数按日 K 站上 MA4 的天数从短到长排。同一只股票只留一条。不含科创、创业、北交所、ST。
  */
 export function collectMa4StandHits(sectors: SectorMa4Screen[]): Ma4StandHit[] {
   const best = new Map<string, Ma4StandHit>();
@@ -558,7 +551,7 @@ export function collectMa4StandHits(sectors: SectorMa4Screen[]): Ma4StandHit[] {
           monthDays,
           ma4OnMa7,
           crossDays,
-          holdDays: boxDays,
+          holdDays: cross.holdDays ?? cross.days,
         },
         [boardRef],
       );
@@ -574,12 +567,8 @@ export function collectMa4StandHits(sectors: SectorMa4Screen[]): Ma4StandHit[] {
   return [...best.values()]
     .filter(hasIndustryAndConcept)
     .filter((hit) => {
-      return (
-        hit.weekOnMa4 &&
-        hit.weekOnMa7 &&
-        hit.days >= 1 &&
-        hit.days <= SCREENER_MAX_STAND_DAYS
-      );
+      const allThreeDays = hit.holdDays || hit.days;
+      return allThreeDays >= 1 && allThreeDays <= SCREENER_MAX_STAND_DAYS;
     })
     .sort((a, b) => {
       const left = hitRank(a);
