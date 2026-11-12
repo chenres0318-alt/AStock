@@ -112,9 +112,9 @@ function toMemberPaths(series: Array<{ code: string; name: string; bars: KBar[] 
   });
 }
 
-/** 波段红框要从更早的低点走到现在。 */
+/** 周线 MA10 大约要 10 周日线；多留一些以便红框从更早的起点走到现在。 */
 const TREND_BARS = 700;
-/** 红框是否还开着只看最近一段波段，不必把多年日线都拉一遍。 */
+/** 红框是否还开着要够算周 MA10，大约 10～12 周。 */
 const LIVE_BARS = 160;
 
 async function boardSeries(code: string, count: number): Promise<{ name: string; bars: KBar[] }> {
@@ -146,7 +146,7 @@ export async function getSectorTrend(code: string): Promise<SectorTrendReport> {
   const boardCode = code.trim();
   if (!isTonghuashunBoard(boardCode)) throw new UpstreamError("请从同花顺行业或概念里选择一个板块", 400);
   return cached(
-    `sector-trend-report:v18:${boardCode}`,
+    `sector-trend-report:v20:${boardCode}`,
     10 * 60_000,
     () => loadSectorTrend(boardCode),
     (report) => report.memberCount >= 5 || report.trends.length > 0,
@@ -334,7 +334,7 @@ async function scanOpenTrend(
 
 /**
  * 最新一根还落在趋势区间里的板块代码。
- * 下拉标红只看指数波段红框能不能留到最后一根，避免对全市场成分股再扫一遍把当前板块拖死。
+ * 下拉标红只看周 K 是否还站在 MA4（并且这段是从 MA4+MA10 站上开始的），避免对全市场成分股再扫一遍把当前板块拖死。
  * 选股扫行业和概念。板块页一进就扫指数红框给下拉标红，不等点进某个板块；点进去只补成分股龙头，不再改红白。
  */
 export async function listBoardsInTrend(
@@ -350,13 +350,13 @@ export async function listBoardsInTrend(
       return mergeTrendScan(industry, concept);
     }
     if (scope === "concept") {
-      return await loadTrendScan("boards-in-open-trend:concept:v16", onLive, async (emit) => {
+      return await loadTrendScan("boards-in-open-trend:concept:v18", onLive, async (emit) => {
         const boards = await listTonghuashunConcepts().catch(() => [] as SectorItem[]);
         if (!boards.length) return { codes: [] as string[], offMa4: [] as string[] };
         return scanOpenTrend(boards, 10, emit);
       });
     }
-    return await loadTrendScan("boards-in-open-trend:v20", onLive, async (emit) => {
+    return await loadTrendScan("boards-in-open-trend:v22", onLive, async (emit) => {
       const boards = await listAllIndustryBoards();
       return scanOpenTrend(boards, 8, emit);
     });
