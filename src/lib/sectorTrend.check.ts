@@ -112,10 +112,9 @@ assert(
 const fadedCloses = rise(100, [1.03], [0.9]);
 const faded = withLaunchLow(fadedCloses);
 const fadedAt = faded.findIndex((bar, index) => index > 0 && bar.close !== faded[index - 1].close);
-const fadedTrends = captureSectorTrends(faded, membersAheadFrom(faded, fadedAt));
 assert(
-  fadedTrends.length === 1 && fadedTrends[0].status === "closed" && fadedTrends[0].end === faded[fadedAt].time,
-  "a launch that breaks the next day stays as a gray box ending on the launch day",
+  captureSectorTrends(faded, membersAheadFrom(faded, fadedAt)).length === 0,
+  "a launch that breaks the next day is a failed pulse, not a gray box",
 );
 
 const held = barsFromCloses(rise(100, [1.02, 1.02, 1.02, 1.02, 1.015]));
@@ -224,6 +223,43 @@ assert(
     heldLowTrends[0].start === reversal.at(-1)?.time &&
     heldLowTrends[0].end === heldLow.at(-1)?.time,
   "once the next day holds the low, the box stays and runs through the latest bar",
+);
+
+/** 锤线低点之后先回一下再拉起来，应画成一段，而不是收在锤线当天。 */
+const vBottom = [
+  ...flats,
+  kbar(8, 103, 96, 104, 100),
+  kbar(9, 101, 99, 102, 103),
+  kbar(10, 100.5, 99.2, 101.5, 101),
+  kbar(11, 103.5, 100.8, 104, 100.5),
+  kbar(12, 106, 103, 106.5, 103.5),
+  kbar(13, 108, 105.5, 108.5, 106),
+  kbar(14, 109.5, 107.5, 110, 108),
+  kbar(15, 108.2, 107.8, 109.8, 109.5),
+  kbar(16, 106.4, 106, 108.4, 108.2),
+];
+const vTrends = captureSectorTrends(vBottom, membersFollowing(vBottom));
+assert(
+  vTrends.length === 1 &&
+    vTrends[0].status === "closed" &&
+    vTrends[0].start === vBottom[8].time &&
+    vTrends[0].end === vBottom[14].time,
+  "a hammer plus a later rally is one closed swing from the low to the high",
+);
+assert(vTrends[0].gain >= 0.05, "that swing clears the closed-box gain floor");
+
+/** 下跌里 4 根 4% 的反弹，走完后丢掉。 */
+const shortBounce = [
+  ...flats,
+  kbar(8, 96, 95.5, 98, 100),
+  kbar(9, 97, 96.2, 97.5, 96),
+  kbar(10, 98.5, 96.8, 99, 97),
+  kbar(11, 99.9, 98, 100.2, 98.5),
+  kbar(12, 97.2, 96.8, 99.5, 99.9),
+];
+assert(
+  captureSectorTrends(shortBounce, membersFollowing(shortBounce)).length === 0,
+  "a 4-day 4% bounce that already gave back is not kept as a gray box",
 );
 
 function tradingBars(closes: number[], start = "2024-01-02"): KBar[] {
