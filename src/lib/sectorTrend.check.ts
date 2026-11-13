@@ -53,49 +53,53 @@ function fromWeeks(weekCloses: number[]): KBar[] {
 }
 
 const tooShort = fromWeeks(Array.from({ length: 3 }, () => 100));
-assert(captureSectorTrends(tooShort).length === 0, "three weeks cannot stand on weekly MA4");
+assert(captureSectorTrends(tooShort).length === 0, "three weeks cannot stack weekly MA4>MA7>MA10");
 assert(!indexCouldBeOpen(tooShort), "three weeks is not an open weekly trend");
 const fourWeeks = fromWeeks(Array.from({ length: 4 }, () => 100));
-assert(indexCouldBeOpen(fourWeeks), "four flat weeks on weekly MA4 start an open red box");
+assert(!indexCouldBeOpen(fourWeeks), "four weeks is not enough for weekly MA10");
+assert(!indexCouldBeOpen(fromWeeks(Array.from({ length: 12 }, () => 100))), "flat weeks are not MA4>MA7>MA10");
 
-const standing = fromWeeks(Array.from({ length: 12 }, () => 100));
+const standing = fromWeeks(Array.from({ length: 12 }, (_, i) => 100 + i));
 const standingTrends = captureSectorTrends(standing);
 assert(
   standingTrends.length === 1 && standingTrends[0].status === "open" && standingTrends[0].end === standing.at(-1)?.time,
-  "twelve flat weeks on MA4 stay an open red box",
+  "twelve rising weeks with MA4>MA7>MA10 stay an open red box",
 );
-assert(indexCouldBeOpen(standing), "a weekly MA4 stand looks open on price alone");
+assert(indexCouldBeOpen(standing), "a weekly MA4>MA7>MA10 stack looks open on price alone");
 assert(openPriceTrend(standing)?.end === standing.at(-1)?.time, "price-only window covers the latest bar");
 assert(trendCoversLastBar(standingTrends, standing.at(-1)?.time), "the open box covers the latest bar");
 assert(captureSectorTrends(standing, []).length === 1, "drawing the weekly box does not need constituents");
 
-const crashed = fromWeeks([...Array.from({ length: 12 }, () => 100), 90]);
+const pullbackAboveMa7 = fromWeeks([...Array.from({ length: 12 }, (_, i) => 100 + i), 109]);
+assert(indexCouldBeOpen(pullbackAboveMa7), "a dip under weekly MA4 still keeps the box while the index is above MA7");
+
+const crashed = fromWeeks([...Array.from({ length: 12 }, (_, i) => 100 + i), 90]);
 const crashedTrends = captureSectorTrends(crashed);
-assert(crashedTrends.length === 1 && crashedTrends[0].status === "closed", "breaking weekly MA4 closes the box");
+assert(crashedTrends.length === 1 && crashedTrends[0].status === "closed", "an index below weekly MA7 closes the box");
 assert(
   crashedTrends[0].end === standing.at(-1)?.time,
-  "the gray box stops on the last day still on weekly MA4",
+  "the gray box stops on the last day still at or above weekly MA7",
 );
-assert(!indexCouldBeOpen(crashed), "a weekly MA4 break is no longer an open trend");
+assert(!indexCouldBeOpen(crashed), "an index below weekly MA7 is no longer an open trend");
 assert(!trendCoversLastBar(crashedTrends, crashed.at(-1)?.time), "a closed box does not cover the break day");
 
-/** 周线站上 MA4 即可启动，不必再站上 MA10。 */
+/** 只站上周线 MA4、没有 MA4>MA7>MA10，不能开红框。 */
 const ma4OnlyWeek = fromWeeks([120, 119, 118, 117, 116, 108, 108, 108, 108.2, 108.3]);
-assert(captureSectorTrends(ma4OnlyWeek).some((item) => item.status === "open"), "weekly MA4 without MA10 still starts a red box");
-assert(indexCouldBeOpen(ma4OnlyWeek), "an index on weekly MA4 but under MA10 is still open");
+assert(!captureSectorTrends(ma4OnlyWeek).some((item) => item.status === "open"), "weekly MA4 without MA4>MA7>MA10 does not start a red box");
+assert(!indexCouldBeOpen(ma4OnlyWeek), "an index on weekly MA4 but not stacked is not open");
 
 const restarted = fromWeeks([
-  ...Array.from({ length: 12 }, () => 100),
+  ...Array.from({ length: 12 }, (_, i) => 100 + i),
   90,
   90,
-  ...Array.from({ length: 12 }, () => 110),
+  ...Array.from({ length: 12 }, (_, i) => 110 + i),
 ]);
 const restartedTrends = captureSectorTrends(restarted);
 assert(
   restartedTrends.length === 2 &&
     restartedTrends[0].status === "closed" &&
     restartedTrends[1].status === "open",
-  "after a weekly MA4 break, standing on MA4 again starts a new red box",
+  "after the index falls below weekly MA7, stacking MA4>MA7>MA10 again starts a new red box",
 );
 
 assert(isTonghuashunIndustry("881121") && !isTonghuashunConcept("881121"), "an industry code stays an industry");
