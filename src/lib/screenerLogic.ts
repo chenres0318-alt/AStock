@@ -303,6 +303,7 @@ export function collectRibbonHits(
     turnover?: number | null;
     sector?: string;
     sectorCode?: string;
+    boards?: ScreenerBoardRef[];
   }>,
 ): RibbonHit[] {
   const best = new Map<string, RibbonHit>();
@@ -314,9 +315,8 @@ export function collectRibbonHits(
     const days = consecutiveMaRibbonDays(closes, stock.price);
     if (days < 1) continue;
     const since = stock.bars[stock.bars.length - days]?.time ?? "";
-    const boardCode = stock.sectorCode ?? "";
-    const boardName = stock.sector ?? "";
-    const boards = boardCode || boardName ? [{ code: boardCode, name: boardName || boardCode }] : [];
+    const boards = ribbonHitBoards(stock);
+    const primary = boards.find((item) => isIndustryBoard(item.code)) ?? boards[0] ?? { code: "", name: "" };
     const hit: RibbonHit = {
       code: stock.code,
       name: stock.name,
@@ -325,12 +325,19 @@ export function collectRibbonHits(
       price: stock.price ?? null,
       pct: stock.pct ?? null,
       turnover: stock.turnover ?? null,
-      sector: boardName,
-      sectorCode: boardCode,
+      sector: primary.name,
+      sectorCode: primary.code,
       boards,
     };
     const prev = best.get(hit.code);
-    if (!prev || hit.days < prev.days) best.set(hit.code, hit);
+    if (!prev) {
+      best.set(hit.code, hit);
+      continue;
+    }
+    const keep = hit.days < prev.days ? hit : prev;
+    const merged = sortScreenerBoards([...prev.boards, ...hit.boards]);
+    const home = merged.find((item) => isIndustryBoard(item.code)) ?? merged[0] ?? keep;
+    best.set(hit.code, { ...keep, boards: merged, sector: home.name, sectorCode: home.code });
   }
   return [...best.values()].sort((a, b) => {
     if (a.days !== b.days) return a.days - b.days;
@@ -541,6 +548,19 @@ export function dualBoxMemberIds(sectors: SectorMa4Screen[]): string[] {
     }
   }
   return [...industry].filter((id) => concept.has(id));
+}
+
+function ribbonHitBoards(stock: {
+  sector?: string;
+  sectorCode?: string;
+  boards?: ScreenerBoardRef[];
+}): ScreenerBoardRef[] {
+  const ordered = sortScreenerBoards(stock.boards ?? []);
+  if (ordered.length) return ordered;
+  const code = stock.sectorCode ?? "";
+  const name = stock.sector ?? "";
+  if (!code && !name) return [];
+  return [{ code, name: name || code }];
 }
 
 function sortScreenerBoards(boards: ScreenerBoardRef[]): ScreenerBoardRef[] {

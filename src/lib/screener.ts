@@ -1,7 +1,7 @@
-import { listAllIndustryBoards, listBoardMembers } from "./boards";
+import { listAllIndustryBoards, listBoardMembers, listTonghuashunConcepts } from "./boards";
 import { bareCode, toTencentCode } from "./codes";
 import { loadScreenerMemberKlines } from "./sectorTrendData";
-import { collectRibbonHits, isScreenerShare } from "./screenerLogic";
+import { collectRibbonHits, isScreenerShare, type ScreenerBoardRef } from "./screenerLogic";
 import { raceDeadline, runDynamicPool } from "./pool";
 import { SCREENER_BOARD_MEMBER_LIMIT } from "./thsMemberPages";
 import type { BoardMember, ScreenerHit } from "./types";
@@ -66,6 +66,7 @@ type StockRow = {
   turnover: number | null;
   sector: string;
   sectorCode: string;
+  boards: ScreenerBoardRef[];
 };
 
 let job: ScanJob | null = null;
@@ -90,18 +91,27 @@ function startJob(): ScanJob {
     scanned: 0,
     universe: 0,
     liveBoards: 0,
+    industryLive: 0,
+    conceptLive: 0,
     stocks: [] as StockRow[],
+    boardsById: new Map<string, ScreenerBoardRef[]>(),
     done: false,
     discovering: true,
   };
+  const withBoards = (stock: StockRow): StockRow => ({
+    ...stock,
+    boards: state.boardsById.get(bareCode(stock.code)) ?? stock.boards,
+  });
   const snapshot = (): StockScreenResult => ({
     scanned: state.scanned,
     universe: state.universe,
     liveBoards: state.liveBoards,
-    items: collectRibbonHits(state.stocks).map(toHit),
-    source: "ths-industry",
+    items: collectRibbonHits(state.stocks.map(withBoards)).map(toHit),
+    source: "ths-board",
     scanning: !state.done,
     discovering: state.discovering,
+    industryLive: state.industryLive,
+    conceptLive: state.conceptLive,
     timedOut: state.done && (state.discovering || (state.universe > 0 && state.scanned < state.universe)),
   });
   const deadline = startedAt + SCAN_MAX_MS;
@@ -110,8 +120,14 @@ function startJob(): ScanJob {
     const seenBoards = new Set<string>();
     const seenStocks = new Set<string>();
     const boardNames = new Map<string, string>();
-    const sectorById = new Map<string, { sector: string; sectorCode: string }>();
     const quotes = new Map<string, BoardMember>();
+    const addBoard = (id: string, board: ScreenerBoardRef) => {
+      if (!board.code) return;
+      const list = state.boardsById.get(id) ?? [];
+      if (list.some((item) => item.code === board.code)) return;
+      list.push(board);
+      state.boardsById.set(id, list);
+    };
     let listingDone = false;
     let waiters: Array<() => void> = [];
     const wake = () => {
@@ -131,12 +147,13 @@ function startJob(): ScanJob {
       try {
         const members = await listBoardMembers(code, SCREENER_BOARD_MEMBER_LIMIT);
         const sector = boardNames.get(code) ?? "";
+        const board = { code, name: sector || code };
         const fresh: BoardMember[] = [];
         for (const member of members) {
           if (!isScreenerShare(member.code, member.name)) continue;
           const id = bareCode(member.code);
           if (!quotes.has(id)) quotes.set(id, member);
-          if (!sectorById.has(id)) sectorById.set(id, { sectorCode: code, sector });
+          addBoard(id, board);
           if (seenStocks.has(id)) continue;
           seenStocks.add(id);
           state.universe = seenStocks.size;
@@ -146,7 +163,6 @@ function startJob(): ScanJob {
           const rows = await loadScreenerMemberKlines(fresh);
           for (const row of rows) {
             const id = bareCode(row.code);
-            const home = sectorById.get(id);
             const quote = quotes.get(id);
             state.stocks.push({
               code: row.code,
@@ -155,8 +171,9 @@ function startJob(): ScanJob {
               price: row.price,
               pct: quote?.pct ?? null,
               turnover: quote?.turnover ?? null,
-              sector: home?.sector ?? "",
-              sectorCode: home?.sectorCode ?? "",
+              sector: "",
+              sectorCode: "",
+              boards: state.boardsById.get(id) ?? [],
             });
             state.scanned += 1;
           }
@@ -165,19 +182,27 @@ function startJob(): ScanJob {
         // skip board
       }
     };
-    const listing = listAllIndustryBoards()
-      .then((boards) => {
-        for (const board of boards) {
-          boardNames.set(board.code, board.name);
-          enqueue(board.code);
-        }
-        state.liveBoards = boards.length;
-      })
-      .finally(() => {
-        listingDone = true;
-        state.discovering = false;
-        wake();
-      });
+    const enqueueList = (boards: { code: string; name: string }[], kind: "industry" | "concept") => {
+      for (const board of boards) {
+        boardNames.set(board.code, board.name);
+        enqueue(board.code);
+      }
+      if (kind === "concept") state.conceptLive = boards.length;
+      else state.industryLive = boards.length;
+      state.liveBoards = state.industryLive + state.conceptLive;
+    };
+    const listing = Promise.all([
+      listAllIndustryBoards()
+        .then((boards) => enqueueList(boards, "industry"))
+        .catch(() => enqueueList([], "industry")),
+      listTonghuashunConcepts()
+        .then((boards) => enqueueList(boards, "concept"))
+        .catch(() => enqueueList([], "concept")),
+    ]).finally(() => {
+      listingDone = true;
+      state.discovering = false;
+      wake();
+    });
     await Promise.all([
       listing,
       runDynamicPool(BOARD_CONCURRENCY, {
@@ -190,11 +215,6 @@ function startJob(): ScanJob {
         work: scanBoard,
       }),
     ]);
-    for (const stock of state.stocks) {
-      if (stock.sector) continue;
-      const home = sectorById.get(bareCode(stock.code));
-      if (home?.sector) stock.sector = home.sector;
-    }
     state.done = true;
     state.discovering = false;
     return snapshot();

@@ -712,6 +712,32 @@ const ribbonRanked = collectRibbonHits([
 assert(ribbonRanked.map((row) => row.name).join(",") === "刚排好,排好久", "first-week names rank by daily ribbon duration; stale weekly stands and ChiNext drop");
 assert(ribbonRanked[0]?.days === 1, "the shortest daily ribbon still comes first");
 assert((ribbonRanked[1]?.days ?? 0) > 1, "a longer daily ribbon in the first week is still listed after");
+const ribbonBoards = collectRibbonHits([
+  {
+    code: "sh600001",
+    name: "刚排好",
+    bars: shortRibbonWeek,
+    price: 20,
+    boards: [
+      { code: "885799", name: "储能" },
+      { code: "881121", name: "半导体" },
+    ],
+  },
+  {
+    code: "sh600001",
+    name: "刚排好",
+    bars: shortRibbonWeek,
+    price: 20,
+    boards: [{ code: "885800", name: "光伏" }],
+    sector: "半导体",
+    sectorCode: "881121",
+  },
+]);
+assert(
+  ribbonBoards[0]?.boards.map((item) => item.name).join(",") === "半导体,储能,光伏",
+  "所属板块 lists the industry then every concept",
+);
+assert(ribbonBoards[0]?.sector === "半导体" && ribbonBoards[0]?.sectorCode === "881121", "the industry stays the primary board");
 
 const oneWeekWiggleBars = tradingBars([
   ...Array.from({ length: 15 }, () => 10),
