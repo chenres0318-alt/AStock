@@ -290,7 +290,8 @@ export type RibbonHit = {
 
 /**
  * 不看板块红框。股价站上 MA4，MA4>MA7>MA10，三根均线都比上一日高。
- * 持续天数按这些条件连续成立的交易日数从短到长排。同一只股票只留一条。不含科创、创业、北交所、ST。
+ * 周 K 须本周站上 MA4，且连续不超过 1 周。
+ * 持续天数按日线这些条件连续成立的交易日数从短到长排。同一只股票只留一条。不含科创、创业、北交所、ST。
  */
 export function collectRibbonHits(
   stocks: Array<{
@@ -307,6 +308,8 @@ export function collectRibbonHits(
   const best = new Map<string, RibbonHit>();
   for (const stock of stocks) {
     if (!isScreenerShare(stock.code, stock.name)) continue;
+    const week = periodStand(dailyToWeekly(stock.bars), stock.price);
+    if (!isFirstWeekOnMa4({ weekOnMa4: week.on, weekDays: week.days })) continue;
     const closes = stock.bars.map((bar) => bar.close);
     const days = consecutiveMaRibbonDays(closes, stock.price);
     if (days < 1) continue;
