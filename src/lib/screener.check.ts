@@ -240,6 +240,10 @@ assert(consecutiveMaRibbonDays(Array.from({ length: 16 }, () => 12)) === 0, "a f
 assert(consecutiveMaRibbonDays(Array.from({ length: 16 }, (_, i) => 20 - i)) === 0, "a declining tape does not have rising MAs");
 const firstRibbonDay = [...Array.from({ length: 15 }, () => 10), 20];
 assert(consecutiveMaRibbonDays(firstRibbonDay) === 1, "a last-bar jump that stacks and lifts all three MAs is one day");
+const hongtong = [11.67, 11.71, 11.57, 11.8, 11.62, 12.78, 12.42, 12.27, 11.92, 11.95, 11.68, 11.88, 11.98, 12.32, 13.55, 14.32];
+assert(maRibbonOk(hongtong, hongtong.length - 1), "洪通燃气 today stacks MA4>MA7>MA10 and turns all three up");
+assert(!maRibbonOk(hongtong, hongtong.length - 2), "yesterday was still not MA4>MA7>MA10");
+assert(consecutiveMaRibbonDays(hongtong) === 2, "yesterday already stood on MA4 with all three MAs rising, so duration is 2");
 
 const stHit = collectMa4StandHits([
   screen({
