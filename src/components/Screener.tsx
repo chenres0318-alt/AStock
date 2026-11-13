@@ -152,7 +152,7 @@ function HitTable({
                         : [];
                   if (!boards.length) return <span className="text-mute">--</span>;
                   return (
-                    <div className="flex flex-col gap-0.5">
+                    <div className="flex max-w-[320px] flex-wrap gap-x-2 gap-y-0.5">
                       {boards.map((board) =>
                         board.code ? (
                           <Link
@@ -320,7 +320,7 @@ export default function Screener() {
           选股：不看板块概念是否红框，只筛选股价站上MA4，并且MA4&gt;MA7&gt;MA10，并且MA4、MA7、MA10大于上一日。并且周K线站上MA4不超过1周。
         </div>
         <div className="mt-2 max-w-4xl text-xs leading-5 text-mute">
-          持续时间是日线这些条件连续成立的交易日数，越短越靠前。周 K 须本周站上 MA4、上周未站上（不超过1周）。扫行业里的主板成分股。不含科创板、创业板、北交所、ST。同一只股票只出现一次。
+          持续时间是日线这些条件连续成立的交易日数，越短越靠前。周 K 须本周站上 MA4、上周未站上（不超过1周）。扫行业和概念里的主板成分股。所属板块同时列出行业和概念，可点进板块页。不含科创板、创业板、北交所、ST。同一只股票只出现一次。
         </div>
       </section>
 
@@ -336,7 +336,7 @@ export default function Screener() {
               {meta ? (
                 <span className="text-[10px] text-mute">
                   扫描 {meta.scanned}{meta?.universe ? `/${meta.universe}` : ""} · 命中 {hits.length}
-                  {meta.source === "ths-industry" ? " · 同花顺行业成分股" : ""}
+                  {meta.source === "ths-board" || meta.source === "ths-industry" ? " · 同花顺行业+概念" : ""}
                   {meta.elapsedMs ? ` · ${Math.round(meta.elapsedMs / 1000)}s` : ""}
                 </span>
               ) : null}
