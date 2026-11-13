@@ -245,9 +245,12 @@ function seriesWithSpot(closes: number[], index: number, spot?: number | null): 
   return next;
 }
 
-/** 收盘站上 MA4，且 MA4>MA7>MA10，三根均线都比上一根高。 */
-export function maRibbonOk(closes: number[], index: number, spot?: number | null): boolean {
-  if (index < 10 || index >= closes.length) return false;
+function maRibbonParts(
+  closes: number[],
+  index: number,
+  spot?: number | null,
+): { onMa4: boolean; stacked: boolean; rising: boolean } | null {
+  if (index < 10 || index >= closes.length) return null;
   const series = seriesWithSpot(closes, index, spot);
   const price = series[index];
   const ma4 = maAt(series, 4, index);
@@ -256,20 +259,37 @@ export function maRibbonOk(closes: number[], index: number, spot?: number | null
   const prev4 = maAt(closes, 4, index - 1);
   const prev7 = maAt(closes, 7, index - 1);
   const prev10 = maAt(closes, 10, index - 1);
-  if (ma4 == null || ma7 == null || ma10 == null || prev4 == null || prev7 == null || prev10 == null) return false;
-  if (!priceOnMa(price, ma4)) return false;
-  if (!(ma4 > ma7 && ma7 > ma10)) return false;
-  return ma4 > prev4 && ma7 > prev7 && ma10 > prev10;
+  if (ma4 == null || ma7 == null || ma10 == null || prev4 == null || prev7 == null || prev10 == null) return null;
+  return {
+    onMa4: priceOnMa(price, ma4),
+    stacked: ma4 > ma7 && ma7 > ma10,
+    rising: ma4 > prev4 && ma7 > prev7 && ma10 > prev10,
+  };
 }
 
-/** 从最新一根往前数，均线多头排列且向上的连续交易日数。 */
+/** 收盘站上 MA4，且 MA4>MA7>MA10，三根均线都比上一根高。 */
+export function maRibbonOk(closes: number[], index: number, spot?: number | null): boolean {
+  const parts = maRibbonParts(closes, index, spot);
+  return Boolean(parts?.onMa4 && parts.stacked && parts.rising);
+}
+
+/** 收盘站上 MA4，且 MA4、MA7、MA10 都比上一根高。不要求已经排成 MA4>MA7>MA10。 */
+export function maRibbonTrendOk(closes: number[], index: number, spot?: number | null): boolean {
+  const parts = maRibbonParts(closes, index, spot);
+  return Boolean(parts?.onMa4 && parts.rising);
+}
+
+/**
+ * 从最新一根往前数：当天须多头排列且向上，持续天数按「站上 MA4 且三线向上」连续成立的交易日。
+ * 昨天已站上且三线向上、今天才排成 MA4>MA7>MA10，算 2 天。
+ */
 export function consecutiveMaRibbonDays(closes: number[], spot?: number | null): number {
   if (closes.length < 11) return 0;
   const last = closes.length - 1;
   if (!maRibbonOk(closes, last, spot)) return 0;
   let n = 1;
   for (let i = last - 1; i >= 10; i -= 1) {
-    if (!maRibbonOk(closes, i)) break;
+    if (!maRibbonTrendOk(closes, i)) break;
     n += 1;
   }
   return n;
@@ -291,7 +311,7 @@ export type RibbonHit = {
 /**
  * 不看板块红框。股价站上 MA4，MA4>MA7>MA10，三根均线都比上一日高。
  * 周 K 须本周站上 MA4，且连续不超过 1 周。
- * 持续天数按日线这些条件连续成立的交易日数从短到长排。同一只股票只留一条。不含科创、创业、北交所、ST。
+ * 持续天数按股价站上 MA4 且三根均线都比上一日高的连续交易日数从短到长排。同一只股票只留一条。不含科创、创业、北交所、ST。
  */
 export function collectRibbonHits(
   stocks: Array<{
