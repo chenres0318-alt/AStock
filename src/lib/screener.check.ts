@@ -1,5 +1,7 @@
 import {
   collectMa4StandHits,
+  collectRibbonHits,
+  consecutiveMaRibbonDays,
   dualBoxDays,
   dualBoxMemberIds,
   conditionHoldDays,
@@ -13,6 +15,7 @@ import {
   isFirstWeekOnMa4,
   isScreenerShare,
   ma4CrossedUpMa7,
+  maRibbonOk,
   matchIndustryBoard,
   monthStandsOnMa4,
   trendBoxDays,
@@ -229,6 +232,31 @@ assert(!isScreenerShare("sh688981", "中芯国际"), "STAR names are dropped");
 assert(!isScreenerShare("bj430047", "诺思兰德"), "Beijing names are dropped");
 assert(!isScreenerShare("sh600180", "*ST瑞茂"), "ST names are dropped");
 assert(!isScreenerShare("sz000002", "ST万科"), "a leading ST tag is dropped");
+
+function ribbonBars(closes: number[]) {
+  return closes.map((close, i) => ({
+    time: `2026-10-${String(i + 1).padStart(2, "0")}`,
+    open: close,
+    high: close,
+    low: close,
+    close,
+    volume: 1,
+  }));
+}
+const risingRibbon = Array.from({ length: 16 }, (_, i) => 10 + i);
+assert(maRibbonOk(risingRibbon, risingRibbon.length - 1), "a steadily rising tape stacks MA4>MA7>MA10 and turns all three up");
+assert(consecutiveMaRibbonDays(risingRibbon) >= 1, "the rising ribbon holds for at least the last bar");
+assert(consecutiveMaRibbonDays(Array.from({ length: 16 }, () => 12)) === 0, "a flat tape is not MA4>MA7>MA10");
+assert(consecutiveMaRibbonDays(Array.from({ length: 16 }, (_, i) => 20 - i)) === 0, "a declining tape does not have rising MAs");
+const firstRibbonDay = [...Array.from({ length: 15 }, () => 10), 20];
+assert(consecutiveMaRibbonDays(firstRibbonDay) === 1, "a last-bar jump that stacks and lifts all three MAs is one day");
+const ribbonRanked = collectRibbonHits([
+  { code: "sh600001", name: "刚排好", bars: ribbonBars(firstRibbonDay), price: 20 },
+  { code: "sh600002", name: "排好久", bars: ribbonBars(risingRibbon), price: risingRibbon.at(-1) },
+  { code: "sz300001", name: "创业", bars: ribbonBars(firstRibbonDay), price: 20 },
+]);
+assert(ribbonRanked.map((row) => row.name).join(",") === "刚排好,排好久", "shorter ribbon duration ranks first and ChiNext is dropped");
+assert(ribbonRanked[0]?.days === 1 && ribbonRanked[1]?.days > 1, "duration is consecutive days the ribbon conditions hold");
 
 const stHit = collectMa4StandHits([
   screen({

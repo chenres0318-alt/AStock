@@ -236,6 +236,105 @@ export function consecutiveOnMa4AndMa7AndMa10(closes: number[], spot?: number | 
   return consecutiveOnPeriods(closes, [4, 7, 10], spot);
 }
 
+function seriesWithSpot(closes: number[], index: number, spot?: number | null): number[] {
+  if (index !== closes.length - 1) return closes;
+  const last = alignedLivePrice(spot, closes[index]) ?? closes[index];
+  if (last === closes[index]) return closes;
+  const next = closes.slice();
+  next[index] = last;
+  return next;
+}
+
+/** 收盘站上 MA4，且 MA4>MA7>MA10，三根均线都比上一根高。 */
+export function maRibbonOk(closes: number[], index: number, spot?: number | null): boolean {
+  if (index < 10 || index >= closes.length) return false;
+  const series = seriesWithSpot(closes, index, spot);
+  const price = series[index];
+  const ma4 = maAt(series, 4, index);
+  const ma7 = maAt(series, 7, index);
+  const ma10 = maAt(series, 10, index);
+  const prev4 = maAt(closes, 4, index - 1);
+  const prev7 = maAt(closes, 7, index - 1);
+  const prev10 = maAt(closes, 10, index - 1);
+  if (ma4 == null || ma7 == null || ma10 == null || prev4 == null || prev7 == null || prev10 == null) return false;
+  if (!priceOnMa(price, ma4)) return false;
+  if (!(ma4 > ma7 && ma7 > ma10)) return false;
+  return ma4 > prev4 && ma7 > prev7 && ma10 > prev10;
+}
+
+/** 从最新一根往前数，均线多头排列且向上的连续交易日数。 */
+export function consecutiveMaRibbonDays(closes: number[], spot?: number | null): number {
+  if (closes.length < 11) return 0;
+  const last = closes.length - 1;
+  if (!maRibbonOk(closes, last, spot)) return 0;
+  let n = 1;
+  for (let i = last - 1; i >= 10; i -= 1) {
+    if (!maRibbonOk(closes, i)) break;
+    n += 1;
+  }
+  return n;
+}
+
+export type RibbonHit = {
+  code: string;
+  name: string;
+  days: number;
+  since: string;
+  price: number | null;
+  pct: number | null;
+  turnover: number | null;
+  sector: string;
+  sectorCode: string;
+  boards: ScreenerBoardRef[];
+};
+
+/**
+ * 不看板块红框。股价站上 MA4，MA4>MA7>MA10，三根均线都比上一日高。
+ * 持续天数按这些条件连续成立的交易日数从短到长排。同一只股票只留一条。不含科创、创业、北交所、ST。
+ */
+export function collectRibbonHits(
+  stocks: Array<{
+    code: string;
+    name: string;
+    bars: KBar[];
+    price?: number | null;
+    pct?: number | null;
+    turnover?: number | null;
+    sector?: string;
+    sectorCode?: string;
+  }>,
+): RibbonHit[] {
+  const best = new Map<string, RibbonHit>();
+  for (const stock of stocks) {
+    if (!isScreenerShare(stock.code, stock.name)) continue;
+    const closes = stock.bars.map((bar) => bar.close);
+    const days = consecutiveMaRibbonDays(closes, stock.price);
+    if (days < 1) continue;
+    const since = stock.bars[stock.bars.length - days]?.time ?? "";
+    const boardCode = stock.sectorCode ?? "";
+    const boardName = stock.sector ?? "";
+    const boards = boardCode || boardName ? [{ code: boardCode, name: boardName || boardCode }] : [];
+    const hit: RibbonHit = {
+      code: stock.code,
+      name: stock.name,
+      days,
+      since,
+      price: stock.price ?? null,
+      pct: stock.pct ?? null,
+      turnover: stock.turnover ?? null,
+      sector: boardName,
+      sectorCode: boardCode,
+      boards,
+    };
+    const prev = best.get(hit.code);
+    if (!prev || hit.days < prev.days) best.set(hit.code, hit);
+  }
+  return [...best.values()].sort((a, b) => {
+    if (a.days !== b.days) return a.days - b.days;
+    return a.name.localeCompare(b.name, "zh-CN");
+  });
+}
+
 function periodStand(
   bars: KBar[],
   price?: number | null,
