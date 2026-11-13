@@ -131,6 +131,9 @@ export type ScreenerHit = {
   hist: number;
   /** 周 K 连续呈 MA4>MA7>MA10 的周数（含当周）。 */
   standDays: number;
+  weekDays: number;
+  /** 日 K 连续站上 MA4 且 MA4>MA7>MA10 且三线向上的天数。 */
+  dayDays: number;
   reasons: string[];
   sector: string | null;
   sectorCode: string | null;
