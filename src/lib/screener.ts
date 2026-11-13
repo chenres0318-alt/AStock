@@ -12,7 +12,7 @@ const SCAN_MAX_MS = 300_000;
 const FIRST_WAIT_MS = 2_000;
 
 function hitReasons(): string[] {
-  return ["日K站上MA4", "MA4>MA7>MA10", "均线向上"];
+  return ["日K站上MA4", "MA4>MA7>MA10", "均线向上", "周K本周站上MA4"];
 }
 
 function toHit(row: ReturnType<typeof collectRibbonHits>[number]): ScreenerHit {
