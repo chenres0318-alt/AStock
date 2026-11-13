@@ -308,9 +308,21 @@ export type RibbonHit = {
   boards: ScreenerBoardRef[];
 };
 
+/** 周 K 现价对应的收盘呈 MA4>MA7>MA10 多头排列。 */
+export function weekMaStacked(bars: KBar[], price?: number | null): boolean {
+  const closes = dailyToWeekly(bars).map((bar) => bar.close);
+  if (closes.length < 10) return false;
+  const last = closes.length - 1;
+  const series = seriesWithSpot(closes, last, price);
+  const ma4 = maAt(series, 4, last);
+  const ma7 = maAt(series, 7, last);
+  const ma10 = maAt(series, 10, last);
+  return ma4 != null && ma7 != null && ma10 != null && ma4 > ma7 && ma7 > ma10;
+}
+
 /**
  * 不看板块红框。股价站上 MA4，MA4>MA7>MA10，三根均线都比上一日高。
- * 周 K 须本周站上 MA4，且连续不超过 1 周。
+ * 周 K 须呈 MA4>MA7>MA10 排列。
  * 持续天数按股价站上 MA4 且三根均线都比上一日高的连续交易日数从短到长排。同一只股票只留一条。不含科创、创业、北交所、ST。
  */
 export function collectRibbonHits(
@@ -329,8 +341,7 @@ export function collectRibbonHits(
   const best = new Map<string, RibbonHit>();
   for (const stock of stocks) {
     if (!isScreenerShare(stock.code, stock.name)) continue;
-    const week = periodStand(dailyToWeekly(stock.bars), stock.price);
-    if (!isFirstWeekOnMa4({ weekOnMa4: week.on, weekDays: week.days })) continue;
+    if (!weekMaStacked(stock.bars, stock.price)) continue;
     const closes = stock.bars.map((bar) => bar.close);
     const days = consecutiveMaRibbonDays(closes, stock.price);
     if (days < 1) continue;
