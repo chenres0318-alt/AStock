@@ -35,6 +35,8 @@ export type MaStandFlags = {
   weekMa4Up: boolean;
   /** 周线已够算 MA4，才能谈跌破。 */
   weekMaReady: boolean;
+  /** 周线 MA4>MA7>MA10。 */
+  weekStacked: boolean;
   monthOnMa4: boolean;
   /** 月线 MA4 高于前一根。 */
   monthMa4Up: boolean;
@@ -42,6 +44,8 @@ export type MaStandFlags = {
   dayBelowMa4: boolean;
   /** 周收盘跌破周线 MA4。 */
   weekBelowMa4: boolean;
+  /** 周收盘低于周线 MA7。 */
+  weekBelowMa7: boolean;
 };
 
 function closeOn(closes: Map<string, number>, times: string[], index: number): number | null {
@@ -149,6 +153,13 @@ function maRising(closes: number[], period: number, index: number): boolean {
   const cur = maAt(closes, period, index);
   const prev = maAt(closes, period, index - 1);
   return cur != null && prev != null && cur > prev;
+}
+
+function maStacked(closes: number[], index: number): boolean {
+  const ma4 = maAt(closes, 4, index);
+  const ma7 = maAt(closes, 7, index);
+  const ma10 = maAt(closes, 10, index);
+  return ma4 != null && ma7 != null && ma10 != null && ma4 > ma7 && ma7 > ma10;
 }
 
 function closeOnMa4(closes: number[], index: number, spot = closes[index]): boolean {
@@ -273,20 +284,22 @@ export function maStandFlags(bars: KBar[]): MaStandFlags[] {
       weekOnMa10: closeOnMa(weekCloses, 10, w),
       weekMa4Up: maRising(weekCloses, 4, w),
       weekMaReady: weekCloses.length >= 4,
+      weekStacked: maStacked(weekCloses, w),
       monthOnMa4: closeAboveMa(monthCloses, 4, m),
       monthMa4Up: maRising(monthCloses, 4, m),
       dayBelowMa4: closeBelowMa(dayCloses, 4, index),
       weekBelowMa4: closeBelowMa(weekCloses, 4, w),
+      weekBelowMa7: closeBelowMa(weekCloses, 7, w),
     };
   });
 }
 
 function canStart(flags: MaStandFlags): boolean {
-  return flags.weekOnMa4;
+  return flags.weekStacked && !flags.weekBelowMa7;
 }
 
 function shouldEnd(flags: MaStandFlags): boolean {
-  return flags.weekBelowMa4;
+  return flags.weekBelowMa7;
 }
 
 /** 最后一根是否还落在某段趋势区间里。收口的灰框不含跌破当天。 */
@@ -296,8 +309,8 @@ export function trendCoversLastBar(segments: SectorTrendSegment[], lastTime: str
 }
 
 /**
- * 周 K 站上周线 MA4，趋势开始。
- * 周 K 跌破周线 MA4，红色趋势结束，改成灰框，停在跌破前最后一根。
+ * 周线 MA4>MA7>MA10，趋势开始。
+ * 指数周收盘低于周线 MA7，红色趋势结束，改成灰框，停在跌破前最后一根。
  */
 export function captureSectorTrends(bars: KBar[], members: SectorMemberPath[] = []): SectorTrendSegment[] {
   if (bars.length < 4) return [];
@@ -336,7 +349,7 @@ export function captureSectorTrends(bars: KBar[], members: SectorMemberPath[] = 
 }
 
 /**
- * 指数自己能不能把红框留到最后一根。开始看周收盘站上 MA4；结束看周收盘跌破 MA4。不扫成分股。
+ * 指数自己能不能把红框留到最后一根。开始看周线 MA4>MA7>MA10；结束看周收盘低于 MA7。不扫成分股。
  */
 export function indexCouldBeOpen(bars: KBar[]): boolean {
   const last = bars.at(-1)?.time;
