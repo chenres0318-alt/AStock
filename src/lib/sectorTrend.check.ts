@@ -46,21 +46,25 @@ function tradingBars(closes: number[], start = "2024-01-01"): KBar[] {
 }
 
 const tooShort = tradingBars([100, 100, 100]);
-assert(captureSectorTrends(tooShort).length === 0, "three days cannot stack daily MA4>MA7>MA10");
+assert(captureSectorTrends(tooShort).length === 0, "three days cannot make daily MA7>MA10");
 assert(!indexCouldBeOpen(tooShort), "three days is not an open daily trend");
 assert(!indexCouldBeOpen(tradingBars([100, 100, 100, 100])), "four days is not enough for daily MA10");
-assert(!indexCouldBeOpen(tradingBars(Array.from({ length: 16 }, () => 100))), "flat days are not MA4>MA7>MA10");
+assert(!indexCouldBeOpen(tradingBars(Array.from({ length: 16 }, () => 100))), "flat days are not MA7>MA10");
 
 const standing = tradingBars(Array.from({ length: 16 }, (_, i) => 100 + i));
 const standingTrends = captureSectorTrends(standing);
 assert(
   standingTrends.length === 1 && standingTrends[0].status === "open" && standingTrends[0].end === standing.at(-1)?.time,
-  "sixteen rising days with MA4>MA7>MA10 stay an open red box",
+  "sixteen rising days with MA7>MA10 stay an open red box",
 );
-assert(indexCouldBeOpen(standing), "a daily MA4>MA7>MA10 stack looks open on price alone");
+assert(indexCouldBeOpen(standing), "daily MA7>MA10 looks open on price alone");
 assert(openPriceTrend(standing)?.end === standing.at(-1)?.time, "price-only window covers the latest bar");
 assert(trendCoversLastBar(standingTrends, standing.at(-1)?.time), "the open box covers the latest bar");
 assert(captureSectorTrends(standing, []).length === 1, "drawing the daily box does not need constituents");
+assert(
+  indexCouldBeOpen(tradingBars([10, 11, 12, 12, 12, 20, 20, 20, 16, 16, 16, 19])),
+  "MA7>MA10 still starts a red box when MA4 is not above MA7",
+);
 
 const pullbackAboveMa7 = tradingBars([...Array.from({ length: 16 }, (_, i) => 100 + i), 113]);
 assert(indexCouldBeOpen(pullbackAboveMa7), "a dip under daily MA4 still keeps the box while the index is above MA7");
@@ -75,10 +79,10 @@ assert(
 assert(!indexCouldBeOpen(crashed), "an index below daily MA7 is no longer an open trend");
 assert(!trendCoversLastBar(crashedTrends, crashed.at(-1)?.time), "a closed box does not cover the break day");
 
-/** 只站上日线 MA4、没有 MA4>MA7>MA10，不能开红框。 */
+/** 只站上日线 MA4、MA7 没有大于 MA10，不能开红框。 */
 const ma4OnlyDay = tradingBars([120, 119, 118, 117, 116, 108, 108, 108, 108.2, 108.3, 108.4, 108.5]);
-assert(!captureSectorTrends(ma4OnlyDay).some((item) => item.status === "open"), "daily MA4 without MA4>MA7>MA10 does not start a red box");
-assert(!indexCouldBeOpen(ma4OnlyDay), "an index on daily MA4 but not stacked is not open");
+assert(!captureSectorTrends(ma4OnlyDay).some((item) => item.status === "open"), "daily MA4 without MA7>MA10 does not start a red box");
+assert(!indexCouldBeOpen(ma4OnlyDay), "an index on daily MA4 but with MA7 not above MA10 is not open");
 
 const restarted = tradingBars([
   ...Array.from({ length: 16 }, (_, i) => 100 + i),
@@ -91,7 +95,7 @@ assert(
   restartedTrends.length === 2 &&
     restartedTrends[0].status === "closed" &&
     restartedTrends[1].status === "open",
-  "after the index falls below daily MA7, stacking MA4>MA7>MA10 again starts a new red box",
+  "after the index falls below daily MA7, MA7>MA10 again starts a new red box",
 );
 
 assert(isTonghuashunIndustry("881121") && !isTonghuashunConcept("881121"), "an industry code stays an industry");

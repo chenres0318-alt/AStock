@@ -39,6 +39,8 @@ export type MaStandFlags = {
   weekStacked: boolean;
   /** 日线 MA4>MA7>MA10。 */
   dayStacked: boolean;
+  /** 日线 MA7>MA10。 */
+  dayMa7AboveMa10: boolean;
   monthOnMa4: boolean;
   /** 月线 MA4 高于前一根。 */
   monthMa4Up: boolean;
@@ -166,6 +168,12 @@ function maStacked(closes: number[], index: number): boolean {
   return ma4 != null && ma7 != null && ma10 != null && ma4 > ma7 && ma7 > ma10;
 }
 
+function ma7AboveMa10(closes: number[], index: number): boolean {
+  const ma7 = maAt(closes, 7, index);
+  const ma10 = maAt(closes, 10, index);
+  return ma7 != null && ma10 != null && ma7 > ma10;
+}
+
 function closeOnMa4(closes: number[], index: number, spot = closes[index]): boolean {
   return closeOnMa(closes, 4, index, spot);
 }
@@ -290,6 +298,7 @@ export function maStandFlags(bars: KBar[]): MaStandFlags[] {
       weekMaReady: weekCloses.length >= 4,
       weekStacked: maStacked(weekCloses, w),
       dayStacked: maStacked(dayCloses, index),
+      dayMa7AboveMa10: ma7AboveMa10(dayCloses, index),
       monthOnMa4: closeAboveMa(monthCloses, 4, m),
       monthMa4Up: maRising(monthCloses, 4, m),
       dayBelowMa4: closeBelowMa(dayCloses, 4, index),
@@ -301,7 +310,7 @@ export function maStandFlags(bars: KBar[]): MaStandFlags[] {
 }
 
 function canStart(flags: MaStandFlags): boolean {
-  return flags.dayStacked && !flags.dayBelowMa7;
+  return flags.dayMa7AboveMa10 && !flags.dayBelowMa7;
 }
 
 function shouldEnd(flags: MaStandFlags): boolean {
@@ -315,7 +324,7 @@ export function trendCoversLastBar(segments: SectorTrendSegment[], lastTime: str
 }
 
 /**
- * 日线 MA4>MA7>MA10，趋势开始。
+ * 日线 MA7>MA10，趋势开始。
  * 指数日收盘低于日线 MA7，红色趋势结束，改成灰框，停在跌破前最后一根。
  */
 export function captureSectorTrends(bars: KBar[], members: SectorMemberPath[] = []): SectorTrendSegment[] {
@@ -355,7 +364,7 @@ export function captureSectorTrends(bars: KBar[], members: SectorMemberPath[] = 
 }
 
 /**
- * 指数自己能不能把红框留到最后一根。开始看日线 MA4>MA7>MA10；结束看日收盘低于 MA7。不扫成分股。
+ * 指数自己能不能把红框留到最后一根。开始看日线 MA7>MA10；结束看日收盘低于 MA7。不扫成分股。
  */
 export function indexCouldBeOpen(bars: KBar[]): boolean {
   const last = bars.at(-1)?.time;
