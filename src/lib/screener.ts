@@ -1,8 +1,10 @@
+import { listAllIndustryBoards, listBoardMembers } from "./boards";
 import { bareCode, toTencentCode } from "./codes";
-import { applyMa4Crosses, listBoardsInTrend, loadBoardMa4Roster, loadScreenerMemberKlines } from "./sectorTrendData";
-import { collectMa4StandHits, dualBoxMemberIds, isScreenerShare, type SectorMa4Screen } from "./screenerLogic";
+import { loadScreenerMemberKlines } from "./sectorTrendData";
+import { collectRibbonHits, isScreenerShare } from "./screenerLogic";
 import { raceDeadline, runDynamicPool } from "./pool";
-import type { BoardMember, KBar, ScreenerHit } from "./types";
+import { SCREENER_BOARD_MEMBER_LIMIT } from "./thsMemberPages";
+import type { BoardMember, ScreenerHit } from "./types";
 
 const BOARD_CONCURRENCY = 6;
 const RESULT_TTL_MS = 2 * 60_000;
@@ -10,10 +12,10 @@ const SCAN_MAX_MS = 300_000;
 const FIRST_WAIT_MS = 2_000;
 
 function hitReasons(): string[] {
-  return ["日K站上MA4", "周K本周站上MA4", "行业红框", "概念红框"];
+  return ["日K站上MA4", "MA4>MA7>MA10", "均线向上"];
 }
 
-function toHit(row: ReturnType<typeof collectMa4StandHits>[number]): ScreenerHit {
+function toHit(row: ReturnType<typeof collectRibbonHits>[number]): ScreenerHit {
   const code = toTencentCode(row.code);
   return {
     code,
@@ -30,8 +32,8 @@ function toHit(row: ReturnType<typeof collectMa4StandHits>[number]): ScreenerHit
     hist: 0,
     standDays: row.days,
     reasons: hitReasons(),
-    sector: row.sector,
-    sectorCode: row.sectorCode,
+    sector: row.sector || null,
+    sectorCode: row.sectorCode || null,
     boards: row.boards,
   };
 }
@@ -43,7 +45,6 @@ export type StockScreenResult = {
   items: ScreenerHit[];
   source: string;
   scanning: boolean;
-  /** 还在确认哪些板块处于红框，名单会边找边变长。 */
   discovering?: boolean;
   industryLive?: number;
   conceptLive?: number;
@@ -54,6 +55,17 @@ type ScanJob = {
   startedAt: number;
   promise: Promise<StockScreenResult>;
   snapshot: () => StockScreenResult;
+};
+
+type StockRow = {
+  code: string;
+  name: string;
+  bars: import("./types").KBar[];
+  price: number | null;
+  pct: number | null;
+  turnover: number | null;
+  sector: string;
+  sectorCode: string;
 };
 
 let job: ScanJob | null = null;
@@ -78,9 +90,7 @@ function startJob(): ScanJob {
     scanned: 0,
     universe: 0,
     liveBoards: 0,
-    industryLive: 0,
-    conceptLive: 0,
-    sectors: [] as SectorMa4Screen[],
+    stocks: [] as StockRow[],
     done: false,
     discovering: true,
   };
@@ -88,20 +98,20 @@ function startJob(): ScanJob {
     scanned: state.scanned,
     universe: state.universe,
     liveBoards: state.liveBoards,
-    items: collectMa4StandHits(state.sectors)
-      .filter((row) => isScreenerShare(row.code, row.name))
-      .map(toHit),
-    source: "ths-board",
+    items: collectRibbonHits(state.stocks).map(toHit),
+    source: "ths-industry",
     scanning: !state.done,
     discovering: state.discovering,
-    industryLive: state.industryLive,
-    conceptLive: state.conceptLive,
     timedOut: state.done && (state.discovering || (state.universe > 0 && state.scanned < state.universe)),
   });
   const deadline = startedAt + SCAN_MAX_MS;
   const promise = (async () => {
     const pending: string[] = [];
-    const seen = new Set<string>();
+    const seenBoards = new Set<string>();
+    const seenStocks = new Set<string>();
+    const boardNames = new Map<string, string>();
+    const sectorById = new Map<string, { sector: string; sectorCode: string }>();
+    const quotes = new Map<string, BoardMember>();
     let listingDone = false;
     let waiters: Array<() => void> = [];
     const wake = () => {
@@ -109,94 +119,65 @@ function startJob(): ScanJob {
       waiters = [];
       for (const resolve of list) resolve();
     };
-    const enqueue = (code: string, kind: "industry" | "concept") => {
-      if (seen.has(code)) return;
-      seen.add(code);
-      if (kind === "concept") state.conceptLive += 1;
-      else state.industryLive += 1;
-      state.liveBoards = seen.size;
-      state.universe = seen.size;
+    const enqueue = (code: string) => {
+      if (seenBoards.has(code)) return;
+      seenBoards.add(code);
+      state.liveBoards = seenBoards.size;
       if (Date.now() <= deadline) pending.push(code);
       wake();
-    };
-    const klines = new Map<string, { code: string; name: string; bars: KBar[]; price: number | null }>();
-    const rosterById = () => {
-      const map = new Map<string, BoardMember>();
-      for (const sector of state.sectors) {
-        for (const member of sector.members) {
-          const id = bareCode(member.code);
-          if (!map.has(id)) {
-            map.set(id, {
-              code: member.code,
-              name: member.name,
-              price: member.price,
-              pct: member.pct,
-              amount: null,
-              turnover: member.turnover,
-            });
-          }
-        }
-      }
-      return map;
-    };
-    const hydrateDualBox = async () => {
-      await new Promise<void>((resolve) => setTimeout(resolve, 0));
-      const ids = dualBoxMemberIds(state.sectors);
-      const roster = rosterById();
-      const missing: BoardMember[] = [];
-      for (const id of ids) {
-        if (klines.has(id)) continue;
-        const row = roster.get(id);
-        if (row) missing.push(row);
-      }
-      if (missing.length) {
-        const rows = await loadScreenerMemberKlines(missing);
-        for (const row of rows) klines.set(bareCode(row.code), row);
-      }
-      const stocks = [...klines.values()];
-      for (let i = 0; i < state.sectors.length; i += 1) {
-        state.sectors[i] = applyMa4Crosses(state.sectors[i], stocks);
-      }
-    };
-    let hydrateTail = Promise.resolve();
-    let hydrateTimer: ReturnType<typeof setTimeout> | null = null;
-    const requestHydrate = (immediate = false) => {
-      const run = () => {
-        hydrateTimer = null;
-        hydrateTail = hydrateTail.then(hydrateDualBox, hydrateDualBox);
-        return hydrateTail;
-      };
-      if (immediate) {
-        if (hydrateTimer) {
-          clearTimeout(hydrateTimer);
-          hydrateTimer = null;
-        }
-        return run();
-      }
-      if (hydrateTimer) return hydrateTail;
-      hydrateTimer = setTimeout(run, 750);
-      return hydrateTail;
     };
     const scanBoard = async (code: string) => {
       if (Date.now() > deadline) return;
       try {
-        const screen = await loadBoardMa4Roster(code);
-        if (screen) state.sectors.push(screen);
+        const members = await listBoardMembers(code, SCREENER_BOARD_MEMBER_LIMIT);
+        const sector = boardNames.get(code) ?? "";
+        const fresh: BoardMember[] = [];
+        for (const member of members) {
+          if (!isScreenerShare(member.code, member.name)) continue;
+          const id = bareCode(member.code);
+          if (!quotes.has(id)) quotes.set(id, member);
+          if (!sectorById.has(id)) sectorById.set(id, { sectorCode: code, sector });
+          if (seenStocks.has(id)) continue;
+          seenStocks.add(id);
+          state.universe = seenStocks.size;
+          fresh.push(member);
+        }
+        if (fresh.length && Date.now() <= deadline) {
+          const rows = await loadScreenerMemberKlines(fresh);
+          for (const row of rows) {
+            const id = bareCode(row.code);
+            const home = sectorById.get(id);
+            const quote = quotes.get(id);
+            state.stocks.push({
+              code: row.code,
+              name: row.name,
+              bars: row.bars,
+              price: row.price,
+              pct: quote?.pct ?? null,
+              turnover: quote?.turnover ?? null,
+              sector: home?.sector ?? "",
+              sectorCode: home?.sectorCode ?? "",
+            });
+            state.scanned += 1;
+          }
+        }
       } catch {
         // skip board
-      } finally {
-        state.scanned += 1;
-        void requestHydrate();
       }
     };
-    const listing = Promise.all([
-      listBoardsInTrend("industry", (code) => enqueue(code, "industry")),
-      listBoardsInTrend("concept", (code) => enqueue(code, "concept")),
-    ]).finally(() => {
-      listingDone = true;
-      state.discovering = false;
-      wake();
-    });
+    const listing = listAllIndustryBoards()
+      .then((boards) => {
+        for (const board of boards) {
+          boardNames.set(board.code, board.name);
+          enqueue(board.code);
+        }
+        state.liveBoards = boards.length;
+      })
+      .finally(() => {
+        listingDone = true;
+        state.discovering = false;
+        wake();
+      });
     await Promise.all([
       listing,
       runDynamicPool(BOARD_CONCURRENCY, {
@@ -209,19 +190,20 @@ function startJob(): ScanJob {
         work: scanBoard,
       }),
     ]);
-    await requestHydrate(true);
+    for (const stock of state.stocks) {
+      if (stock.sector) continue;
+      const home = sectorById.get(bareCode(stock.code));
+      if (home?.sector) stock.sector = home.sector;
+    }
     state.done = true;
     state.discovering = false;
     return snapshot();
   })()
     .then((value) => {
-      const emptyDualBox = value.items.length === 0 && (value.conceptLive ?? 0) === 0;
-      if (!emptyDualBox) {
-        cachedResult = {
-          value: { ...value, scanning: false },
-          expireAt: Date.now() + (value.timedOut || !value.items.length ? 20_000 : RESULT_TTL_MS),
-        };
-      }
+      cachedResult = {
+        value: { ...value, scanning: false },
+        expireAt: Date.now() + (value.timedOut || !value.items.length ? 20_000 : RESULT_TTL_MS),
+      };
       return value;
     })
     .finally(() => {
