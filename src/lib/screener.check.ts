@@ -11,6 +11,7 @@ import {
   dailyToWeekly,
   decorateMa4Crosses,
   isFirstWeekOnMa4,
+  isFirstWeekOnMa4AndMa7,
   isScreenerShare,
   ma4CrossedUpMa7,
   matchIndustryBoard,
@@ -266,10 +267,11 @@ const weekMa4Needed = hits([
 ]);
 assert(
   weekMa4Needed.map((row) => row.name).sort().join(",") ===
-    ["MA4还在下", "周只空一周", "缺周MA7", "缺月K"].sort().join(","),
-  "this week on weekly MA4 after last week off is required; weekly MA7 and monthly MA4 are not",
+    ["MA4还在下", "周只空一周", "缺月K"].sort().join(","),
+  "this week on weekly MA4 and MA7 after last week off both is required; monthly MA4 is not",
 );
-assert(!weekMa4Needed.some((row) => row.name === "周已两周"), "a second consecutive week on MA4 is dropped");
+assert(!weekMa4Needed.some((row) => row.name === "周已两周"), "a second consecutive week on MA4 and MA7 is dropped");
+assert(!weekMa4Needed.some((row) => row.name === "缺周MA7"), "weekly MA4 without MA7 is dropped");
 assert(!weekMa4Needed.some((row) => row.name === "只有日K" || row.name === "缺周K"), "missing this-week MA4 is dropped");
 
 const rankedDays = hits([
@@ -413,7 +415,7 @@ const weekOnlyLonger = hits([
     ],
   }),
 ]);
-assert(weekOnlyLonger.map((row) => row.name).join(",") === "无周MA7短,日周都有", "weekly MA7 is not required on the first week; shorter daily MA4 stand still ranks first");
+assert(weekOnlyLonger.map((row) => row.name).join(",") === "日周都有", "weekly MA4 without MA7 is dropped even with a shorter daily stand");
 
 const wave1 = collectMa4StandHits([
   screen({
@@ -568,6 +570,18 @@ assert(isFirstWeekOnMa4({ weekOnMa4: true, weekDays: 1 }), "this week on MA4 and
 assert(!isFirstWeekOnMa4({ weekOnMa4: true, weekDays: 2 }), "two consecutive weeks on MA4 is not the first week");
 assert(!isFirstWeekOnMa4({ weekOnMa4: false, weekDays: 1 }), "last week off does not count if this week is also off");
 assert(!isFirstWeekOnMa4({ weekOnMa4: true }), "this week on MA4 without a 1-week count is not the first week");
+assert(
+  isFirstWeekOnMa4AndMa7({ weekOnMa4: true, weekOnMa7: true, weekDays: 1 }),
+  "this week on weekly MA4 and MA7 after last week off both is the first week",
+);
+assert(
+  !isFirstWeekOnMa4AndMa7({ weekOnMa4: true, weekOnMa7: false, weekDays: 1 }),
+  "weekly MA4 without MA7 is not the first week on both",
+);
+assert(
+  !isFirstWeekOnMa4AndMa7({ weekOnMa4: true, weekOnMa7: true, weekDays: 2 }),
+  "two consecutive weeks on weekly MA4 and MA7 is not the first week",
+);
 
 assert(consecutiveOnMa4([10, 11, 12, 13]) === 1, "four rising closes are the first monthly/weekly bar that can stand on MA4");
 assert(consecutiveOnMa4AndMa7([10, 11, 12, 13, 14, 15, 16]) === 1, "seven rising closes are the first bar that can stand on MA4 and MA7");
@@ -677,10 +691,27 @@ const firstWeekDecorated = decorateMa4Crosses(
 );
 assert(
   firstWeekDecorated[0]?.weekOnMa4 === true &&
-    firstWeekDecorated[0]?.weekDays === 1 &&
+    firstWeekDecorated[0]?.weekOnMa7 !== true &&
+    (firstWeekDecorated[0]?.weekDays ?? 0) === 0 &&
     (firstWeekDecorated[0]?.weekGap ?? 0) >= 2,
-  "this week on MA4 after two weeks off is a real first week",
+  "this week on MA4 after two weeks off is not yet on weekly MA7",
 );
+
+const firstBothWeekBars = tradingBars([
+  ...Array.from({ length: 30 }, () => 10),
+  ...Array.from({ length: 5 }, () => 20),
+]);
+const firstBothWeekDecorated = decorateMa4Crosses(
+  [{ code: "sh600039", name: "双线首周", days: 1, time: firstBothWeekBars.at(-1)!.time }],
+  [{ code: "sh600039", bars: firstBothWeekBars, price: 20 }],
+);
+assert(
+  firstBothWeekDecorated[0]?.weekOnMa4 === true &&
+    firstBothWeekDecorated[0]?.weekOnMa7 === true &&
+    firstBothWeekDecorated[0]?.weekDays === 1,
+  "seven weekly bars with a last-week jump is the first week on MA4 and MA7",
+);
+assert(isFirstWeekOnMa4AndMa7(firstBothWeekDecorated[0]!), "decorate marks that tape as the first week on both");
 
 const oneWeekWiggleBars = tradingBars([
   ...Array.from({ length: 15 }, () => 10),
@@ -693,7 +724,6 @@ const oneWeekWiggleDecorated = decorateMa4Crosses(
 );
 assert(
   oneWeekWiggleDecorated[0]?.weekOnMa4 === true &&
-    oneWeekWiggleDecorated[0]?.weekDays === 1 &&
     (oneWeekWiggleDecorated[0]?.weekGap ?? 0) === 1,
   "a one-week dip then reclaim is not a two-week gap",
 );

@@ -40,7 +40,7 @@ export type SectorMa4Cross = {
   weekOnMa7?: boolean;
   /** 月 K 收盘站上月线 MA4。 */
   monthOnMa4?: boolean;
-  /** 周 K 连续站上 MA4 的周数。选股只要首周（上一周未站上）。 */
+  /** 周 K 连续同时站上 MA4 和 MA7 的周数。选股只要首周（上一周未同时站上）。 */
   weekDays?: number;
   /** 本周站上之前，连续没站上周线 MA4 的周数。 */
   weekGap?: number;
@@ -397,7 +397,7 @@ export function decorateMa4Crosses(
       weekOnMa4: weekMa4.on,
       weekOnMa7: week.on,
       monthOnMa4: month.on,
-      weekDays: weekMa4.days,
+      weekDays: week.days,
       weekGap: weeksOffMa4Before(weekCloses),
       monthDays: month.days,
       crossDays,
@@ -507,8 +507,17 @@ export function isFirstWeekOnMa4(hit: { weekOnMa4?: boolean; weekDays?: number }
   return Boolean(hit.weekOnMa4) && (hit.weekDays ?? 0) === 1;
 }
 
+/** 周 K 本周同时站上 MA4 和 MA7，且上周未同时站上（连续站上周数为 1）。 */
+export function isFirstWeekOnMa4AndMa7(hit: {
+  weekOnMa4?: boolean;
+  weekOnMa7?: boolean;
+  weekDays?: number;
+}): boolean {
+  return Boolean(hit.weekOnMa4) && Boolean(hit.weekOnMa7) && (hit.weekDays ?? 0) === 1;
+}
+
 /**
- * 必须：个股日 K 站上 MA4；周 K 本周站上 MA4 且上周未站上（第一周）。
+ * 必须：个股日 K 站上 MA4；周 K 本周同时站上 MA4 和 MA7，且上周未同时站上（第一周）。
  * 所属行业和至少一个概念都要红框覆盖最新一根。只过行业或只过概念的不要。
  * 持续天数按日 K 站上 MA4 的天数从短到长排。同一只股票只留一条。不含科创、创业、北交所、ST。
  */
@@ -569,7 +578,7 @@ export function collectMa4StandHits(sectors: SectorMa4Screen[]): Ma4StandHit[] {
   }
   return [...best.values()]
     .filter(hasIndustryAndConcept)
-    .filter((hit) => hit.days >= 1 && isFirstWeekOnMa4(hit))
+    .filter((hit) => hit.days >= 1 && isFirstWeekOnMa4AndMa7(hit))
     .sort((a, b) => {
       const left = hitRank(a);
       const right = hitRank(b);
