@@ -129,7 +129,7 @@ export type ScreenerHit = {
   dif: number;
   dea: number;
   hist: number;
-  /** 日 K 连续站上 MA4 的交易日数（含当天）。 */
+  /** 周 K 连续呈 MA4>MA7>MA10 的周数（含当周）。 */
   standDays: number;
   reasons: string[];
   sector: string | null;

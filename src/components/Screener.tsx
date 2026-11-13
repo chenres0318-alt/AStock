@@ -115,7 +115,7 @@ function HitTable({
   if (!items.length) {
     const scanningText = discovering
       ? "正在拉取行业成分股，扫到符合均线的股票会马上出现"
-      : "正在扫描，按均线条件持续天数从短到长排";
+      : "正在扫描，按周K MA4>MA7>MA10持续周数从短到长排";
     const idleText = "没有符合条件的结果";
     return <EmptyHint text={scanning ? scanningText : idleText} />;
   }
@@ -177,7 +177,7 @@ function HitTable({
                 {formatPrice(item.price, priceDigits(item.code, item.name))}
               </td>
               <td className={`num px-3 py-2 text-right ${toneClass(item.pct)}`}>{formatPct(item.pct)}</td>
-              <td className="num px-3 py-2 text-right">{item.standDays}日</td>
+              <td className="num px-3 py-2 text-right">{item.standDays}周</td>
               <td className="px-3 py-2">
                 <div className="flex flex-wrap gap-1">
                   {item.reasons.map((reason) => (
@@ -320,7 +320,7 @@ export default function Screener() {
           选股：不看板块概念是否红框，只筛选股价站上MA4，并且MA4&gt;MA7&gt;MA10，并且MA4、MA7、MA10大于上一日。并且周K线呈MA4&gt;MA7&gt;MA10排列。
         </div>
         <div className="mt-2 max-w-4xl text-xs leading-5 text-mute">
-          持续时间是股价站上MA4、且MA4、MA7、MA10都比上一日高的连续天数，越短越靠前。当天还须日线 MA4&gt;MA7&gt;MA10。周 K 须呈 MA4&gt;MA7&gt;MA10 排列。扫行业和概念里的主板成分股。所属板块同时列出行业和概念，可点进板块页。不含科创板、创业板、北交所、ST。同一只股票只出现一次。
+          持续时间是周 K 呈 MA4&gt;MA7&gt;MA10 的连续周数，越短越靠前。当天还须股价站上MA4，日线 MA4&gt;MA7&gt;MA10，且 MA4、MA7、MA10 都比上一日高。扫行业和概念里的主板成分股。所属板块同时列出行业和概念，可点进板块页。不含科创板、创业板、北交所、ST。同一只股票只出现一次。
         </div>
       </section>
 
@@ -355,7 +355,7 @@ export default function Screener() {
           <div className="border-b border-line px-4 py-2 text-xs text-mute">
             {meta?.discovering
               ? "正在拉取行业成分股，边扫边显示。"
-              : "边扫边显示，按均线条件持续天数从短到长排。"}{" "}
+              : "边扫边显示，按周K MA4>MA7>MA10持续周数从短到长排。"}{" "}
             已扫 {meta?.scanned ?? 0}
             {meta?.universe ? `/${meta.universe}` : ""} · 命中 {hits.length}
           </div>
