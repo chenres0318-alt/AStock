@@ -19,6 +19,7 @@ import {
   matchIndustryBoard,
   monthStandsOnMa4,
   trendBoxDays,
+  weekMaStacked,
   weekStandsOnMa4,
   weekStandsOnMa4AndMa7,
   weeksOffMa4Before,
@@ -700,28 +701,39 @@ assert(
 function firstWeekRibbon(lastWeek: number[]) {
   return tradingBars([...Array.from({ length: 15 }, () => 10), ...Array.from({ length: 10 }, () => 8), ...lastWeek]);
 }
-const shortRibbonWeek = firstWeekRibbon([8, 8, 8, 8, 20]);
-const longRibbonWeek = firstWeekRibbon([12, 13, 14, 15, 16]);
-assert(weekStandsOnMa4(shortRibbonWeek, 20) && weekStandsOnMa4(longRibbonWeek, 16), "both first-week ribbon tapes stand on weekly MA4");
-assert(consecutiveMaRibbonDays(shortRibbonWeek.map((bar) => bar.close), 20) === 1, "a last-day jump is one daily ribbon day");
-assert(consecutiveMaRibbonDays(longRibbonWeek.map((bar) => bar.close), 16) > 1, "a rising last week holds the daily ribbon longer");
-const staleWeekRibbon = tradingBars(Array.from({ length: 40 }, (_, i) => 10 + Math.floor(i / 5)));
-assert((weekMa7Decorated[0]?.weekDays ?? 0) > 1, "the long rising weekly tape is already past the first week");
+function weekStackedRibbon(lastWeek: number[]) {
+  return tradingBars([
+    ...Array.from({ length: 40 }, (_, i) => 12 + Math.floor(i / 5)),
+    ...Array.from({ length: 5 }, () => 8),
+    ...lastWeek,
+  ]);
+}
+const shortRibbonWeek = weekStackedRibbon([8, 8, 8, 8, 22]);
+const longRibbonWeek = weekStackedRibbon([18, 19, 20, 21, 22]);
+const firstWeekOnly = firstWeekRibbon([8, 8, 8, 8, 20]);
+assert(weekMaStacked(shortRibbonWeek, 22) && weekMaStacked(longRibbonWeek, 22), "ten rising weeks stack weekly MA4>MA7>MA10");
+assert(!weekMaStacked(firstWeekOnly, 20), "the first week on weekly MA4 is not yet MA4>MA7>MA10");
+assert(
+  !weekMaStacked(tradingBars(Array.from({ length: 50 }, (_, i) => 30 - Math.floor(i / 5)))),
+  "ten falling weeks are not weekly MA4>MA7>MA10",
+);
+assert(consecutiveMaRibbonDays(shortRibbonWeek.map((bar) => bar.close), 22) === 1, "a last-day jump is one daily ribbon day");
+assert(consecutiveMaRibbonDays(longRibbonWeek.map((bar) => bar.close), 22) > 1, "a rising last week holds the daily ribbon longer");
 const ribbonRanked = collectRibbonHits([
-  { code: "sh600001", name: "刚排好", bars: shortRibbonWeek, price: 20 },
-  { code: "sh600002", name: "排好久", bars: longRibbonWeek, price: 16 },
-  { code: "sh600003", name: "周过久", bars: staleWeekRibbon, price: staleWeekRibbon.at(-1)!.close },
-  { code: "sz300001", name: "创业", bars: shortRibbonWeek, price: 20 },
+  { code: "sh600001", name: "刚排好", bars: shortRibbonWeek, price: 22 },
+  { code: "sh600002", name: "排好久", bars: longRibbonWeek, price: 22 },
+  { code: "sh600003", name: "周未排好", bars: firstWeekOnly, price: 20 },
+  { code: "sz300001", name: "创业", bars: shortRibbonWeek, price: 22 },
 ]);
-assert(ribbonRanked.map((row) => row.name).join(",") === "刚排好,排好久", "first-week names rank by daily ribbon duration; stale weekly stands and ChiNext drop");
+assert(ribbonRanked.map((row) => row.name).join(",") === "刚排好,排好久", "weekly stacked names rank by daily ribbon duration; unstacked weeks and ChiNext drop");
 assert(ribbonRanked[0]?.days === 1, "the shortest daily ribbon still comes first");
-assert((ribbonRanked[1]?.days ?? 0) > 1, "a longer daily ribbon in the first week is still listed after");
+assert((ribbonRanked[1]?.days ?? 0) > 1, "a longer daily ribbon with weekly stack is still listed after");
 const ribbonBoards = collectRibbonHits([
   {
     code: "sh600001",
     name: "刚排好",
     bars: shortRibbonWeek,
-    price: 20,
+    price: 22,
     boards: [
       { code: "885799", name: "储能" },
       { code: "881121", name: "半导体" },
