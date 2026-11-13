@@ -284,12 +284,25 @@ export function maRibbonTrendOk(closes: number[], index: number, spot?: number |
  * 昨天已站上且三线向上、今天才排成 MA4>MA7>MA10，算 2 天。
  */
 export function consecutiveMaRibbonDays(closes: number[], spot?: number | null): number {
+  return countRibbonDays(closes, spot, maRibbonTrendOk);
+}
+
+/** 从最新一根往前数，日 K 连续「站上 MA4 且 MA4>MA7>MA10 且三线向上」的交易日。 */
+export function consecutiveMaRibbonStackDays(closes: number[], spot?: number | null): number {
+  return countRibbonDays(closes, spot, maRibbonOk);
+}
+
+function countRibbonDays(
+  closes: number[],
+  spot: number | null | undefined,
+  hold: (closes: number[], index: number, spot?: number | null) => boolean,
+): number {
   if (closes.length < 11) return 0;
   const last = closes.length - 1;
   if (!maRibbonOk(closes, last, spot)) return 0;
   let n = 1;
   for (let i = last - 1; i >= 10; i -= 1) {
-    if (!maRibbonTrendOk(closes, i)) break;
+    if (!hold(closes, i)) break;
     n += 1;
   }
   return n;
@@ -298,7 +311,11 @@ export function consecutiveMaRibbonDays(closes: number[], spot?: number | null):
 export type RibbonHit = {
   code: string;
   name: string;
+  /** 周 K 连续 MA4>MA7>MA10 的周数。 */
   days: number;
+  weekDays: number;
+  /** 日 K 连续站上 MA4 且 MA4>MA7>MA10 且三线向上的天数。 */
+  dayDays: number;
   since: string;
   price: number | null;
   pct: number | null;
@@ -335,10 +352,16 @@ export function consecutiveWeekMaStacked(bars: KBar[], price?: number | null): n
   return n;
 }
 
+function preferShorterRibbon(hit: RibbonHit, prev: RibbonHit): RibbonHit {
+  if (hit.weekDays !== prev.weekDays) return hit.weekDays < prev.weekDays ? hit : prev;
+  if (hit.dayDays !== prev.dayDays) return hit.dayDays < prev.dayDays ? hit : prev;
+  return prev;
+}
+
 /**
- * 不看板块红框。股价站上 MA4，MA4>MA7>MA10，三根均线都比上一日高。
+ * 不看板块红框。股价站上 MA4，日 K MA4>MA7>MA10，三根均线都比上一日高。
  * 周 K 须呈 MA4>MA7>MA10 排列。
- * 持续时间按周 K 连续 MA4>MA7>MA10 的周数从短到长排。同一只股票只留一条。不含科创、创业、北交所、ST。
+ * 先按周 K 连续排列周数从短到长，同周数再按日 K 连续排列天数从短到长。同一只股票只留一条。不含科创、创业、北交所、ST。
  */
 export function collectRibbonHits(
   stocks: Array<{
@@ -357,17 +380,20 @@ export function collectRibbonHits(
   for (const stock of stocks) {
     if (!isScreenerShare(stock.code, stock.name)) continue;
     const weekBars = dailyToWeekly(stock.bars);
-    const days = consecutiveWeekMaStacked(stock.bars, stock.price);
-    if (days < 1) continue;
+    const weekDays = consecutiveWeekMaStacked(stock.bars, stock.price);
+    if (weekDays < 1) continue;
     const closes = stock.bars.map((bar) => bar.close);
-    if (!maRibbonOk(closes, closes.length - 1, stock.price)) continue;
-    const since = weekBars[weekBars.length - days]?.time ?? "";
+    const dayDays = consecutiveMaRibbonStackDays(closes, stock.price);
+    if (dayDays < 1) continue;
+    const since = weekBars[weekBars.length - weekDays]?.time ?? "";
     const boards = ribbonHitBoards(stock);
     const primary = boards.find((item) => isIndustryBoard(item.code)) ?? boards[0] ?? { code: "", name: "" };
     const hit: RibbonHit = {
       code: stock.code,
       name: stock.name,
-      days,
+      days: weekDays,
+      weekDays,
+      dayDays,
       since,
       price: stock.price ?? null,
       pct: stock.pct ?? null,
@@ -381,13 +407,14 @@ export function collectRibbonHits(
       best.set(hit.code, hit);
       continue;
     }
-    const keep = hit.days < prev.days ? hit : prev;
+    const keep = preferShorterRibbon(hit, prev);
     const merged = sortScreenerBoards([...prev.boards, ...hit.boards]);
     const home = merged.find((item) => isIndustryBoard(item.code)) ?? merged[0] ?? keep;
     best.set(hit.code, { ...keep, boards: merged, sector: home.name, sectorCode: home.code });
   }
   return [...best.values()].sort((a, b) => {
-    if (a.days !== b.days) return a.days - b.days;
+    if (a.weekDays !== b.weekDays) return a.weekDays - b.weekDays;
+    if (a.dayDays !== b.dayDays) return a.dayDays - b.dayDays;
     return a.name.localeCompare(b.name, "zh-CN");
   });
 }

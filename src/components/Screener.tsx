@@ -115,7 +115,7 @@ function HitTable({
   if (!items.length) {
     const scanningText = discovering
       ? "正在拉取行业成分股，扫到符合均线的股票会马上出现"
-      : "正在扫描，按周K MA4>MA7>MA10持续周数从短到长排";
+      : "正在扫描，先按周K排列周数、再按日K排列天数从短到长排";
     const idleText = "没有符合条件的结果";
     return <EmptyHint text={scanning ? scanningText : idleText} />;
   }
@@ -177,7 +177,10 @@ function HitTable({
                 {formatPrice(item.price, priceDigits(item.code, item.name))}
               </td>
               <td className={`num px-3 py-2 text-right ${toneClass(item.pct)}`}>{formatPct(item.pct)}</td>
-              <td className="num px-3 py-2 text-right">{item.standDays}周</td>
+              <td className="px-3 py-2 text-right text-[11px] leading-4 text-mute">
+                <div>持续周数:{item.weekDays}周</div>
+                <div>持续日K数:{item.dayDays}天</div>
+              </td>
               <td className="px-3 py-2">
                 <div className="flex flex-wrap gap-1">
                   {item.reasons.map((reason) => (
@@ -317,10 +320,10 @@ export default function Screener() {
 
       <section className="panel px-4 py-3">
         <div className="text-sm">
-          选股：不看板块概念是否红框，只筛选股价站上MA4，并且MA4&gt;MA7&gt;MA10，并且MA4、MA7、MA10大于上一日。并且周K线呈MA4&gt;MA7&gt;MA10排列。
+          选股：不看板块概念是否红框，只筛选股价站上MA4，并且日K线MA4&gt;MA7&gt;MA10，并且MA4、MA7、MA10大于上一日。并且周K线呈MA4&gt;MA7&gt;MA10排列。
         </div>
         <div className="mt-2 max-w-4xl text-xs leading-5 text-mute">
-          持续时间是周 K 呈 MA4&gt;MA7&gt;MA10 的连续周数，越短越靠前。当天还须股价站上MA4，日线 MA4&gt;MA7&gt;MA10，且 MA4、MA7、MA10 都比上一日高。扫行业和概念里的主板成分股。所属板块同时列出行业和概念，可点进板块页。不含科创板、创业板、北交所、ST。同一只股票只出现一次。
+          先按周 K 呈 MA4&gt;MA7&gt;MA10 的连续周数从短到长排，同周数再按日 K 呈 MA4&gt;MA7&gt;MA10（且站上MA4、三线向上）的连续天数从短到长排。扫行业和概念里的主板成分股。所属板块同时列出行业和概念，可点进板块页。不含科创板、创业板、北交所、ST。同一只股票只出现一次。
         </div>
       </section>
 
@@ -355,7 +358,7 @@ export default function Screener() {
           <div className="border-b border-line px-4 py-2 text-xs text-mute">
             {meta?.discovering
               ? "正在拉取行业成分股，边扫边显示。"
-              : "边扫边显示，按周K MA4>MA7>MA10持续周数从短到长排。"}{" "}
+              : "边扫边显示，先按周K排列周数、再按日K排列天数从短到长排。"}{" "}
             已扫 {meta?.scanned ?? 0}
             {meta?.universe ? `/${meta.universe}` : ""} · 命中 {hits.length}
           </div>
