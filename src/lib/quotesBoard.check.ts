@@ -1,10 +1,9 @@
 import { isForeignTencentCode, toTencentCode } from "./codes.ts";
 import {
   QUOTES_INSTRUMENTS,
-  dayWeekStandOnMa4,
   quotesInstrument,
-  sortQuotesByMa4Stand,
-  standsOnMa4,
+  sortQuotesByWeekStack,
+  weekMaStacked,
 } from "./quotesBoard.ts";
 import { parseSinaFuturesKline } from "./sources/sinaKlineParse.ts";
 import type { KBar } from "./types.ts";
@@ -76,27 +75,22 @@ function bars(closes: number[]): KBar[] {
   }));
 }
 
-assert(!standsOnMa4(bars([10, 11, 12])), "fewer than 4 bars cannot stand on MA4");
-assert(standsOnMa4(bars([10, 11, 12, 13])), "a rising 4th close stands on MA4");
-assert(!standsOnMa4(bars([10, 11, 12, 8])), "a close below MA4 is not standing");
-assert(standsOnMa4(bars([10, 10, 10, 10])), "close equal to MA4 still counts as standing");
+assert(!weekMaStacked(bars(Array.from({ length: 9 }, (_, i) => 10 + i))), "fewer than 10 weekly bars cannot stack MA10");
+assert(weekMaStacked(bars(Array.from({ length: 10 }, (_, i) => 10 + i))), "ten rising weekly closes stack MA4>MA7>MA10");
+assert(!weekMaStacked(bars(Array.from({ length: 10 }, () => 12))), "a flat weekly tape is not MA4>MA7>MA10");
 assert(
-  dayWeekStandOnMa4(bars([10, 11, 12, 13]), bars([20, 21, 22, 23])),
-  "day and week both on MA4 is a hit",
+  !weekMaStacked(bars(Array.from({ length: 10 }, (_, i) => 19 - i))),
+  "falling weekly closes are not MA4>MA7>MA10",
 );
-assert(
-  !dayWeekStandOnMa4(bars([10, 11, 12, 13]), bars([20, 21, 22, 10])),
-  "week off MA4 is not a hit",
-);
-assert(!dayWeekStandOnMa4(bars([10, 11, 12, 13]), null), "missing week bars is not a hit");
+assert(!weekMaStacked(null), "missing week bars is not a hit");
 
-const ranked = sortQuotesByMa4Stand(
+const ranked = sortQuotesByWeekStack(
   [{ code: "a" }, { code: "b" }, { code: "c" }, { code: "d" }],
   (item) => item.code === "c" || item.code === "a",
 );
 assert(
   ranked.map((item) => item.code).join("") === "acbd",
-  "standing codes a and c keep relative order and move in front of b and d",
+  "stacked codes a and c keep relative order and move in front of b and d",
 );
 
 console.log("quotes board checks passed");

@@ -27,28 +27,27 @@ export function quotesInstrument(code: string): QuotesInstrument | undefined {
   return QUOTES_INSTRUMENTS.find((item) => item.code.toLowerCase() === raw.toLowerCase());
 }
 
-function ma4At(closes: number[], index: number): number | null {
-  if (index < 3 || index >= closes.length) return null;
-  return (closes[index] + closes[index - 1] + closes[index - 2] + closes[index - 3]) / 4;
+function maAt(closes: number[], period: number, index: number): number | null {
+  if (index < period - 1 || index >= closes.length) return null;
+  let sum = 0;
+  for (let i = index - period + 1; i <= index; i += 1) sum += closes[i];
+  return sum / period;
 }
 
-/** 最新一根收盘是否站上该周期的 MA4。 */
-export function standsOnMa4(bars: KBar[] | null | undefined): boolean {
-  if (!bars || bars.length < 4) return false;
+/** 周 K 最新一根呈 MA4>MA7>MA10。 */
+export function weekMaStacked(bars: KBar[] | null | undefined): boolean {
+  if (!bars || bars.length < 10) return false;
   const closes = bars.map((bar) => bar.close);
   const last = closes.length - 1;
-  const ma4 = ma4At(closes, last);
-  return ma4 != null && ma4 > 0 && closes[last] >= ma4;
+  const ma4 = maAt(closes, 4, last);
+  const ma7 = maAt(closes, 7, last);
+  const ma10 = maAt(closes, 10, last);
+  return ma4 != null && ma7 != null && ma10 != null && ma4 > ma7 && ma7 > ma10;
 }
 
-/** 日 K、周 K 收盘都站上各自的 MA4。 */
-export function dayWeekStandOnMa4(day?: KBar[] | null, week?: KBar[] | null): boolean {
-  return standsOnMa4(day) && standsOnMa4(week);
-}
-
-/** 日周都站上 MA4 的排前面，其余保持原顺序。 */
-export function sortQuotesByMa4Stand<T>(items: readonly T[], standing: (item: T) => boolean): T[] {
-  const ranked = items.map((item, index) => ({ item, index, on: standing(item) }));
+/** 周 K 已呈 MA4>MA7>MA10 的排前面，其余保持原顺序。 */
+export function sortQuotesByWeekStack<T>(items: readonly T[], stacked: (item: T) => boolean): T[] {
+  const ranked = items.map((item, index) => ({ item, index, on: stacked(item) }));
   ranked.sort((a, b) => Number(b.on) - Number(a.on) || a.index - b.index);
   return ranked.map((row) => row.item);
 }
