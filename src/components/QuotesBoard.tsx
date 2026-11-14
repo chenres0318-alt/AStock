@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import {
   QUOTES_INSTRUMENTS,
-  dayWeekStandOnMa4,
-  sortQuotesByMa4Stand,
+  sortQuotesByWeekStack,
+  weekMaStacked,
   type QuotesInstrument,
 } from "@/lib/quotesBoard";
 import { formatPct, formatPrice, toneClass } from "@/lib/format";
@@ -54,7 +54,7 @@ function InstrumentCard({
         <div className="flex flex-wrap items-center gap-2">
           <h2 className={`text-sm ${stand ? "text-cyan" : "text-ink"}`}>{item.name}</h2>
           {stand ? (
-            <span className="rounded bg-bg px-1.5 py-0.5 text-[10px] text-cyan">日周站上MA4</span>
+            <span className="rounded bg-bg px-1.5 py-0.5 text-[10px] text-cyan">周K MA4&gt;MA7&gt;MA10</span>
           ) : null}
         </div>
         <div className="flex items-center gap-2">
@@ -143,15 +143,10 @@ export default function QuotesBoard() {
   }, [period]);
 
   const ordered = useMemo(
-    () =>
-      sortQuotesByMa4Stand(QUOTES_INSTRUMENTS, (item) =>
-        dayWeekStandOnMa4(loads[item.code]?.day?.bars, loads[item.code]?.week?.bars),
-      ),
+    () => sortQuotesByWeekStack(QUOTES_INSTRUMENTS, (item) => weekMaStacked(loads[item.code]?.week?.bars)),
     [loads],
   );
-  const standCount = ordered.filter((item) =>
-    dayWeekStandOnMa4(loads[item.code]?.day?.bars, loads[item.code]?.week?.bars),
-  ).length;
+  const standCount = ordered.filter((item) => weekMaStacked(loads[item.code]?.week?.bars)).length;
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-[1600px] flex-col gap-3 p-3">
@@ -160,7 +155,7 @@ export default function QuotesBoard() {
         <div>
           <div className="text-sm">行情：主要指数与商品的日 / 周 / 月 K 线</div>
           <div className="mt-1 text-xs text-mute">
-            金线为 MA4。日 K、周 K 收盘都站上 MA4 的用青色标出并排在前面
+            金线为 MA4。周 K 呈 MA4&gt;MA7&gt;MA10 的用青色标出并排在前面
             {standCount ? <span className="ml-1 text-cyan">· {standCount} 个</span> : null}。
           </div>
         </div>
@@ -181,7 +176,7 @@ export default function QuotesBoard() {
       </section>
       <div className="grid gap-3 lg:grid-cols-2">
         {ordered.map((item) => {
-          const stand = dayWeekStandOnMa4(loads[item.code]?.day?.bars, loads[item.code]?.week?.bars);
+          const stand = weekMaStacked(loads[item.code]?.week?.bars);
           return (
             <InstrumentCard
               key={item.code}
